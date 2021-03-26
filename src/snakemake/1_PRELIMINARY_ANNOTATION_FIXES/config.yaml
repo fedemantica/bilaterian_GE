@@ -1,0 +1,29 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  downloaded: "/users/mirimia/fmantica/projects/bilaterian_GE/downloaded"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  broccoli: "/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli"
+  database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
+  genome_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/genomes"
+  gtf_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref"
+  exint_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/exint/ref"
+
+tools:
+  broccoli_main: "/users/mirimia/fmantica/software/Broccoli-master-2/broccoli.py"
+  get_exint_fasta: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_exint_file.pl"
+  compute_prot_len: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/compute_prot_len.py"
+  mafft: "/users/mirimia/fmantica/software/src/MAFFT_V2.0/mafft.bat"
+  compute_prot_overlap: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/protein_overlap.py"
+  compute_sim_score: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/ProtSim_from_Aln.pl"
+  target_matched_portion: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/target_matched_portion.py"
+
+variables:
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  my_version: "BmA_version"
+  gene_num: ["two_genes", "more_genes"]
+  invertebrate_species: ["BmA", "Bge", "Eba"]
+  seqsim_cutoff: 0.3
+  human_match_cutoff: 0.25
