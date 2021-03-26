@@ -26,19 +26,19 @@ MY_MAFFT = config["tools"]["mafft"]
 COMPUTE_PROT_OVERLAP = config["tools"]["compute_prot_overlap"]
 COMPUTE_SIM_SCORE = config["tools"]["compute_sim_score"]
 TARGET_MATCH_PORTION = config["tools"]["target_matched_portion"]
+GET_CHIMERIC_CLUSTERS = config["tools"]["get_chimeric_clusters"]
+SPLIT_CLUSTERS = config["tools"]["split_clusters"]
+GET_SIM_SCORES_CHIMERIC = config["tools"]["get_sim_scores_chimeric"]
+GET_LONGEST_ALN = config["tools"]["get_longest_aln"]
+GET_EXON_POS_ALN = config["tools"]["get_exon_pos_aln"]
+GET_FIRST_LAST_EX_ALN = config["tools"]["get_first_last_ex_aln"]
+GET_EXCOORDS = config["tools"]["get_excoords"]
+GET_EX_PATH = config["tools"]["get_ex_path"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
 PARSED_ORTHOGROUPS=expand("{path}/{my_version}/parsed_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
-
-POTENTIALLY_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}_potentially_broken-step4.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES)
-HUMAN_BROKEN_PAIRS=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}_longest_human_pairs.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES)
-GENE_OVERLAP=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}/{category}-overlap.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES, category=["broken_genes", "longest_human"])
-COMBINED_INFO=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}/{category}-combined_info.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES, category=["broken_genes", "longest_human"])
-LONGEST_HUMAN_OVERLAP=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}-longest_human-interval_overlap.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES)
-FINAL_TABLE=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}-ALL_combined_info_tofilter.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES)
-FILTERED_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{gene_num}/{species}-ALL_combined_info_filtered.tab", path=BROCCOLI, my_version=MY_VERSION, gene_num=GENE_NUM, species=INVERTEBRATE_SPECIES)
-ALL_INFO_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{species}-ALL_combined_info_broken_genes.tab", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+ALL_INFO_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{species}-selected_broken_genes.tab", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
 
 ######### rules ################
 
@@ -46,13 +46,7 @@ rule all:
 	input:
 		RUN_BROCCOLI,
 		PARSED_ORTHOGROUPS, 
-		#POTENTIALLY_BROKEN_GENES,
-		#HUMAN_BROKEN_PAIRS,
-		#GENE_OVERLAP,
-		#COMBINED_INFO,
-		#FINAL_TABLE,
-		#FILTERED_BROKEN_GENES,
-		ALL_INFO_BROKEN_GENES
+		SELECTED_BROKEN_GENES
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -233,7 +227,7 @@ rule isolate_potential_broken:
 	input:
 		BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{species}_potentially_broken-step1.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step1.tab"
 	shell:
 		"""
 		cat {input} | awk '$1!="" && $2=="{wildcards.species}"' \
@@ -245,10 +239,10 @@ rule isolate_potential_broken:
 #select only those clusters where the genes are on the same chr and strand
 rule filter_by_chr_strand:
 	input:
-		clusters = BROCCOLI+"/{my_version}/broken_genes/{species}_potentially_broken-step1.tab",
+		clusters = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step1.tab",
 		extra_info = DATABASE+"/gene_extra_info/{species}_chr_strand.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{species}_potentially_broken-step2.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step2.tab"
 	run:
 		import pandas as pd
 		
@@ -279,11 +273,11 @@ rule filter_by_chr_strand:
 #select only those clusters where the genes on the same strand and chr are sequential
 rule check_sequentiality:
 	input:
-		clusters = BROCCOLI+"/{my_version}/broken_genes/{species}_potentially_broken-step2.tab",
+		clusters = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step2.tab",
 		coords = DATABASE+"/gene_extra_info/{species}_start_stop.tab",
 		strand = DATABASE+"/gene_extra_info/{species}_chr_strand.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{species}_potentially_broken-step3.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step3.tab"
 	run:
 
 		import pandas as pd
@@ -331,11 +325,11 @@ rule check_sequentiality:
 #4: genename
 rule filter_clusters_with_broken_genes:
 	input:
-		broken = BROCCOLI+"/{my_version}/broken_genes/{species}_potentially_broken-step3.tab",
+		broken = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step3.tab",
 		orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
 	output:
-		step4 = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_potentially_broken-step4.tab",
-		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_broken_genes_pairs.tab"
+		step4 = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step4.tab",
+		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes_pairs.tab"
 	run:
 		import pandas as pd
 		from collections import Counter
@@ -346,11 +340,12 @@ rule filter_clusters_with_broken_genes:
 		geneID_genename_dict = pd.Series(parsed_orthogroups.genename.values, index=parsed_orthogroups.geneID).to_dict()
  
 		cluster_gene_counts_dict = dict(Counter(list(input_df["clusterID"])))
+		clusters_to_save = [element for element in list(cluster_gene_counts_dict.keys()) if cluster_gene_counts_dict[element] >= 1] #select all the genes broken in 2 or more pieces
 		#list of clusters with only two or more broken genes within
-		if str(wildcards.gene_num) == "two_genes":
-		  clusters_to_save = [element for element in list(cluster_gene_counts_dict.keys()) if cluster_gene_counts_dict[element] == 1]
-		if str(wildcards.gene_num) == "more_genes":
-		  clusters_to_save = [element for element in list(cluster_gene_counts_dict.keys()) if cluster_gene_counts_dict[element] >= 2]
+		#if str(wildcards.gene_num) == "two_genes":
+		  #clusters_to_save = [element for element in list(cluster_gene_counts_dict.keys()) if cluster_gene_counts_dict[element] == 1]
+		#if str(wildcards.gene_num) == "more_genes":
+		  #clusters_to_save = [element for element in list(cluster_gene_counts_dict.keys()) if cluster_gene_counts_dict[element] >= 2]
 		#filter only for clusters with given number of broken genes
 		final_df = input_df.loc[input_df.clusterID.isin(clusters_to_save)]
 		final_df = final_df[["clusterID", "gene1", "gene2"]]
@@ -371,10 +366,10 @@ rule filter_clusters_with_broken_genes:
 #For all the combinations of broken genes and human ones. 
 rule broken_human_genes_pairs:
 	input:
-		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_potentially_broken-step4.tab",
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step4.tab",
 		clusters = BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_broken_human_pairs.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_human_pairs.tab"
 	run:
 		import pandas as pd
 		import itertools
@@ -402,10 +397,10 @@ rule broken_human_genes_pairs:
 
 rule filter_longest_human_pairs:
 	input:
-		human_pairs = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_broken_human_pairs.tab",
+		human_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_human_pairs.tab",
 		prot_length = DATABASE+"/gene_extra_info/Hs2_ref_proteins_lengths"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_longest_human_pairs.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human_pairs.tab"
 	run:
 		import pandas as pd
 
@@ -436,9 +431,9 @@ rule filter_longest_human_pairs:
 rule control_genes_pairs:
 	input:
 		clusters = BROCCOLI+"/{my_version}/parsed_orthogroups.txt",
-		potentially_broken = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_potentially_broken-step4.tab"
+		potentially_broken = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step4.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_control_genes_pairs.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-control_genes_pairs.tab"
 	run:
 		import pandas as pd
 
@@ -466,13 +461,13 @@ rule control_genes_pairs:
 ######### Alignments
 rule perform_alignment:
 	input:
-		pairs = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_{category}_pairs.tab",
+		pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}_pairs.tab",
 		fasta = EXINT_REF_DIR+"/{species}_ref_exint.fasta",
 		fasta_hsa = EXINT_REF_DIR+"/Hs2_ref_exint.fasta"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/alingments_check_{category}.txt"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_{category}.txt"
 	params:
-		out_dir = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}"
+		out_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/{category}"
 	shell:
 		"""
 		if [[ ! -d {params.out_dir} ]]; then \
@@ -498,11 +493,11 @@ rule perform_alignment:
 #Here I will have a file for category: 
 rule compute_similarity_scores:
 	input:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/alingments_check_{category}.txt"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_{category}.txt"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}-similarity_scores.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-similarity_scores.tab"
 	params:
-		input_dir = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}"
+		input_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/{category}"
 	shell:
 		"""
 		for file in $(ls {params.input_dir}); do \
@@ -511,11 +506,11 @@ rule compute_similarity_scores:
 
 rule compute_percentage_overlap:
 	input:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/alingments_check_{category}.txt"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_{category}.txt"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}-overlap.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-overlap.tab"
 	params:
-		input_dir = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}"
+		input_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/{category}"
 	shell:
 		"""
 		for file in $(ls {params.input_dir}); do \
@@ -525,11 +520,11 @@ rule compute_percentage_overlap:
 #This is only for the comparison with the longest human protein
 rule compute_human_overlap:
 	input:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/alingments_check_longest_human.txt"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_longest_human.txt"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/longest_human-interval_overlap.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/longest_human-interval_overlap.tab"
 	params:
-		input_dir = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/longest_human"
+		input_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/longest_human"
 	conda:
 		CONDA_ENVS+"/broccoli_1.2.yml"
 	shell:
@@ -550,11 +545,11 @@ rule compute_human_overlap:
 
 rule combine_information:
 	input:
-		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_{category}_pairs.tab",
-		sim_scores = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}-similarity_scores.tab",
-		overlap = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}-overlap.tab"
+		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}_pairs.tab",
+		sim_scores = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-similarity_scores.tab",
+		overlap = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-overlap.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/{category}-combined_info.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-combined_info.tab"
 	run:
 		import pandas as pd
 
@@ -582,11 +577,11 @@ rule combine_information:
 ###### Combine info human comparison
 rule combine_info_longest_human:
 	input:
-		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_broken_genes_pairs.tab",
-		longest_human = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}_longest_human_pairs.tab",
-                interval_overlap = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/longest_human-interval_overlap.tab" 
+		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes_pairs.tab",
+		longest_human = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human_pairs.tab",
+                interval_overlap = BROCCOLI+"/{my_version}/broken_genes/{species}/longest_human-interval_overlap.tab" 
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}-longest_human-interval_overlap.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human-interval_overlap.tab"
 	run:
 		import pandas as pd
 
@@ -649,10 +644,10 @@ rule combine_info_longest_human:
 
 rule join_broken_and_longest_human_info:
 	input:
-		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}/broken_genes-combined_info.tab",
-		longest_human = BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}-longest_human-interval_overlap.tab"
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes-combined_info.tab",
+		longest_human = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human-interval_overlap.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}-ALL_combined_info_tofilter.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_tofilter.tab"
 	run:
 		import pandas as pd
 
@@ -685,9 +680,9 @@ rule join_broken_and_longest_human_info:
 
 rule select_potentially_broken_genes:
 	input:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}-ALL_combined_info_tofilter.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_tofilter.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{gene_num}/{species}-ALL_combined_info_filtered.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_filtered.tab"
 	shell:
 		"""
 		cat {input} | awk '($4<={SEQSIM_CUTOFF} || $5 <={SEQSIM_CUTOFF}) && $6<={HUMAN_MATCH_CUTOFF}' > {output}
@@ -695,15 +690,15 @@ rule select_potentially_broken_genes:
 
 rule join_potentially_broken_genes_by_species:
 	input:
-		two_genes = BROCCOLI+"/{my_version}/broken_genes/two_genes/{species}-ALL_combined_info_filtered.tab",
-		more_genes = BROCCOLI+"/{my_version}/broken_genes/more_genes/{species}-ALL_combined_info_filtered.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_filtered.tab",
+		#more_genes = BROCCOLI+"/{my_version}/broken_genes/more_genes/{species}-ALL_combined_info_filtered.tab"
 	output:
-		BROCCOLI+"/{my_version}/broken_genes/{species}-ALL_combined_info_broken_genes.tab"
+		BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab"
 	run:
 		import pandas as pd
 
-		two_broken_df = pd.read_table(str(input.two_genes), sep="\t", index_col=False, header=None, names=["clusterID", "gene_pairs", "hsa_gene", "geneID1_sim_score", "geneID2_sim_score", "match_overlap_proportion"])
-		more_broken_df = pd.read_table(str(input.more_genes), sep="\t", index_col=False, header=None, names=["clusterID", "gene_pairs", "hsa_gene", "geneID1_sim_score", "geneID2_sim_score", "match_overlap_proportion"])
+		#two_broken_df = pd.read_table(str(input.two_genes), sep="\t", index_col=False, header=None, names=["clusterID", "gene_pairs", "hsa_gene", "geneID1_sim_score", "geneID2_sim_score", "match_overlap_proportion"])
+		more_broken_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["clusterID", "gene_pairs", "hsa_gene", "geneID1_sim_score", "geneID2_sim_score", "match_overlap_proportion"])
 		#join genes on the "more" side
 		more_broken_df["geneID1"] = [element.split(";")[0] for element in list(more_broken_df["gene_pairs"])]
 		more_broken_df["geneID2"] = [element.split(";")[1] for element in list(more_broken_df["gene_pairs"])]	
@@ -730,7 +725,7 @@ rule join_potentially_broken_genes_by_species:
 		      final_group = group["gene_pairs"]
 		  final_df = pd.concat([final_df, final_group])
 		#join more and two genes in the same dataframe
-		final_df = pd.concat([final_df, two_broken_df["gene_pairs"]])
+		#final_df = pd.concat([final_df, two_broken_df["gene_pairs"]])
 		#save df to final file
 		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
 
@@ -853,3 +848,9 @@ rule join_potentially_broken_genes_by_species:
 #		"""
 #		perl {EX_PATH} {input.chimeric_clusters} {input.combined_pos} {input.first_last} {output.main} > {output.stats}
 #		"""
+#
+#		LONGEST_ALN
+#		EXON_POS_ALN
+#		FIRST_LAST_EX_ALN
+#		EXCOORDS
+#		EX_PATH
