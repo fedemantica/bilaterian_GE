@@ -21,13 +21,13 @@ tools:
   target_matched_portion: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/target_matched_portion.py"
   get_chimeric_clusters: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/Get_chimeric_GCLs.pl"
   split_clusters: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/split_cluster_file.pl"
-  get_chimeric_clusters: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/Get_chimeric_GCLs.pl"
   get_sim_scores_chimeric: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_aln_target_gene_v2.pl"
   get_longest_aln: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_longest_aln.pl"
   get_exon_pos_aln: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_exon_pos_aln.pl"
   get_first_last_ex_aln: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_first_last_exaln.pl"
   get_excoords: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_excoords.pl"
   get_ex_path: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_ex_path.pl"
+  get_aa_position: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_aa_pos_exon.pl"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]

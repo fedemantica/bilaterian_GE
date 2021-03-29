@@ -17,6 +17,8 @@ GENE_NUM = config["variables"]["gene_num"]
 SEQSIM_CUTOFF = config["variables"]["seqsim_cutoff"]
 HUMAN_MATCH_CUTOFF = config["variables"]["human_match_cutoff"]
 
+ALL_CLUSTERS_PART = list(range(1,5))
+
 
 ######### tools ################
 BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
@@ -34,11 +36,19 @@ GET_EXON_POS_ALN = config["tools"]["get_exon_pos_aln"]
 GET_FIRST_LAST_EX_ALN = config["tools"]["get_first_last_ex_aln"]
 GET_EXCOORDS = config["tools"]["get_excoords"]
 GET_EX_PATH = config["tools"]["get_ex_path"]
+GET_AA_POSITIONS = config["tools"]["get_aa_position"]
+
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
 PARSED_ORTHOGROUPS=expand("{path}/{my_version}/parsed_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
-ALL_INFO_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{species}-selected_broken_genes.tab", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+SELECTED_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{species}-selected_broken_genes.tab", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+
+#Chimeric genes: the difference here is that it runs for all species
+CHIMERIC_CLUSTERS = expand("{path}/{my_version}/chimeric_proteins/splitted_clusters/part_1_clusters.txt", path=BROCCOLI, my_version=MY_VERSION)
+CHIMERIC_PROT_SIM_SCORES = expand("{path}/{my_version}/chimeric_proteins/sim_scores/scores_part_{part}.txt", path=BROCCOLI, my_version=MY_VERSION, part=ALL_CLUSTERS_PART)
+LONGEST_FRAGMENT = expand("{path}/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab", path=BROCCOLI, my_version=MY_VERSION)
+COMBINED_EX_POS_INFO = expand("{path}/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 
 ######### rules ################
 
@@ -46,7 +56,11 @@ rule all:
 	input:
 		RUN_BROCCOLI,
 		PARSED_ORTHOGROUPS, 
-		SELECTED_BROKEN_GENES
+		SELECTED_BROKEN_GENES,
+		CHIMERIC_CLUSTERS,
+		CHIMERIC_PROT_SIM_SCORES,
+		LONGEST_FRAGMENT,
+		COMBINED_EX_POS_INFO
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -641,7 +655,6 @@ rule combine_info_longest_human:
 #5	geneID1_sim_score (geneID1 vs geneID2)
 #6	geneID2_sim_score (geneID2 vs geneID1)
 #7	matched proportion
-
 rule join_broken_and_longest_human_info:
 	input:
 		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes-combined_info.tab",
@@ -733,124 +746,165 @@ rule join_potentially_broken_genes_by_species:
 ###############################################
 ########### CHIMERIC GENES  ###################
 ###############################################
+#preliminary files
+#Get files with AA positions for each species
+rule geneID_refproteinID:
+	input:
+		GTF_ref = GTF_REF_DIR+"/{species}_annot-B.gtf"
+	output:
+		DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"
+	run:
+		import pandas as pd
+		import re
+
+		my_gtf = pd.read_table(str(input), sep="\t", header=None)
+		my_gtf_subset = my_gtf.iloc[:,my_gtf.shape[1]-1]
+		#filter only the lines containing prot ID
+		my_gtf_subset = my_gtf_subset[my_gtf_subset.str.contains("protein_id")]  
+		#get gene ids list
+		my_raw_gene_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "gene_id" in part]
+		my_gene_id = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in my_raw_gene_id]
+		#get protein id list
+		my_raw_prot_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "protein_id" in part]
+		my_prot_id = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in my_raw_prot_id]
+		final_df = pd.concat([pd.Series(my_gene_id), pd.Series(my_prot_id)], axis=1)
+		final_df = final_df.drop_duplicates()
+		final_df.to_csv(str(output), sep="\t", header=False, index=False)
+
+rule aa_position:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+		ref_proteins = DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"		
+	output:
+		DATABASE+"/aa_position/{species}_refprots_exons_pos.tab"
+	params:
+		out_dir = DATABASE+"/aa_position"
+	shell:
+		"""
+		mkdir -p {params.out_dir}; \
+		perl {GET_AA_POSITIONS} -GTF {input.gtf} -i {input.ref_proteins} -out {output}
+		"""
 
 ###### Keep the chimeric proteins only in the cluster with which it gets a higher similarity score in the multiple alignment.
+rule get_chimeric_clusters:
+	input:
+		BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab"
+	shell:
+		"""
+		perl {GET_CHIMERIC_CLUSTERS} {input} > {output}
+		"""
 
-#rule get_chimeric_clusters:
-#	input:
-#		BROCCOLI_20+"/{my_version}/parsed_orthogroups.txt"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab"
-#	shell:
-#		"""
-#		perl {GET_CHIMERIC_CLUSTERS} {input} > {output}
-#		"""
-#
 ##divide chimeric clusters in groups of 10
 ##the last argument is a directory
-#rule divide_chimeric_clusters:
-#	input:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/splitted_clusters/part_1_clusters.txt"
-#	params:
-#		out_dir=BROCCOLI_20+"/{my_version}/chimeric_proteins/splitted_clusters"
-#	shell:
-#		"""
-#		perl {SPLIT_CLUSTERS} {input} 10 {params.out_dir}
-#		"""
-#
+rule divide_chimeric_clusters:
+	input:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/splitted_clusters/part_1_clusters.txt"
+	params:
+		out_dir = BROCCOLI+"/{my_version}/chimeric_proteins/splitted_clusters"
+	shell:
+		"""
+		perl {SPLIT_CLUSTERS} {input} 10 {params.out_dir}
+		"""
+
 ##Get the scores for the chimeric proteins.
-##see ALL_CLUSTERS_PART variable.
-#rule chimeric_protein_sim_scores:
-#	input:
-#		part_file = BROCCOLI_20+"/{my_version}/chimeric_proteins/splitted_clusters/part_{part}_clusters.txt",
-#		ref_exint_dir = BROCCOLI_20+"/proteins_fasta/exint/ref"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/sim_scores/Scores_part_{part}.txt"
-#	params:
-#		out_dir = BROCCOLI_20+"/{my_version}/chimeric_proteins/sim_scores"
-#	shell:
-#		"""
-#		cd {params.out_dir}; \
-#		perl {SIM_SCORES_CHIMERIC} {input.part_file} {input.ref_exint_dir} {wildcards.part} {output}
-#		"""
-#
+##see ALL_CLUSTERS_PART variable (this will have to change)
+#ALL_CLUSTERS_PART=glob.wildcards(BROCCOLI+"/{my_version}/chimeric_proteins/splitted_clusters/part_*_clusters.txt")
+ALL_CLUSTERS_PART = list(range(1,5))
+#The exint ref dir really has to change
+rule chimeric_protein_sim_scores:
+	input:
+		part_file = BROCCOLI+"/{my_version}/chimeric_proteins/splitted_clusters/part_{part}_clusters.txt",
+		#ref_exint_dir = BROCCOLI+"/proteins_fasta/exint/ref"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/sim_scores/scores_part_{part}.txt"
+	params:
+		out_dir = BROCCOLI+"/{my_version}/chimeric_proteins/sim_scores"
+	shell:
+		"""
+		cd {params.out_dir}; \
+		perl {GET_SIM_SCORES_CHIMERIC} {input.part_file} {EXINT_REF_DIR} {wildcards.part} {output}
+		"""
+
 ##join all the scores generated for each part
-#
-#rule join_scores:
-#	input:
-#		expand("{path}/{my_version}/chimeric_proteins/sim_scores/Scores_part_{part}.txt", path=DATA, my_version=MY_VERSIONS, part=ALL_CLUSTERS_PART)
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/sim_scores/All_scores_chimeric_prots.tab"
-#	shell:
-#		"""
-#		cat {input} | sort -k2,2 > {output}
-#		"""
-#
-##get the longest fragment of aligned aa
-#rule get_longest_fragment:
-#	input:
-#		chimeric_clusters = BROCCOLI_20+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
-#		scores = BROCCOLI_20+"/{my_version}/chimeric_proteins/sim_scores/All_scores_chimeric_prots.tab"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab"
-#	shell:
-#		"""
-#		perl {LONGEST_ALN} {input.chimeric_clusters} {input.scores} {output}
-#		"""
-#
-##Getting the position of the alignment in the exons of the chimeric genes
-#rule exons_pos_aln:
-#	input:
-#		aa_pos_dir = BROCCOLI_20+"/proteins_db/aa_position",
-#		chimeric_clusters = BROCCOLI_20+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
-#		longest_fg = BROCCOLI_20+"/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Exon_pos_in_aln.tab"
-#	shell:
-#		"""
-#		perl {EXON_POS_ALN} {input.aa_pos_dir} {input.chimeric_clusters} {input.longest_fg} {output}
-#		"""
-#
+rule join_scores:
+	input:
+		expand("{path}/{my_version}/chimeric_proteins/sim_scores/scores_part_{part}.txt", path=BROCCOLI, my_version=MY_VERSION, part=ALL_CLUSTERS_PART)
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/sim_scores/All_scores_chimeric_prots.tab"
+	shell:
+		"""
+		cat {input} | sort -k2,2 > {output}
+		"""
+
+##Get the longest fragment of aligned aa
+rule get_longest_fragment:
+	input:
+		chimeric_clusters = BROCCOLI+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
+		scores = BROCCOLI+"/{my_version}/chimeric_proteins/sim_scores/All_scores_chimeric_prots.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab"
+	shell:
+		"""
+		perl {GET_LONGEST_ALN} {input.chimeric_clusters} {input.scores} {output}
+		"""
+
+##Getting the position in the alignment of the exons of the chimeric genes
+rule exons_pos_aln:
+	input:
+		all_pos = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES),
+		chimeric_clusters = BROCCOLI+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
+		longest_fg = BROCCOLI+"/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Exon_pos_in_aln.tab"
+	params:
+		aa_pos_dir = DATABASE+"/aa_position/" #ugly as hell, it will have to change
+	shell:
+		"""
+		perl {GET_EXON_POS_ALN} {params.aa_pos_dir} {input.chimeric_clusters} {input.longest_fg} {output}
+		"""
+
 ##Getting first and last exons of each fragments
-#rule first_last_exon_in_fg:
-#	input:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Exon_pos_in_aln.tab"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
-#	shell:
-#		"""
-#		perl {FIRST_LAST_EX_ALN} {input} {output}
-#		"""
-#
+rule first_last_exon_in_fg:
+	input:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Exon_pos_in_aln.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
+	shell:
+		"""
+		perl {GET_FIRST_LAST_EX_ALN} {input} {output}
+		"""
+
 ##Putting together all the fragments for each chimeric genes and getting the exon coords
-#rule combine_exon_pos_info:
-#	input:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
-#	output:
-#		BROCCOLI_20+"/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab"
-#	shell:
-#		"""
-#		perl {EXCOORDS} {input} {output}
-#		"""
-#
+rule combine_exon_pos_info:
+	input:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab"
+	shell:
+		"""
+		perl {GET_EXCOORDS} {input} {output}
+		"""
+
 ##Getting the final fragments for each chimeric gene
-#rule final_info_chimeric_genes:
-#	input:
-#		chimeric_clusters = BROCCOLI_20+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
-#		combined_pos = BROCCOLI_20+"/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab",
-#		first_last = BROCCOLI_20+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
-#	output:
-#		main = BROCCOLI_20+"/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab",
-#		stats = BROCCOLI_20+"/{my_version}/chimeric_proteins/Final_fragments_chim_genes_stats.txt"
-#	shell:
-#		"""
-#		perl {EX_PATH} {input.chimeric_clusters} {input.combined_pos} {input.first_last} {output.main} > {output.stats}
-#		"""
-#
-#		LONGEST_ALN
-#		EXON_POS_ALN
-#		FIRST_LAST_EX_ALN
-#		EXCOORDS
-#		EX_PATH
+rule final_info_chimeric_genes:
+	input:
+		chimeric_clusters = BROCCOLI+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
+		combined_pos = BROCCOLI+"/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab",
+		first_last = BROCCOLI+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
+	output:
+		main = BROCCOLI+"/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab",
+		stats = BROCCOLI+"/{my_version}/chimeric_proteins/Final_fragments_chim_genes_stats.txt"
+	shell:
+		"""
+		perl {GET_EX_PATH} {input.chimeric_clusters} {input.combined_pos} {input.first_last} {output.main} > {output.stats}
+		"""
+
+##############################################
+############ Correct gtf #####################
+##############################################
+#Correct the gtf taking into account the broken and the chimeric genes
+
