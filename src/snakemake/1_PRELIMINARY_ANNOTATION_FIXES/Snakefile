@@ -27,12 +27,10 @@ import pandas as pd
 chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/chimeric_orthogroups.tab"
 if os.path.isfile(chimeric_protein_file):
   chimeric_genes_df = pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)
-  chimeric_genes = chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]
-  #chimeric_genes = list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"])
-  #n = 50
-  #chimeric_genes_batches = [chimeric_genes[i*n: (i+1)*n] for i in  range((len(chimeric_genes)))] #create batches of 50 chimeric genes
-  CHIMERIC_GENES = [",".join(list(set(list(chimeric_genes_df["geneID"])))[0:10])] #testing only for the first 10 chimeric genes
-  print(CHIMERIC_GENES)
+  chimeric_genes = list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]["geneID"])
+  n = 70 #generate batches of 50 chimeric genes
+  chimeric_genes_batches = [chimeric_genes[i:i+n] for i in range(0, len(chimeric_genes), n)]
+  CHIMERIC_GENES = [[",".join(element)] for element in chimeric_genes_batches]
   CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES)))
 
 ######### tools ################
