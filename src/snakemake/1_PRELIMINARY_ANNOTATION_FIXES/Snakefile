@@ -17,8 +17,15 @@ GENE_NUM = config["variables"]["gene_num"]
 SEQSIM_CUTOFF = config["variables"]["seqsim_cutoff"]
 HUMAN_MATCH_CUTOFF = config["variables"]["human_match_cutoff"]
 
-ALL_CLUSTERS_PART = list(range(1,5))
+ALL_CLUSTERS_PART = list(range(1,5)) #This refers to the old chimeric genes pipeline. Probably to be removed.
 
+import os
+import re
+import pandas as pd
+chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/dir_step3/chimeric_proteins.txt"
+if os.path.isfile(chimeric_protein_file):
+  CHIMERIC_GENES = list(pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)["protein_name"])[0:10] #testing only for the first 10 chimeric genes 
+  CHIMERIC_GENES = [re.sub(".*\|", "", element) for element in CHIMERIC_GENES]
 
 ######### tools ################
 BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
@@ -37,7 +44,7 @@ GET_FIRST_LAST_EX_ALN = config["tools"]["get_first_last_ex_aln"]
 GET_EXCOORDS = config["tools"]["get_excoords"]
 GET_EX_PATH = config["tools"]["get_ex_path"]
 GET_AA_POSITIONS = config["tools"]["get_aa_position"]
-
+ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -49,7 +56,8 @@ CHIMERIC_CLUSTERS = expand("{path}/{my_version}/chimeric_proteins/splitted_clust
 CHIMERIC_PROT_SIM_SCORES = expand("{path}/{my_version}/chimeric_proteins/sim_scores/scores_part_{part}.txt", path=BROCCOLI, my_version=MY_VERSION, part=ALL_CLUSTERS_PART)
 LONGEST_FRAGMENT = expand("{path}/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab", path=BROCCOLI, my_version=MY_VERSION)
 COMBINED_EX_POS_INFO = expand("{path}/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab", path=BROCCOLI, my_version=MY_VERSION)
-
+CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups.tab", path=BROCCOLI, my_version=MY_VERSION)
+MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
 ######### rules ################
 
 rule all:
@@ -60,7 +68,9 @@ rule all:
 		CHIMERIC_CLUSTERS,
 		CHIMERIC_PROT_SIM_SCORES,
 		LONGEST_FRAGMENT,
-		COMBINED_EX_POS_INFO
+		COMBINED_EX_POS_INFO,
+		CHIMERIC_OG,
+		MULTIPLE_ALN
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -100,7 +110,8 @@ rule run_broccoli_20_species:
 		expand("{path}/{my_version}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, my_version=MY_VERSION, species=ALL_SPECIES)
 	output:
 		BROCCOLI+"/{my_version}/dir_step3/orthologous_groups.txt",
-		BROCCOLI+"/{my_version}/dir_step4/orthologous_pairs.txt"
+		BROCCOLI+"/{my_version}/dir_step4/orthologous_pairs.txt",
+		BROCCOLI+"/{my_version}/dir_step3/chimeric_proteins.txt"
 	params:
 		working_dir = BROCCOLI+"/{my_version}",
 		fasta_dir = BROCCOLI+"/{my_version}/fastas"
@@ -743,8 +754,85 @@ rule join_potentially_broken_genes_by_species:
 		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
 
 
-###############################################
+
+##############################################
 ########### CHIMERIC GENES  ###################
+###############################################
+
+#Header output
+#1. clusterID
+#2. species
+#3. geneID
+#4. label: CHIMERIC/NOT_CHIMERIC
+#The chimeric genes are simply the ones which appear in more OGs.
+rule isolate_chimeric_orthogroups:
+	input:
+		BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		chimeric_OG = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+		potentially_fused = BROCCOLI+"/{my_version}/chimeric_proteins/potentially_fused_orthogroups.tab"
+	run:
+		import pandas as pd
+		import collections
+		
+		OG_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "species", "geneID", "geneName"]) #read input.
+		chimeric_genes = [element for element, my_count in collections.Counter(list(OG_df["geneID"])).items() if my_count >= 2] #isolate genes shared between two or more OGs.
+		chimeric_OGs = list(OG_df[OG_df["geneID"].isin(chimeric_genes)]["OG_ID"]) #generate a list of OG_IDs containing the chimeric genes.
+		chimeric_OGs_df = OG_df[OG_df["OG_ID"].isin(chimeric_OGs)] #filter the original df with those OG_IDs.
+		chimeric_OGs_df["chimeric_label"] = ["chimeric" if element in chimeric_genes else "not_chimeric" for element in list(chimeric_OGs_df["geneID"])] #add chimeric gene label.
+		#isolate OGs with chimeric genes coming from more than one species.
+		chimeric_OGs_list = list(chimeric_OGs_df[chimeric_OGs_df["chimeric_label"]=="chimeric"][["OG_ID", "species"]].drop_duplicates()["OG_ID"])
+		pot_fused_OG_list = [element for element, my_count in collections.Counter(chimeric_OGs_list).items() if my_count >=2] #In the same OG, there are chimeric genes from at least two species.
+		#The genes from the different species have to be shared between the same OGs.
+		pot_fused_chimeric_genes_df = chimeric_OGs_df[(chimeric_OGs_df["chimeric_label"]=="chimeric") & (chimeric_OGs_df["OG_ID"].isin(pot_fused_OG_list))]
+		grouped_df = pot_fused_chimeric_genes_df.groupby("geneID")
+		chimeric_gene_OG_dict = {}
+		for gene, group in grouped_df:
+		  chimeric_gene_OG_dict[gene] = tuple(sorted(list(group["OG_ID"])))
+		duplicated_OGs_full = [list(element) for element, my_count in collections.Counter(list(chimeric_gene_OG_dict.values())).items() if my_count >=2] #these are the OG containing the exact same chimeric genes from more species
+		duplicated_OGs_flatten = [OG_ID for element in duplicated_OGs_full for OG_ID in element]
+		final_chimeric_OGs_df = chimeric_OGs_df[~(chimeric_OGs_df["OG_ID"].isin(duplicated_OGs_flatten))]
+		final_pot_fused_chimeric_OGs_df = chimeric_OGs_df[chimeric_OGs_df["OG_ID"].isin(duplicated_OGs_flatten)]
+		#save to output file
+		final_chimeric_OGs_df.to_csv(str(output.chimeric_OG), sep="\t", index=False, header=True, na_rep="NA")
+		final_pot_fused_chimeric_OGs_df.to_csv(str(output.potentially_fused), sep="\t", index=False, header=True, na_rep="NA")
+
+#Generate the multiple alignments within the clusters containing each chimeric gene
+#Input header: OG_ID, species, geneID, geneName, chimeric_label
+rule generate_multiple_alignments:
+	input:
+		chimeric_OG = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+		fastas = expand("{path}/{{my_version}}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, species=ALL_SPECIES)
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln"
+	params:
+		fastas_dir = BROCCOLI+"/{my_version}/fastas"
+	conda:
+		CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:
+		"""
+		python {ALIGN_CHIMERIC_OG} --input_fasta {params.fastas_dir} --input_OG {input.chimeric_OG} --chimeric_gene {wildcards.chimeric_gene} --mafft {MY_MAFFT} --output {output} 
+		"""	
+
+#I need to extract the portion of the chimeric gene which aligns with the other genes in the orthogroup
+#NB: for all the orthogroups in which a chimeric gene is contained.
+#Header of the potential output:
+#1. chimeric geneID
+#2. orthogroupID
+#3. first AA in the chimeric gene aligned with at least 20% of the other genes in the orthogroup.
+#4. last AA in the chimetic gene aligned with at least 20% of the other genes in the orthogroup.
+#5. Exon num of the chimeric gene in which the first aligned AA falls.
+#6. Exon num of the chimeric gene in which the last aligned AA falls.
+rule extract_aln_overlap:
+	input:
+		expand("{path}/{{my_version}}/chimeric_proteins/multiple_aln/{chimeric_gene}_multiple_aln", path=BROCCOLI, chimeric_gene=CHIMERIC_GENES)
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/overlapping_fragments"
+	run:
+		import pandas as pd
+
+###############################################
+########### CHIMERIC GENES OLD ################
 ###############################################
 #preliminary files
 #Get files with AA positions for each species

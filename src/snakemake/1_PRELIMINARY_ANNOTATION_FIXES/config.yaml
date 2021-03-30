@@ -28,6 +28,7 @@ tools:
   get_excoords: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_excoords.pl"
   get_ex_path: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_ex_path.pl"
   get_aa_position: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_aa_pos_exon.pl"
+  align_chimeric_OG: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/align_chimeric_OG.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
