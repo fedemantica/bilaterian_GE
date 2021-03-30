@@ -27,11 +27,11 @@ import pandas as pd
 chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/chimeric_orthogroups.tab"
 if os.path.isfile(chimeric_protein_file):
   chimeric_genes_df = pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)
-  chimeric_genes = list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]["geneID"])
-  n = 70 #generate batches of 50 chimeric genes
+  chimeric_genes = list(set(list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]["geneID"]))) #remove duplicates
+  n = 50 #generate batches of 50 chimeric genes
   chimeric_genes_batches = [chimeric_genes[i:i+n] for i in range(0, len(chimeric_genes), n)]
   CHIMERIC_GENES = [[",".join(element)] for element in chimeric_genes_batches]
-  CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES)))
+  CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES))) #number of batches, to use as index
 
 ######### tools ################
 BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
@@ -826,7 +826,7 @@ rule generate_multiple_alignments:
 	shell:
 		"""
 		python {ALIGN_CHIMERIC_OG} --input_fasta {params.fastas_dir} --input_OG {input.chimeric_OG} --chimeric_genes {params.chimeric_genes} --mafft {MY_MAFFT} --output {params.output_dir}; \
-		echo -e "Performed multiple alignments for the orthogroups of the following genes:\n{params.chimeric_genes}" > {output}
+		echo -e "Performed multiple alignments for the orthogroups of the following chimeric genes:\n{params.chimeric_genes}" > {output}
 		"""	
 
 #I need to extract the portion of the chimeric gene which aligns with the other genes in the orthogroup
@@ -840,9 +840,11 @@ rule generate_multiple_alignments:
 #6. Exon num of the chimeric gene in which the last aligned AA falls.
 rule extract_aln_overlap:
 	input:
-		#expand("{path}/{{my_version}}/chimeric_proteins/multiple_aln/{chimeric_gene}_multiple_aln", path=BROCCOLI, chimeric_gene=CHIMERIC_GENES)
+		
 	output:
 		BROCCOLI+"/{my_version}/chimeric_proteins/overlapping_fragments"
+	params:
+		chimeric_gene = lambda wildcards:
 	run:
 		import pandas as pd
 

@@ -8,7 +8,9 @@ import argparse
 from Bio import SeqIO
 import pandas as pd
 import re
+import os
 import glob
+
 import subprocess
 
 parser = argparse.ArgumentParser(description="Generate multiple alignments among all the proteins in an orthogroup containing chimeric genes")
@@ -40,7 +42,6 @@ for my_file in all_fastas_files: #cycle on all the fasta files
   all_fastas_entries = all_fastas_entries+my_fasta
 
 for my_chimeric_gene in my_chimeric_genes:
-  print(my_chimeric_gene) 
   my_OG_IDs = list(set(list(chimeric_OG_df[chimeric_OG_df["geneID"]==my_chimeric_gene]["OG_ID"])))
   for my_OG_ID in my_OG_IDs:
     OG_df = chimeric_OG_df[chimeric_OG_df["OG_ID"]==my_OG_ID]
@@ -48,12 +49,17 @@ for my_chimeric_gene in my_chimeric_genes:
     OG_genes = list(OG_df["geneID"])
     fastas_entries = [element for element in all_fastas_entries if element.id in OG_genes]
     #save fastas entries to temporary file
-    with open('input_fasta_tmp.fa', 'w') as input_to_aln:
+    input_temp = my_chimeric_gene+"-"+my_OG_ID+"-input_fasta_tmp.fa"
+    with open(input_temp, "w") as input_to_aln:
       SeqIO.write(fastas_entries, input_to_aln, "fasta")
+    input_to_aln.close()
     #call shell command to run the mafft alignment
     my_command = "%s --quiet --retree 2 --localpair --maxiterate 1000 input_fasta_tmp.fa > %s/%s-%s-multiple_aln" % (my_mafft, my_output, my_chimeric_gene, my_OG_ID)
     print(my_command) #this is just to know what has been run.
     output_file =  "%s/%s-%s-multiple_aln" % (my_output, my_chimeric_gene, my_OG_ID)
     with open(output_file, "w") as output:
-      p = subprocess.Popen([my_mafft, "--quiet", "--retree", "2", "--localpair", "--maxiterate", "1000", "input_fasta_tmp.fa"], stdout=output)
+      p = subprocess.Popen([my_mafft, "--quiet", "--retree", "2", "--localpair", "--maxiterate", "1000", input_temp], stdout=output)
       p.wait()
+    #remove temporary input
+    remove_command = "rm %s" % (input_temp) 
+    os.system(remove_command)    
