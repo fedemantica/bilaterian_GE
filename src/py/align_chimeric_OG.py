@@ -9,7 +9,7 @@ from Bio import SeqIO
 import pandas as pd
 import re
 import glob
-import os
+import subprocess
 
 parser = argparse.ArgumentParser(description="Generate multiple alignments among all the proteins in an orthogroup containing chimeric genes")
 parser.add_argument("--input_fastas", "-f", required=True, metavar="input_fastas", help="directory containing all proteome fasta files of species in orthogroups")
@@ -52,5 +52,8 @@ for my_chimeric_gene in my_chimeric_genes:
       SeqIO.write(fastas_entries, input_to_aln, "fasta")
     #call shell command to run the mafft alignment
     my_command = "%s --quiet --retree 2 --localpair --maxiterate 1000 input_fasta_tmp.fa > %s/%s-%s-multiple_aln" % (my_mafft, my_output, my_chimeric_gene, my_OG_ID)
-    print(my_command)
-    os.system(my_command)
+    print(my_command) #this is just to know what has been run.
+    output_file =  "%s/%s-%s-multiple_aln" % (my_output, my_chimeric_gene, my_OG_ID)
+    with open(output_file, "w") as output:
+      p = subprocess.Popen([my_mafft, "--quiet", "--retree", "2", "--localpair", "--maxiterate", "1000", "input_fasta_tmp.fa"], stdout=output)
+      p.wait()
