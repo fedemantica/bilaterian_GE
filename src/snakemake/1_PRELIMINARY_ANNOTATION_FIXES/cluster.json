@@ -14,5 +14,13 @@
     "time" : "08:00:00",
     "disk" : "2G",
     "queue" : "long-sl7"
+  },
+  "generate_multiple_alignments" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "3G",
+    "time" : "00:30:00",
+    "disk" : "2G",
+    "queue" : "short-sl7" 
   }
 }

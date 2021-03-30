@@ -19,13 +19,21 @@ HUMAN_MATCH_CUTOFF = config["variables"]["human_match_cutoff"]
 
 ALL_CLUSTERS_PART = list(range(1,5)) #This refers to the old chimeric genes pipeline. Probably to be removed.
 
+#generate list of chimeric genes
+#This still will not work with a single command from the very beginning. I need to find an alternative.
 import os
 import re
 import pandas as pd
-chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/dir_step3/chimeric_proteins.txt"
+chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/chimeric_orthogroups.tab"
 if os.path.isfile(chimeric_protein_file):
-  CHIMERIC_GENES = list(pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)["protein_name"])[0:10] #testing only for the first 10 chimeric genes 
-  CHIMERIC_GENES = [re.sub(".*\|", "", element) for element in CHIMERIC_GENES]
+  chimeric_genes_df = pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)
+  chimeric_genes = chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]
+  #chimeric_genes = list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"])
+  #n = 50
+  #chimeric_genes_batches = [chimeric_genes[i*n: (i+1)*n] for i in  range((len(chimeric_genes)))] #create batches of 50 chimeric genes
+  CHIMERIC_GENES = [",".join(list(set(list(chimeric_genes_df["geneID"])))[0:10])] #testing only for the first 10 chimeric genes
+  print(CHIMERIC_GENES)
+  CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES)))
 
 ######### tools ################
 BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
@@ -57,7 +65,9 @@ CHIMERIC_PROT_SIM_SCORES = expand("{path}/{my_version}/chimeric_proteins/sim_sco
 LONGEST_FRAGMENT = expand("{path}/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab", path=BROCCOLI, my_version=MY_VERSION)
 COMBINED_EX_POS_INFO = expand("{path}/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups.tab", path=BROCCOLI, my_version=MY_VERSION)
-MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
+#MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
+MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
+
 ######### rules ################
 
 rule all:
@@ -797,21 +807,28 @@ rule isolate_chimeric_orthogroups:
 		final_chimeric_OGs_df.to_csv(str(output.chimeric_OG), sep="\t", index=False, header=True, na_rep="NA")
 		final_pot_fused_chimeric_OGs_df.to_csv(str(output.potentially_fused), sep="\t", index=False, header=True, na_rep="NA")
 
+
+#CHIMERIC_GENES has to be modified so that it generated batches of 50 genes.
+
 #Generate the multiple alignments within the clusters containing each chimeric gene
 #Input header: OG_ID, species, geneID, geneName, chimeric_label
+
 rule generate_multiple_alignments:
 	input:
 		chimeric_OG = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
 		fastas = expand("{path}/{{my_version}}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, species=ALL_SPECIES)
 	output:
-		BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln"
+		BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log"
 	params:
-		fastas_dir = BROCCOLI+"/{my_version}/fastas"
+		fastas_dir = BROCCOLI+"/{my_version}/fastas",
+		chimeric_genes = lambda wildcards: str(CHIMERIC_GENES[int(wildcards.batch_index)]),
+		output_dir = BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln"
 	conda:
 		CONDA_ENVS+"/broccoli_1.2.yml"
 	shell:
 		"""
-		python {ALIGN_CHIMERIC_OG} --input_fasta {params.fastas_dir} --input_OG {input.chimeric_OG} --chimeric_gene {wildcards.chimeric_gene} --mafft {MY_MAFFT} --output {output} 
+		python {ALIGN_CHIMERIC_OG} --input_fasta {params.fastas_dir} --input_OG {input.chimeric_OG} --chimeric_genes {params.chimeric_genes} --mafft {MY_MAFFT} --output {params.output_dir}; \
+		echo -e "Performed multiple alignments for the orthogroups of the following genes:\n{params.chimeric_genes}" > {output}
 		"""	
 
 #I need to extract the portion of the chimeric gene which aligns with the other genes in the orthogroup
@@ -825,7 +842,7 @@ rule generate_multiple_alignments:
 #6. Exon num of the chimeric gene in which the last aligned AA falls.
 rule extract_aln_overlap:
 	input:
-		expand("{path}/{{my_version}}/chimeric_proteins/multiple_aln/{chimeric_gene}_multiple_aln", path=BROCCOLI, chimeric_gene=CHIMERIC_GENES)
+		#expand("{path}/{{my_version}}/chimeric_proteins/multiple_aln/{chimeric_gene}_multiple_aln", path=BROCCOLI, chimeric_gene=CHIMERIC_GENES)
 	output:
 		BROCCOLI+"/{my_version}/chimeric_proteins/overlapping_fragments"
 	run:
