@@ -853,15 +853,13 @@ rule extract_aligned_fragments:
 		exon_position_dir = DATABASE+"/aa_position" 
 	shell:
 		"""
-		echo -e "chimeric_geneID\torthogroup_id\tfirst_aligned_aa\tlast_aligned_aa\tfirst_aligned_ex\tlast_aligned_ex" > {output}; \
-		for file in $(ls -d {params.input_dir}/*-multiple_aln); do chimeric_gene=$(basename $file | sed 's/-.*//'); orthogroupID=$(basename $file | sed 's/-multiple_aln//; s/.*-//'); \
-			python {GET_CHIMERIC_ALIGNED_REGION} 	--alignment $file \
-								--exon_positions_dir {params.exon_position_dir} \
-								--chimeric_gene $chimeric_gene \
-								--orthogroup_id $orthogroupID \
-								--overlap_stringency {OVERLAP_STRINGENCY} \
-								--output {output}; \
-		done
+		echo $(ls {params.input_dir}/*-multiple_aln | xargs -n1 basename) | sed 's/-multiple_aln//g; s/ /;/g' > {output}.tmp; \
+		python {GET_CHIMERIC_ALIGNED_REGION} 	--input_dir {params.input_dir} \
+							--exon_positions_dir {params.exon_position_dir} \
+							--alignment {output}.tmp \
+							--overlap_stringency {OVERLAP_STRINGENCY} \
+							--output {output};
+		rm {output}.tmp
 		"""		
 
 

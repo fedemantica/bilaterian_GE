@@ -22,5 +22,13 @@
     "time" : "00:45:00",
     "disk" : "2G",
     "queue" : "short-sl7" 
+  },
+  "extract_aligned_fragments" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "4G",
+    "time" : "01:00:00",
+    "disk" : "2G",
+    "queue" : "short-sl7" 
   }
 }
