@@ -33,6 +33,8 @@ if os.path.isfile(chimeric_protein_file):
   CHIMERIC_GENES = [[",".join(element)] for element in chimeric_genes_batches]
   CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES))) #number of batches, to use as index
 
+OVERLAP_STRINGENCY = config["variables"]["overlap_stringency"]
+
 ######### tools ################
 BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
 GET_EXINT_FASTA = config["tools"]["get_exint_fasta"]
@@ -51,6 +53,7 @@ GET_EXCOORDS = config["tools"]["get_excoords"]
 GET_EX_PATH = config["tools"]["get_ex_path"]
 GET_AA_POSITIONS = config["tools"]["get_aa_position"]
 ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
+GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -65,6 +68,7 @@ COMBINED_EX_POS_INFO = expand("{path}/{my_version}/chimeric_proteins/Combines_ex
 CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups.tab", path=BROCCOLI, my_version=MY_VERSION)
 #MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
 MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
+ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 
 ######### rules ################
 
@@ -78,7 +82,8 @@ rule all:
 		LONGEST_FRAGMENT,
 		COMBINED_EX_POS_INFO,
 		CHIMERIC_OG,
-		MULTIPLE_ALN
+		MULTIPLE_ALN,
+		ALIGNED_FRAGMENT_INFO
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -838,15 +843,27 @@ rule generate_multiple_alignments:
 #4. last AA in the chimetic gene aligned with at least 20% of the other genes in the orthogroup.
 #5. Exon num of the chimeric gene in which the first aligned AA falls.
 #6. Exon num of the chimeric gene in which the last aligned AA falls.
-rule extract_aln_overlap:
+rule extract_aligned_fragments:
 	input:
-		
+		expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
 	output:
-		BROCCOLI+"/{my_version}/chimeric_proteins/overlapping_fragments"
+		BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab"
 	params:
-		chimeric_gene = lambda wildcards:
-	run:
-		import pandas as pd
+		input_dir = BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln",
+		exon_position_dir = DATABASE+"/aa_position" 
+	shell:
+		"""
+		echo -e "chimeric_geneID\torthogroup_id\tfirst_aligned_aa\tlast_aligned_aa\tfirst_aligned_ex\tlast_aligned_ex" > {output}; \
+		for file in $(ls -d {params.input_dir}/*-multiple_aln); do chimeric_gene=$(basename $file | sed 's/-.*//'); orthogroupID=$(basename $file | sed 's/-multiple_aln//; s/.*-//'); \
+			python {GET_CHIMERIC_ALIGNED_REGION} 	--alignment $file \
+								--exon_positions_dir {params.exon_position_dir} \
+								--chimeric_gene $chimeric_gene \
+								--orthogroup_id $orthogroupID \
+								--overlap_stringency {OVERLAP_STRINGENCY} \
+								--output {output}; \
+		done
+		"""		
+
 
 ###############################################
 ########### CHIMERIC GENES OLD ################

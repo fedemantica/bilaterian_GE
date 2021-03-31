@@ -29,11 +29,13 @@ tools:
   get_ex_path: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_ex_path.pl"
   get_aa_position: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_aa_pos_exon.pl"
   align_chimeric_OG: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/align_chimeric_OG.py"
+  get_chimeric_aligned_region: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_chimeric_aligned_region.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
   my_version: "BmA_version"
   gene_num: ["two_genes", "more_genes"]
   invertebrate_species: ["BmA", "Bge", "Eba"]
-  seqsim_cutoff: 0.3
+  seqsim_cutoff: 0.30
   human_match_cutoff: 0.25
+  overlap_stringency: 0.80

@@ -12,7 +12,7 @@ parser.add_argument("--exon_positions_dir", "-e", required=True, metavar="exon_p
 parser.add_argument("--chimeric_gene", "-g", required=True, metavar="chimeric_gene", help="GeneID of the chimeric gene in the alignment")
 parser.add_argument("--orthogroup_id", "-og", required=True, metavar="orthogroup_id", help="OrthogroupID of the orthogroup to which the chimeric gene belongs")
 parser.add_argument("--overlap_stringency", "-s", required=True, metavar="overlap_stringency", help="Minumum percentage of aligned genes in OG required to define the overlap")
-#parser.add_argument("--output", "-o", required=True, metavar="output_dir", help="path to output file")
+parser.add_argument("--output", "-o", required=True, metavar="output_dir", help="path to output file")
 
 #Read arguments
 args = parser.parse_args()
@@ -21,8 +21,10 @@ my_exon_positions_dir = args.exon_positions_dir
 my_chimeric_gene = args.chimeric_gene
 my_orthogroupID = args.orthogroup_id
 my_overlap_stringency = float(args.overlap_stringency)
-#my_output = args.output
+my_output_file = args.output
 
+#print chimeric gene
+print(my_chimeric_gene+"\t"+my_orthogroupID)
 #Get a list of all the entries in the alignment 
 my_aln = list(list(SeqIO.parse(my_alignment_file, "fasta")))
 total_genes = len(my_aln) #Count total amount of genes in the orthogroup
@@ -65,14 +67,17 @@ chimeric_gene_exon_pos = all_exon_pos_df[all_exon_pos_df["geneID"]==my_chimeric_
 chimeric_gene_exon_pos_dict = pd.Series(chimeric_gene_exon_pos.exon_num.values, index=chimeric_gene_exon_pos.aa_coords).to_dict() #dictionary with key=aa_pos, value=exon_num
 chimeric_gene_exon_pos_ranges = [range(int(element.split("-")[0]), int(element.split("-")[1])) for element in list(chimeric_gene_exon_pos_dict.keys())]
 overlapping_exons = [element for element in chimeric_gene_exon_pos_ranges if set(range(first_aligned_aa, last_aligned_aa)).intersection(element)]
-first_overlapping_exon = overlapping_exons[0]
-last_overlapping_exon = overlapping_exons[len(overlapping_exons)-1]
-#Transform ranges back to coordinates
-first_overlapping_exon_aa = str(first_overlapping_exon[0])+"-"+str(first_overlapping_exon[len(first_overlapping_exon)-1]+1)
-last_overlapping_exon_aa = str(last_overlapping_exon[0])+"-"+str(last_overlapping_exon[len(last_overlapping_exon)-1]+1)
-#Intersect with the aminoacid positions to get the correspondent exon numer
-first_overlapping_exon_num = chimeric_gene_exon_pos_dict[first_overlapping_exon_aa]
-last_overlapping_exon_num = chimeric_gene_exon_pos_dict[last_overlapping_exon_aa]
+if len(overlapping_exons) >= 1:
+  first_overlapping_exon = overlapping_exons[0]
+  last_overlapping_exon = overlapping_exons[len(overlapping_exons)-1]
+  #Transform ranges back to coordinates
+  first_overlapping_exon_aa = str(first_overlapping_exon[0])+"-"+str(first_overlapping_exon[len(first_overlapping_exon)-1]+1)
+  last_overlapping_exon_aa = str(last_overlapping_exon[0])+"-"+str(last_overlapping_exon[len(last_overlapping_exon)-1]+1)
+  #Intersect with the aminoacid positions to get the correspondent exon numer
+  first_overlapping_exon_num = chimeric_gene_exon_pos_dict[first_overlapping_exon_aa]
+  last_overlapping_exon_num = chimeric_gene_exon_pos_dict[last_overlapping_exon_aa]
+else:
+  first_overlapping_exon_aa = "NA"; last_overlapping_exon_aa = "NA"; first_overlapping_exon_num = "NA"; last_overlapping_exon_num = "NA"
 
 #Save output file with header:
 #1. Chimeric geneID
@@ -81,6 +86,8 @@ last_overlapping_exon_num = chimeric_gene_exon_pos_dict[last_overlapping_exon_aa
 #4. Last aligned aa
 #5. First aligned exon (exon num: aa coords)
 #6. Last aligned exon (exon num: aa coords)
-final_string = "%s\t%s\t%s\t%s\t%s:%s\t%s:%s" % (my_chimeric_gene, my_orthogroupID, first_aligned_aa, last_aligned_aa, first_overlapping_exon_num, first_overlapping_exon_aa , last_overlapping_exon_num, last_overlapping_exon_aa)
-print(final_string)
+final_string = "%s\t%s\t%s\t%s\t%s:%s\t%s:%s\n" % (my_chimeric_gene, my_orthogroupID, first_aligned_aa, last_aligned_aa, first_overlapping_exon_num, first_overlapping_exon_aa, last_overlapping_exon_num, last_overlapping_exon_aa)
+with open(my_output_file, "a") as my_output:
+   my_output.write(final_string)
 
+print(final_string)
