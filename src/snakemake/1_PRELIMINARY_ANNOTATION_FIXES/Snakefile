@@ -884,8 +884,10 @@ rule geneID_refproteinID:
 		#get gene ids list
 		my_raw_gene_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "gene_id" in part]
 		my_gene_id = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in my_raw_gene_id]
-		#get protein id list
-		my_raw_prot_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "protein_id" in part]
+		#get protein id list: select the first subfield containing the protein ID. Useful in case of weird GTF structure
+		protein_id_subfield = list(my_gtf_subset)[0].split(";").index([element for element in list(my_gtf_subset)[0].split(";") if "protein_id" in element][0])
+		my_raw_prot_id = [element.split(";")[protein_id_subfield] for element in list(my_gtf_subset)]
+		#my_raw_prot_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "protein_id" in part]
 		my_prot_id = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in my_raw_prot_id]
 		final_df = pd.concat([pd.Series(my_gene_id), pd.Series(my_prot_id)], axis=1)
 		final_df = final_df.drop_duplicates()
