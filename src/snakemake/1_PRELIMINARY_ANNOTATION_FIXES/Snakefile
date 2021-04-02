@@ -17,7 +17,8 @@ GENE_NUM = config["variables"]["gene_num"]
 SEQSIM_CUTOFF = config["variables"]["seqsim_cutoff"]
 HUMAN_MATCH_CUTOFF = config["variables"]["human_match_cutoff"]
 
-ALL_CLUSTERS_PART = list(range(1,5)) #This refers to the old chimeric genes pipeline. Probably to be removed.
+#ALL_CLUSTERS_PART = list(range(1,5)) #This refers to the old chimeric genes pipeline. Probably to be removed.
+ALL_CLUSTERS_PART, = glob_wildcards(BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/splitted_clusters/part_{cluster_part}_clusters.txt")
 
 #generate list of chimeric genes
 #This still will not work with a single command from the very beginning. I need to find an alternative.
@@ -70,6 +71,9 @@ CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups
 MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
 ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 
+REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
+FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
+
 ######### rules ################
 
 rule all:
@@ -81,9 +85,11 @@ rule all:
 		CHIMERIC_PROT_SIM_SCORES,
 		LONGEST_FRAGMENT,
 		COMBINED_EX_POS_INFO,
+		REF_PROT_AA_POS,
 		CHIMERIC_OG,
 		MULTIPLE_ALN,
-		ALIGNED_FRAGMENT_INFO
+		ALIGNED_FRAGMENT_INFO,
+		FINAL_FRAGMENTS_YAMI
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -772,6 +778,30 @@ rule join_potentially_broken_genes_by_species:
 ########### CHIMERIC GENES  ###################
 ###############################################
 
+rule geneID_refproteinID:
+	input:
+		EXINT_REF_DIR+"/{species}_ref_exint.fasta"
+	output:
+		DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"
+	shell:
+		"""
+		cat {input} | grep ">" | sed 's/>//; s/|/\t/' | awk -v OFS="\t" '{{print $2,$1}}' > {output}
+		"""
+
+rule aa_position:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+		ref_proteins = DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"		
+	output:
+		DATABASE+"/aa_position/{species}_refprots_exons_pos.tab"
+	params:
+		out_dir = DATABASE+"/aa_position"
+	shell:
+		"""
+		mkdir -p {params.out_dir}; \
+		python {GET_AA_POSITIONS} --gtf {input.gtf} --ref_prot {input.ref_proteins} --output {output}
+		"""
+
 #Header output
 #1. clusterID
 #2. species
@@ -845,7 +875,8 @@ rule generate_multiple_alignments:
 #6. Exon num of the chimeric gene in which the last aligned AA falls.
 rule extract_aligned_fragments:
 	input:
-		expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
+		expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES),
+		expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 	output:
 		BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab"
 	params:
@@ -868,44 +899,6 @@ rule extract_aligned_fragments:
 ###############################################
 #preliminary files
 #Get files with AA positions for each species
-rule geneID_refproteinID:
-	input:
-		GTF_ref = GTF_REF_DIR+"/{species}_annot-B.gtf"
-	output:
-		DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"
-	run:
-		import pandas as pd
-		import re
-
-		my_gtf = pd.read_table(str(input), sep="\t", header=None)
-		my_gtf_subset = my_gtf.iloc[:,my_gtf.shape[1]-1]
-		#filter only the lines containing prot ID
-		my_gtf_subset = my_gtf_subset[my_gtf_subset.str.contains("protein_id")]  
-		#get gene ids list
-		my_raw_gene_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "gene_id" in part]
-		my_gene_id = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in my_raw_gene_id]
-		#get protein id list: select the first subfield containing the protein ID. Useful in case of weird GTF structure
-		protein_id_subfield = list(my_gtf_subset)[0].split(";").index([element for element in list(my_gtf_subset)[0].split(";") if "protein_id" in element][0])
-		my_raw_prot_id = [element.split(";")[protein_id_subfield] for element in list(my_gtf_subset)]
-		#my_raw_prot_id = [part for element in list(my_gtf_subset) for part in element.split(";") if "protein_id" in part]
-		my_prot_id = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in my_raw_prot_id]
-		final_df = pd.concat([pd.Series(my_gene_id), pd.Series(my_prot_id)], axis=1)
-		final_df = final_df.drop_duplicates()
-		final_df.to_csv(str(output), sep="\t", header=False, index=False)
-
-rule aa_position:
-	input:
-		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
-		ref_proteins = DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"		
-	output:
-		DATABASE+"/aa_position/{species}_refprots_exons_pos.tab"
-	params:
-		out_dir = DATABASE+"/aa_position"
-	shell:
-		"""
-		mkdir -p {params.out_dir}; \
-		perl {GET_AA_POSITIONS} -GTF {input.gtf} -i {input.ref_proteins} -out {output}
-		"""
 
 ###### Keep the chimeric proteins only in the cluster with which it gets a higher similarity score in the multiple alignment.
 rule get_chimeric_clusters:
@@ -935,7 +928,7 @@ rule divide_chimeric_clusters:
 ##Get the scores for the chimeric proteins.
 ##see ALL_CLUSTERS_PART variable (this will have to change)
 #ALL_CLUSTERS_PART=glob.wildcards(BROCCOLI+"/{my_version}/chimeric_proteins/splitted_clusters/part_*_clusters.txt")
-ALL_CLUSTERS_PART = list(range(1,5))
+#ALL_CLUSTERS_PART = list(range(1,5))
 #The exint ref dir really has to change
 rule chimeric_protein_sim_scores:
 	input:
