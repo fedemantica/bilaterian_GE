@@ -33,6 +33,9 @@ if os.path.isfile(chimeric_protein_file):
   chimeric_genes_batches = [chimeric_genes[i:i+n] for i in range(0, len(chimeric_genes), n)]
   CHIMERIC_GENES = [[",".join(element)] for element in chimeric_genes_batches]
   CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES))) #number of batches, to use as index
+else:
+  CHIMERIC_GENES = ""
+  CHIMERIC_GENES_BATCHES = "1"
 
 OVERLAP_STRINGENCY = config["variables"]["overlap_stringency"]
 
@@ -81,15 +84,15 @@ rule all:
 		RUN_BROCCOLI,
 		PARSED_ORTHOGROUPS, 
 		SELECTED_BROKEN_GENES,
-		CHIMERIC_CLUSTERS,
-		CHIMERIC_PROT_SIM_SCORES,
-		LONGEST_FRAGMENT,
-		COMBINED_EX_POS_INFO,
-		REF_PROT_AA_POS,
-		CHIMERIC_OG,
-		MULTIPLE_ALN,
-		ALIGNED_FRAGMENT_INFO,
-		FINAL_FRAGMENTS_YAMI
+		#CHIMERIC_CLUSTERS,
+		#CHIMERIC_PROT_SIM_SCORES,
+		#LONGEST_FRAGMENT,
+		#COMBINED_EX_POS_INFO,
+		#REF_PROT_AA_POS,
+		CHIMERIC_OG
+		#MULTIPLE_ALN,
+		#ALIGNED_FRAGMENT_INFO,
+		#FINAL_FRAGMENTS_YAMI
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -827,24 +830,31 @@ rule isolate_chimeric_orthogroups:
 		chimeric_OGs_list = list(chimeric_OGs_df[chimeric_OGs_df["chimeric_label"]=="chimeric"][["OG_ID", "species"]].drop_duplicates()["OG_ID"])
 		pot_fused_OG_list = [element for element, my_count in collections.Counter(chimeric_OGs_list).items() if my_count >=2] #In the same OG, there are chimeric genes from at least two species.
 		#The genes from the different species have to be shared between the same OGs.
-		
 		pot_fused_chimeric_genes_df = chimeric_OGs_df[(chimeric_OGs_df["chimeric_label"]=="chimeric") & (chimeric_OGs_df["OG_ID"].isin(pot_fused_OG_list))]
-		
+		#Isolate the OG sharing the exact same chimeric genes from different species
 		grouped_df = pot_fused_chimeric_genes_df.groupby("geneID")
 		chimeric_gene_OG_dict = {}
 		for gene, group in grouped_df:
 		  chimeric_gene_OG_dict[gene] = tuple(sorted(list(group["OG_ID"])))
+		duplicated_OGs_full = [list(element) for element, my_count in collections.Counter(list(chimeric_gene_OG_dict.values())).items() if my_count >=2 and len(element)>=2]
+		#Get a dicionary with the chimeric genes contained by each potentially fused OG.	
+		grouped_OG_df = chimeric_OGs_df[chimeric_OGs_df["chimeric_label"]=="chimeric"].groupby("OG_ID")
+		OG_chimeric_gene_dict = {}
+		for OG, group in grouped_OG_df:
+		  OG_chimeric_gene_dict[OG] = tuple(sorted(list(group["geneID"])))
+		duplicated_OGs_double = [element for element in duplicated_OGs_full if len(element)==2 and OG_chimeric_gene_dict[element[0]]==OG_chimeric_gene_dict[element[1]]]
+		#Make sure that the chimeric genes shared between more orthogroups are not the single chimeric genes in others
+		grouped_df = chimeric_OGs_df[chimeric_OGs_df["chimeric_label"]=="chimeric"].groupby("geneID") #Build a dictionary where ALL chimeric OG (not only the potentially fused) are considered
+		chimeric_gene_OG_dict_all = {}
+		for gene, group in grouped_df:
+		  chimeric_gene_OG_dict_all[gene] = tuple(sorted(list(group["OG_ID"])))
 		
-		duplicated_OGs_full = [list(element) for element, my_count in collections.Counter(list(chimeric_gene_OG_dict.values())).items() if my_count >=2] #these are the OG containing the exact same chimeric genes from more species
-		#Double check: the orthogroups containing the same set of chimeric genes also have to be the only OG containing the chimeric genes
-		#single_chimeric_genes_list = [element for element, my_count in collections.Counter(chimeric_OGs_list).items() if my_count ==1]
-		#grouped_OG_df = pot_fused_chimeric_genes_df.groupby("OG_ID")
-		#OG_chimeric_gene_dict = {}
-		#for OG, group in grouped_OG_df:
-		  #chimeric_gene_OG_dict[OG] = tuple(sorted(list(group["geneID"])))
-		#prova = [element for element in duplicated_OGs_full if chimeric_gene_OG_dict[element[0]] not in single_chimeric_genes_list]
-		prova = [element for element in duplicated_OGs_full if len(element) >= 2]
-		duplicated_OGs_flatten = [OG_ID for element in duplicated_OGs_full for OG_ID in element]
+		duplicated_OGs_flatten = []
+		for OG_pair in duplicated_OGs_double:
+		  OG_gene_list = OG_chimeric_gene_dict[OG_pair[0]]
+		  if len([element for element in OG_gene_list if list(chimeric_gene_OG_dict_all[element])==list(OG_pair)]) == len(OG_gene_list):
+		    duplicated_OGs_flatten = duplicated_OGs_flatten+OG_pair
+
 		final_chimeric_OGs_df = chimeric_OGs_df[~(chimeric_OGs_df["OG_ID"].isin(duplicated_OGs_flatten))]
 		final_pot_fused_chimeric_OGs_df = chimeric_OGs_df[chimeric_OGs_df["OG_ID"].isin(duplicated_OGs_flatten)]
 		#save to output file
