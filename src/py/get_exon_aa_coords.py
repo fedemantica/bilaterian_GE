@@ -20,36 +20,20 @@ gtf = pd.read_table(gtf_file, sep="\t", index_col=False, header=None, names=["ch
 ref_prot_df = pd.read_table(ref_prot_file, sep="\t", index_col=False, header=None, names=["geneID", "ref_prot_ID"])
 #Filter for CDS exons only
 gtf_CDS = gtf[(gtf["type"]=="CDS") & (gtf["attribute"].str.contains("protein_id"))]
+#Change data type
+gtf_CDS["start"] = gtf_CDS["start"].astype(int) #Change the data type
+gtf_CDS["stop"] = gtf_CDS["stop"].astype(int) #Change the data type
+gtf_CDS["phase"] = gtf_CDS["phase"].astype(int)
 
 #Add columns with relevant information
-gtf_CDS["gene_id"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "gene_id" in part]
+gtf_CDS["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "gene_id" in part]
+gtf_CDS["exon_number"]  = [int(re.sub(".*[ ]", "", re.sub('"', "", part))) for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "exon_number" in part]
+#This is necessary for when the proteinID field is repeated at the end of the GTF.
 if len([element for element in  list(gtf_CDS["attribute"])[0].split(";") if "protein_id" in element]) == 2:
-  gtf_CDS["proteinID"] = [re.sub(".*[ ]", "", re.sub('"', "", element.split(";")[0])) for element in list(gtf_CDS["attribute"])] 
+  gtf_CDS["proteinID"] = [re.sub(".*[ ]", "", re.sub('"', "", element.split(";")[-2])) for element in list(gtf_CDS["attribute"])] 
 else:
   gtf_CDS["proteinID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "protein_id" in part]
 
-#Create a new columns with the last sub-field of the attribute field
-#gtf_CDS["last_field"] = [part for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "protein_ID" in part]
-
-#gtf_CDS["last_field"] = [element.split(";")[-2] for element in list(gtf_CDS["attribute"])]
-#This is when the proteinID is the last entry
-#protein_id_last = [element for element in list(gtf_CDS["last_field"]) if "protein_id" in element]
-#gtf_protein_id_last = gtf_CDS[gtf_CDS["last_field"].isin(protein_id_last)]
-#gtf_protein_id_last["protein_id"] = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in list(gtf_protein_id_last["last_field"])]
-#This is when the proteinID is NOT the last entry
-#gtf_NOprotein_id_last = gtf_CDS[~(gtf_CDS["last_field"].isin(protein_id_last))]
-#gtf_NOprotein_id_last["protein_id"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "protein_id" in part] 
-#Update
-#gtf_CDS = pd.concat([gtf_protein_id_last, gtf_NOprotein_id_last])
-
-#Horrible code, but life is complicated. This is necessary for when the proteinID is repeated in the GTF.
-#if len([element for element in  list(gtf_CDS["attribute"])[0].split(";") if "protein_id" in element]) == 2:
-#  raw_protein = [part for element in list(gtf_CDS["attribute"]) for part in element.split(";")[:-2] if "protein_id" in part] #I simply remove the last entry in the attribute column where the proteinID is repeated.
-#else:
-#  raw_protein = [part for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "protein_id" in part]
-#gtf_CDS["proteinID"] = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in raw_protein]
-#gtf_CDS["exon_number"]  = [int(re.sub(".*[ ]", "", re.sub('"', "", part))) for element in list(gtf_CDS["attribute"]) for part in element.split(";") if "exon_number" in part]
-#gtf_CDS["phase"] = pd.to_numeric(gtf_CDS["phase"])
 
 #Filter only for ref proteins
 gtf_CDS_ref = gtf_CDS[gtf_CDS["proteinID"].isin(list(ref_prot_df["ref_prot_ID"]))]
@@ -67,6 +51,7 @@ for name, group in grouped_df:
 
 #save to final output
 final_df["ID"] = final_df["proteinID"]+"|"+final_df["geneID"]
+final_df["chr"] = final_df["chr"].astype(str)
 final_df["start"] = final_df["start"].astype(str) #Change the data type
 final_df["stop"] = final_df["stop"].astype(str) #Change the data type
 final_df["coords"] = final_df["chr"]+":"+final_df["start"]+"-"+final_df["stop"]
