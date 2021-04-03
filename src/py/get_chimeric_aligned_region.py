@@ -24,13 +24,31 @@ my_output_file = args.output
 with open(args.alignment, "r") as alignment_prefix_file:
   my_alignment_prefix_list = alignment_prefix_file.readline().rstrip().split(";") #list of chimeric_geneID;orthogroupID
 
+#Define functions
+#This function gets the number of sligned position in the string to which the tested AA belongs to.
+def aligned_pos_in_string(aln_list, x):
+  num = 0
+  pos_list_left = list(range(0,x))[::-1] #the right boundary is excluded. rever the list
+  pos_list_right = list(range(x+1,len(aln_list)-1))
+  for pos in pos_list_left:
+    if aln_list[pos] != "-":
+      num = num+1
+    else:
+      break
+  for pos in pos_list_right:
+    if aln_list[pos] != "-":
+      num = num+1
+    else:
+      break
+  return(num+1) #the +1 counts the position itself
+
 #Generate dataframe with all the correspondence between exon num and aa_coords for all genes and all species.
-all_exon_pos_files = glob.glob(my_exon_positions_dir+"/*")
+all_exon_pos_files = glob.glob(my_exon_positions_dir+"/*_refprots_exons_pos.tab")
 all_exon_pos_df = pd.DataFrame()
 for my_file in all_exon_pos_files:
-  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=None, names=["geneID", "exon_num","aa_coords", "chr", "genomic_coords", "strand","type"]) #NB: the GeneID col is still in the format ProtID|GeneID
+  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=None, names=["geneID", "exon_num","aa_coords", "genomic_coords", "strand"]) #NB: the GeneID col is still in the format ProtID|GeneID
   all_exon_pos_df = pd.concat([all_exon_pos_df, my_df])
-all_exon_pos_df["geneID"] = [re.sub(".*\|", "", element) for element in list(all_exon_pos_df["geneID"])] #modify geneID column
+all_exon_pos_df["geneID"] = [re.sub(".*\|", "", str(element)) for element in list(all_exon_pos_df["geneID"])] #modify geneID column
 
 #print header in output fiels
 with open(my_output_file, "a") as my_output:
@@ -53,19 +71,23 @@ for my_alignment_prefix in my_alignment_prefix_list:
   alignment_df = pd.DataFrame()
   for entry in my_aln:
     alignment_df[entry.id] = list(entry.seq)
-  transposed_alignment_df = alignment_df.transpose() #Transpose the dataframe
+  transposed_alignment_df = alignment_df.transpose() #Transpose the dataframe (row=gene, column=alignment position)
 
   #Get a dictionary with key=alignment position, value=percentage of genes that align there (i.e. position != "-")
   max_aln_positions = transposed_alignment_df.shape[0] #number of species
   percent_aln_positions = transposed_alignment_df.apply(lambda x: len([element for element in x if element != "-"])/max_aln_positions, axis=0) #this returns a series
   position_percent_aln_dict = percent_aln_positions.to_dict()
-
-  #Select the lowest and highest key which are aligned and in chimeric gene for which value >= 80%
+  #Get a dictionary with key=alignment position, value=length of the aligned  fragment to which the position belongs
+  aligned_pos_len_list = [aligned_pos_in_string("".join(list(entry.seq)), x) for x in list(range(len("".join(list(entry.seq)))))]
+  aligned_pos_num_dict = {index: value for index,value in enumerate(aligned_pos_len_list)}
+  
+  #Select the lowest and highest key which are aligned and in chimeric gene for which value >= %stringency
   #first and last aligned aminoacid, respectively
   chimeric_gene_aln_pos = transposed_alignment_df.loc[my_chimeric_gene,]
   chimeric_gene_aligned_pos = list(chimeric_gene_aln_pos[chimeric_gene_aln_pos != "-"].index.values)
   valid_positions = [key for key in list(position_percent_aln_dict.keys()) if key in chimeric_gene_aligned_pos]
-  valid_positions_with_coverage = [position for position in valid_positions if position_percent_aln_dict[position] >= my_overlap_stringency] #at least one positions that aligns with a certain percentage of the orthogroup
+  valid_positions_with_length = [position for position in valid_positions if aligned_pos_num_dict[position] >= 10] #the position is in a string of at least n aligned AA
+  valid_positions_with_coverage = [position for position in valid_positions_with_length if position_percent_aln_dict[position] >= my_overlap_stringency] #at least one positions that aligns with a certain percentage of the orthogroup
   if len(valid_positions_with_coverage) >=1:
     first_aligned_pos = min(valid_positions_with_coverage)
     last_aligned_pos = max(valid_positions_with_coverage)
