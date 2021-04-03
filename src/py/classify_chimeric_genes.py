@@ -24,6 +24,8 @@ grouped_df = input_df.groupby("chimeric_geneID")
 
 #open output filehandle
 my_output = open(my_output_file, "w")
+#print header
+my_output.write("chimeric_geneID\torthogroup_ids\tfirst-last_aligned_ex\tfirst-last_aligned_aa\tex:start|stop_coord\tchimeric_class\n")
 for gene, group in grouped_df: #For each group
   #If the chimeric gene is divided only between 2 orthogroups:
   if group.shape[0] == 2:
