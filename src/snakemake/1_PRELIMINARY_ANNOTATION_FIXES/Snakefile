@@ -28,7 +28,7 @@ import pandas as pd
 chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/chimeric_orthogroups.tab"
 if os.path.isfile(chimeric_protein_file):
   chimeric_genes_df = pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)
-  chimeric_genes = list(set(list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]["geneID"]))) #remove duplicates
+  chimeric_genes = sorted(list(set(list(chimeric_genes_df[chimeric_genes_df["chimeric_label"]=="chimeric"]["geneID"])))) #remove duplicates and sort list
   n = 50 #generate batches of 50 chimeric genes
   chimeric_genes_batches = [chimeric_genes[i:i+n] for i in range(0, len(chimeric_genes), n)]
   CHIMERIC_GENES = [[",".join(element)] for element in chimeric_genes_batches]
@@ -58,6 +58,7 @@ GET_EX_PATH = config["tools"]["get_ex_path"]
 GET_AA_POSITIONS = config["tools"]["get_aa_position"]
 ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
 GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
+CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -73,6 +74,7 @@ CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups
 #MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
 MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
 ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
+CLASSIFIED_CHIMERIC_GENES = expand("{path}/{my_version}/chimeric_proteins/classified_chimeric_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
@@ -89,9 +91,10 @@ rule all:
 		#LONGEST_FRAGMENT,
 		#COMBINED_EX_POS_INFO,
 		#REF_PROT_AA_POS,
-		CHIMERIC_OG
-		#MULTIPLE_ALN,
-		#ALIGNED_FRAGMENT_INFO,
+		CHIMERIC_OG,
+		MULTIPLE_ALN,
+		ALIGNED_FRAGMENT_INFO,
+		CLASSIFIED_CHIMERIC_GENES
 		#FINAL_FRAGMENTS_YAMI
 
 ###############################################
@@ -913,6 +916,16 @@ rule extract_aligned_fragments:
 							--output {output};
 		rm {output}.tmp
 		"""		
+
+rule classify_chimeric_genes:
+	input:
+		BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab"
+	shell:
+		"""
+		python {CLASSIFY_CHIMERIC_GENES} -i {input} -o {output}
+		"""
 
 
 ###############################################

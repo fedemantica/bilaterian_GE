@@ -27,9 +27,10 @@ tools:
   get_first_last_ex_aln: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_first_last_exaln.pl"
   get_excoords: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_excoords.pl"
   get_ex_path: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_ex_path.pl"
-  get_aa_position: "/users/mirimia/fmantica/projects/bilaterian_GE/src/pl/get_aa_pos_exon.pl"
+  get_aa_position: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_exon_aa_coords.py"
   align_chimeric_OG: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/align_chimeric_OG.py"
   get_chimeric_aligned_region: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_chimeric_aligned_region.py"
+  classify_chimeric_genes: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/classify_chimeric_genes.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
