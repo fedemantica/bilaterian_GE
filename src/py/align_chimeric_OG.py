@@ -29,6 +29,8 @@ my_chimeric_genes = args.chimeric_genes.split(",") #split the original batch
 my_mafft = args.mafft
 my_output = args.output
 
+print(my_chimeric_genes)
+#Header: OG_ID, species, geneID, geneName, chimeric_label
 chimeric_OG_df = pd.read_table(str(my_input_OG), sep="\t", header=0, index_col=False)
 #Read and join fasta files all together
 all_fastas_files = glob.glob(my_input_fastas+"/*") #list all the fasta files in the input directory
@@ -45,8 +47,9 @@ for my_chimeric_gene in my_chimeric_genes:
   my_OG_IDs = list(set(list(chimeric_OG_df[chimeric_OG_df["geneID"]==my_chimeric_gene]["OG_ID"])))
   for my_OG_ID in my_OG_IDs:
     OG_df = chimeric_OG_df[chimeric_OG_df["OG_ID"]==my_OG_ID]
-    #I still need to remove all the other chimeric genes from the orthogroup.
-    OG_genes = list(OG_df["geneID"])
+    #remove all the other chimeric genes from the orthogroups
+    OG_other_chimeric_genes = [element for element in list(OG_df[OG_df["chimeric_label"]=="chimeric"]["geneID"]) if element != my_chimeric_gene]
+    OG_genes = [gene for gene in list(OG_df["geneID"]) if gene not in OG_other_chimeric_genes]
     fastas_entries = [element for element in all_fastas_entries if element.id in OG_genes]
     #save fastas entries to temporary file
     input_temp = my_chimeric_gene+"-"+my_OG_ID+"-input_fasta_tmp.fa"
