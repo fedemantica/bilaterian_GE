@@ -79,8 +79,7 @@ CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups
 MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
 ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 CLASSIFIED_CHIMERIC_GENES = expand("{path}/{my_version}/chimeric_proteins/classified_chimeric_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
-CHIMERIC_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt", path=BROCCOLI, my_version=MY_VERSION, species = INVERTEBRATE_SPECIES)
-BROCCOLI+"/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt"
+NEW_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt", path=BROCCOLI, my_version=MY_VERSION, species = INVERTEBRATE_SPECIES)
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
@@ -102,7 +101,7 @@ rule all:
 		ALIGNED_FRAGMENT_INFO,
 		CLASSIFIED_CHIMERIC_GENES,
 		FINAL_FRAGMENTS_YAMI,
-		CHIMERIC_GENE_IDS
+		NEW_GENE_IDS
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -939,17 +938,19 @@ rule classify_chimeric_genes:
 ############ Correct gtf #####################
 ##############################################
 #Correct the gtf taking into account the broken and the chimeric genes
-
-rule generate_new_chimeric_IDs:
+#Generate new geneIDs for the broken and the chimeric genes
+#Header: geneID, new_IDs, category (chimeric, broken)
+rule generate_new_IDs:
 	input:
-		BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab"
+		chimeric = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+		broken = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab"
 	output:
-		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt"
+		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
 	shell:
 		"""
-		python {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} --input {input} --output {output}
+		python {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} \
+			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
 		"""
-
 
 ###############################################
 ########### CHIMERIC GENES OLD ################
