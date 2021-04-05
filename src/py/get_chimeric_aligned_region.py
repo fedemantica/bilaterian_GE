@@ -13,6 +13,7 @@ parser.add_argument("--exon_positions_dir", "-e", required=True, metavar="exon_p
 #parser.add_argument("--chimeric_gene", "-g", required=True, metavar="chimeric_gene", help="GeneID of the chimeric gene in the alignment")
 #parser.add_argument("--orthogroup_id", "-og", required=True, metavar="orthogroup_id", help="OrthogroupID of the orthogroup to which the chimeric gene belongs")
 parser.add_argument("--overlap_stringency", "-s", required=True, metavar="overlap_stringency", help="Minumum percentage of aligned genes in OG required to define the overlap")
+parser.add_argument("--min_aligned", "-m", required=True, metavar="minimum_alignment", help="Minimum aligned sequence length within which the boundaries of the overlapping fragments can be selected")
 parser.add_argument("--output", "-o", required=True, metavar="output_dir", help="path to output file")
 
 #Read arguments
@@ -20,6 +21,7 @@ args = parser.parse_args()
 my_input_dir = args.input_dir
 my_exon_positions_dir = args.exon_positions_dir
 my_overlap_stringency = float(args.overlap_stringency)
+my_min_aligned = inr(args.min_aligned)
 my_output_file = args.output
 with open(args.alignment, "r") as alignment_prefix_file:
   my_alignment_prefix_list = alignment_prefix_file.readline().rstrip().split(";") #list of chimeric_geneID;orthogroupID
@@ -86,7 +88,7 @@ for my_alignment_prefix in my_alignment_prefix_list:
   chimeric_gene_aln_pos = transposed_alignment_df.loc[my_chimeric_gene,]
   chimeric_gene_aligned_pos = list(chimeric_gene_aln_pos[chimeric_gene_aln_pos != "-"].index.values)
   valid_positions = [key for key in list(position_percent_aln_dict.keys()) if key in chimeric_gene_aligned_pos]
-  valid_positions_with_length = [position for position in valid_positions if aligned_pos_num_dict[position] >= 10] #the position is in a string of at least n aligned AA
+  valid_positions_with_length = [position for position in valid_positions if aligned_pos_num_dict[position] >= my_min_aligned] #the position is in a string of at least n aligned AA
   valid_positions_with_coverage = [position for position in valid_positions_with_length if position_percent_aln_dict[position] >= my_overlap_stringency] #at least one positions that aligns with a certain percentage of the orthogroup
   if len(valid_positions_with_coverage) >=1:
     first_aligned_pos = min(valid_positions_with_coverage)

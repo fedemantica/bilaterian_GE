@@ -40,3 +40,4 @@ variables:
   seqsim_cutoff: 0.30
   human_match_cutoff: 0.25
   overlap_stringency: 0.80
+  min_aligned: 10

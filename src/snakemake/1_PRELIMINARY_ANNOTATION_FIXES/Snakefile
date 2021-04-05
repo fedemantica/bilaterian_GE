@@ -38,6 +38,7 @@ else:
   CHIMERIC_GENES_BATCHES = "1"
 
 OVERLAP_STRINGENCY = config["variables"]["overlap_stringency"]
+MIN_ALIGNED = config["variables"]["min_aligned"]
 
 ######### tools ################
 BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
@@ -94,8 +95,8 @@ rule all:
 		CHIMERIC_OG,
 		MULTIPLE_ALN,
 		ALIGNED_FRAGMENT_INFO,
-		CLASSIFIED_CHIMERIC_GENES
-		#FINAL_FRAGMENTS_YAMI
+		CLASSIFIED_CHIMERIC_GENES,
+		FINAL_FRAGMENTS_YAMI
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -913,6 +914,7 @@ rule extract_aligned_fragments:
 							--exon_positions_dir {params.exon_position_dir} \
 							--alignment {output}.tmp \
 							--overlap_stringency {OVERLAP_STRINGENCY} \
+							--min_aligned {MIN_ALIGNED} \
 							--output {output};
 		rm {output}.tmp
 		"""		
@@ -1032,7 +1034,7 @@ rule combine_exon_pos_info:
 	input:
 		BROCCOLI+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
 	output:
-		BROCCOLI+"/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab"
+		BROCCOLI+"/{my_version}/chimeric_proteins/Combined_exons_pos_info.tab"
 	shell:
 		"""
 		perl {GET_EXCOORDS} {input} {output}
@@ -1042,7 +1044,7 @@ rule combine_exon_pos_info:
 rule final_info_chimeric_genes:
 	input:
 		chimeric_clusters = BROCCOLI+"/{my_version}/chimeric_proteins/Chimeric_clusters.tab",
-		combined_pos = BROCCOLI+"/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab",
+		combined_pos = BROCCOLI+"/{my_version}/chimeric_proteins/Combined_exons_pos_info.tab",
 		first_last = BROCCOLI+"/{my_version}/chimeric_proteins/Exon_first-last_in_aln.tab"
 	output:
 		main = BROCCOLI+"/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab",
