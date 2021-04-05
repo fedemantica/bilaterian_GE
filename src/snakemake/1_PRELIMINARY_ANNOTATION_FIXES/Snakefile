@@ -8,6 +8,7 @@ DATABASE = config["paths"]["database"]
 GENOME_DIR = config["paths"]["genome_dir"]
 GTF_REF_DIR = config["paths"]["gtf_ref_dir"]
 EXINT_REF_DIR = config["paths"]["exint_ref_dir"]
+GENEID_PARAMS = config["paths"]["geneID_params"]
 
 ########## variables ###########
 ALL_SPECIES = config["variables"]["all_species"]
@@ -60,6 +61,8 @@ GET_AA_POSITIONS = config["tools"]["get_aa_position"]
 ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
 GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
 CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
+GENERATE_CHIMERIC_GENE_IDS = config["tools"]["generate_chimeric_geneIDs"]
+
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -76,6 +79,8 @@ CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups
 MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
 ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 CLASSIFIED_CHIMERIC_GENES = expand("{path}/{my_version}/chimeric_proteins/classified_chimeric_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
+CHIMERIC_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt", path=BROCCOLI, my_version=MY_VERSION, species = INVERTEBRATE_SPECIES)
+BROCCOLI+"/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt"
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
@@ -96,7 +101,8 @@ rule all:
 		MULTIPLE_ALN,
 		ALIGNED_FRAGMENT_INFO,
 		CLASSIFIED_CHIMERIC_GENES,
-		FINAL_FRAGMENTS_YAMI
+		FINAL_FRAGMENTS_YAMI,
+		CHIMERIC_GENE_IDS
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -929,6 +935,21 @@ rule classify_chimeric_genes:
 		python {CLASSIFY_CHIMERIC_GENES} -i {input} -o {output}
 		"""
 
+##############################################
+############ Correct gtf #####################
+##############################################
+#Correct the gtf taking into account the broken and the chimeric genes
+
+rule generate_new_chimeric_IDs:
+	input:
+		BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab"
+	output:
+		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt"
+	shell:
+		"""
+		ptyhon {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} --input {input} --output {output}
+		"""
+
 
 ###############################################
 ########### CHIMERIC GENES OLD ################
@@ -1054,8 +1075,4 @@ rule final_info_chimeric_genes:
 		perl {GET_EX_PATH} {input.chimeric_clusters} {input.combined_pos} {input.first_last} {output.main} > {output.stats}
 		"""
 
-##############################################
-############ Correct gtf #####################
-##############################################
-#Correct the gtf taking into account the broken and the chimeric genes
 

@@ -1,0 +1,4 @@
+species	geneID_prefix	geneID_length
+BmA	BGIBMGA	13
+Eba	EBAG	11
+Bge	BGER	10

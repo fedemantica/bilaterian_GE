@@ -10,6 +10,7 @@ paths:
   genome_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/genomes"
   gtf_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref"
   exint_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/exint/ref"
+  geneID_params: "./geneID_params.txt"  
 
 tools:
   broccoli_main: "/users/mirimia/fmantica/software/Broccoli-master-2/broccoli.py"
@@ -31,6 +32,7 @@ tools:
   align_chimeric_OG: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/align_chimeric_OG.py"
   get_chimeric_aligned_region: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_chimeric_aligned_region.py"
   classify_chimeric_genes: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/classify_chimeric_genes.py"
+  generate_chimeric_geneIDs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/generate_chimeric_geneIDs.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
