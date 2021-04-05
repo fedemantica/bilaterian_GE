@@ -94,8 +94,8 @@ for my_alignment_prefix in my_alignment_prefix_list:
 
     #Translate from alignment position to chimeric gene position. Create a dictionary between the two "coordinate" systems (the chimeric gene aln with and without indels)
     aln_chimeric_gene_pos_dict = {key: value for value, key in enumerate(valid_positions)}
-    first_aligned_aa = aln_chimeric_gene_pos_dict[first_aligned_pos] #first aa in the fragment
-    last_aligned_aa = aln_chimeric_gene_pos_dict[last_aligned_pos] #last aa in the fragment
+    first_aligned_aa = aln_chimeric_gene_pos_dict[first_aligned_pos]+1 #first aa in the fragment. Add one because the other aa_pos are in a 1-based system
+    last_aligned_aa = aln_chimeric_gene_pos_dict[last_aligned_pos]+1 #last aa in the fragment. Add one because other aa_post are in a 1-based system
 
     #Subset the exon positions dataframe to only the chimeric gene of interest
     chimeric_gene_exon_pos = all_exon_pos_df[all_exon_pos_df["geneID"]==my_chimeric_gene]
