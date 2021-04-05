@@ -12,7 +12,7 @@ parser.add_argument("--output", "-o", required=True, metavar="output", help="Pat
 
 #Read arguments
 args = parser.parse_args()
-species = args.species
+my_species = args.species
 my_params_file = args.params_file
 my_input_file = args.input
 my_output_file = args.output
@@ -20,8 +20,8 @@ my_output_file = args.output
 #Read params file
 #Header: species, geneID_prefix, geneID_length
 params_df = pd.read_table(my_params_file, sep="\t", header=0, index_col=False)
-prefix = str(params_df[params_df["species"]==my_species]["geneID_prefix"][0])
-length = str(params_df[params_df["species"]==my_species]["geneID_length"][0])
+prefix = str(list(params_df[params_df["species"]==my_species]["geneID_prefix"])[0])
+length = int(list(params_df[params_df["species"]==my_species]["geneID_length"])[0])
 
 #Read input
 #Header: OG_ID, species, geneID, geneName, chimeric_label

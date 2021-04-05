@@ -947,7 +947,7 @@ rule generate_new_chimeric_IDs:
 		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_chimeric_geneID.txt"
 	shell:
 		"""
-		ptyhon {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} --input {input} --output {output}
+		python {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} --input {input} --output {output}
 		"""
 
 
