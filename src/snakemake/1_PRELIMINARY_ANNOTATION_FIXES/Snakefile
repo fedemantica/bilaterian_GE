@@ -62,7 +62,7 @@ ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
 GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
 CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
 GENERATE_CHIMERIC_GENE_IDS = config["tools"]["generate_chimeric_geneIDs"]
-
+CORRECT_REF_GTF = config["tools"]["correct_ref_gtf"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -926,12 +926,13 @@ rule extract_aligned_fragments:
 
 rule classify_chimeric_genes:
 	input:
-		BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab"
+		aligned_fragments = BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab",
+		gene_ID_species_dict = BROCCOLI+"/{my_version}/geneID_species_dict.tab"
 	output:
 		BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab"
 	shell:
 		"""
-		python {CLASSIFY_CHIMERIC_GENES} -i {input} -o {output}
+		python {CLASSIFY_CHIMERIC_GENES} -i {input.aligned_fragments} -s {input.gene_ID_species_dict} -o {output}
 		"""
 
 ##############################################
@@ -951,6 +952,21 @@ rule generate_new_IDs:
 		python {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} \
 			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
 		"""
+
+#rule correct_gtf:
+#	input:
+#		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+#		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab",
+#		chimeric_genes = BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab",
+#		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+#	output:
+#		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot"
+#	shell:
+#		"""
+#		python {CORRECT_REF_GTF} --gtf {input.gtf} --broken {input.broken} --chimeric {input.chimeric} \
+#			--IDs {input.geneIDs} --params_file {GENEID_PARAMS} --output {output}
+#		"""
+
 
 ###############################################
 ########### CHIMERIC GENES OLD ################
