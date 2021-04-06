@@ -20,7 +20,7 @@ my_input_chimeric = args.input_chimeric
 my_output_file = args.output
 
 #Read params file
-#Header: species, geneID_prefix, geneID_length
+#Header: species, geneID_prefix, geneID_length, transcript_suffix, protein_suffix
 params_df = pd.read_table(my_params_file, sep="\t", header=0, index_col=False)
 prefix = str(list(params_df[params_df["species"]==my_species]["geneID_prefix"])[0])
 length = int(list(params_df[params_df["species"]==my_species]["geneID_length"])[0])
@@ -33,7 +33,7 @@ new_IDs_num = species_broken_df.shape[0] #how many new broken IDs need to be gen
 new_IDs_suffix = [str(element) for element in list(range(1, new_IDs_num+1))]
 new_IDs_list = [broken_prefix + str("0"*(length-len(broken_prefix)-len(element))) + element for element in new_IDs_suffix]
 #Pair the chimeric geneIDs
-species_broken_df["chimeric_IDs"] = new_IDs_list #there are only two columns here: geneID, chimeric_IDs
+species_broken_df["new_IDs"] = new_IDs_list #there are only two columns here: broken_geneID, new_IDs
 species_broken_df["category"] = "broken"
 
 ########## Chimeric genes 
@@ -50,9 +50,9 @@ new_IDs_list = [chimeric_prefix + str("0"*(length-len(chimeric_prefix)-len(eleme
 #Pair the chimeric geneIDs
 new_IDs_it = iter(new_IDs_list) #NB: the iterator is consumed once called
 new_IDs_paired = [element[0]+";"+element[1] for element in list(zip(new_IDs_it, new_IDs_it))]
-species_chimeric_df["chimeric_IDs"] = new_IDs_paired
+species_chimeric_df["new_IDs"] = new_IDs_paired
 species_chimeric_df["category"] = "chimeric"
-species_chimeric_df = species_chimeric_df[["geneID", "chimeric_IDs", "category"]] #Add IDs to original df
+species_chimeric_df = species_chimeric_df[["geneID", "new_IDs", "category"]] #Add IDs to original df
 
 #concat broken genes info
 final_df = pd.concat([species_broken_df, species_chimeric_df])
