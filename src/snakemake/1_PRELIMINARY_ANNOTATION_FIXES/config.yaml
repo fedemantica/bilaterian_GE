@@ -33,6 +33,7 @@ tools:
   get_chimeric_aligned_region: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_chimeric_aligned_region.py"
   classify_chimeric_genes: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/classify_chimeric_genes.py"
   generate_chimeric_geneIDs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/generate_chimeric_geneIDs.py"
+  correct_ref_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_ref_gtf.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
