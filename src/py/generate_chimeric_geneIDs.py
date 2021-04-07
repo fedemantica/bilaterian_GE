@@ -40,19 +40,23 @@ species_broken_df["category"] = "broken"
 #Read input
 #Header: OG_ID, species, geneID, geneName, chimeric_label
 chimeric_input_df = pd.read_table(my_input_chimeric, sep="\t", index_col=False, header=0)
-species_chimeric_df = chimeric_input_df.loc[(chimeric_input_df["species"]==my_species) & (chimeric_input_df["chimeric_label"]=="chimeric")]
+chimeric_input_df = chimeric_input_df.loc[(chimeric_input_df["species"]==my_species) & (chimeric_input_df["chimeric_label"]=="chimeric")]
+species_chimeric_genes = list(set(list(chimeric_input_df["geneID"])))
 
 #Generate the new chimeric geneIDs
 chimeric_prefix = prefix+"C"
-new_IDs_num = species_chimeric_df.shape[0]*2 #how many new chimeric IDs need to be generated
+new_IDs_num = len(species_chimeric_genes)*2 #how many new chimeric IDs need to be generated
 new_IDs_suffix = [str(element) for element in list(range(1, new_IDs_num+1))]
 new_IDs_list = [chimeric_prefix + str("0"*(length-len(chimeric_prefix)-len(element))) + element for element in new_IDs_suffix]
 #Pair the chimeric geneIDs
 new_IDs_it = iter(new_IDs_list) #NB: the iterator is consumed once called
 new_IDs_paired = [element[0]+";"+element[1] for element in list(zip(new_IDs_it, new_IDs_it))]
-species_chimeric_df["new_IDs"] = new_IDs_paired
-species_chimeric_df["category"] = "chimeric"
-species_chimeric_df = species_chimeric_df[["geneID", "new_IDs", "category"]] #Add IDs to original df
+
+species_chimeric_df = pd.DataFrame({"geneID" : species_chimeric_genes, "new_IDs" : new_IDs_paired, "category" : ["chimeric"]*len(species_chimeric_genes)})
+
+#species_chimeric_df["new_IDs"] = new_IDs_paired
+#species_chimeric_df["category"] = "chimeric"
+#species_chimeric_df = species_chimeric_df[["geneID", "new_IDs", "category"]] #Add IDs to original df
 
 #concat broken genes info
 final_df = pd.concat([species_broken_df, species_chimeric_df])
