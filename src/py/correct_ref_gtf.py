@@ -14,7 +14,8 @@ parser.add_argument("--broken", "-b", required=True, metavar="suffix", help="One
 parser.add_argument("--chimeric", "-c", required=True, metavar="length", help="Output of classify_chimeric_genes.py, with classification of the chimeric genes")
 parser.add_argument("--IDs", "-i", required=True, metavar="input", help="File with col1=original gene IDs (of broken or chimeric genes) and col2=new geneID after correction")
 parser.add_argument("--params_file", "-p", required=True, metavar="input", help="Params file with geneID infos for each species (suffix, length)")
-parser.add_argument("--output", "-o", required=True, metavar="output", help="Path to output file")
+parser.add_argument("--output", "-o", required=True, metavar="output", help="Path to output file for corrected GTF")
+parser.add_argument("--output_unresolved", "-or", required=True, metavar="output_unresolved", help="Path to output file with unresolved chimeric genes")
 
 ###### Read arguments
 args = parser.parse_args()
@@ -25,6 +26,7 @@ chimeric_genes_file = args.chimeric
 geneIDs_file = args.IDs
 my_params_file = args.params_file
 output_file = args.output
+output_unresolved = args.output_unresolved
 
 ##################################
 ###### DEFINE FUNCTIONS ##########
@@ -100,6 +102,11 @@ def def_boundary_exon(chimeric_df): #input is a dataframe with header: species, 
   final_df = pd.concat([final_df, my_df_selected[["chimeric_geneID", "boundary_ex_left", "boundary_ex_right"]]]) 
   #separately save the DIFFERENT_EXONS-OVERLAP which can't be properly classified
   my_df_unselected = my_df[my_df["ex_overlap"]!=1]
+  my_df_unselected = my_df_unselected.drop(columns=["ex_stop1", "ex_start2"]) #remove extra columns
+  ######### COMPLETE_OVERLAP: this will not be corrected, I will act at the level of gene orthogroups.
+  my_df = chimeric_df[chimeric_df["chimeric_class"]=="COMPLETE_OVERLAP"]
+  my_df["ex_overlap"] = "complete"
+  my_df_unselected = pd.concat([my_df_unselected, my_df])  
   return(final_df, my_df_unselected)
 
 def modify_value_in_tuple(attribute_field, category, new_value):
@@ -317,15 +324,18 @@ for repaired_gene, group in grouped_broken_GTF_df:
 ##################################
 
 ###Preprocessing: get exon boundaries for all categories
-chimeric_genes_to_correct_df = chimeric_genes_df[~(chimeric_genes_df["chimeric_class"]=="COMPLETE_OVERLAP")]
+#chimeric_genes_to_correct_df = chimeric_genes_df[~(chimeric_genes_df["chimeric_class"]=="COMPLETE_OVERLAP")]
 #print(chimeric_genes_to_correct_df)
 #print(chimeric_genes_to_correct_df.shape)
-chimeric_genes_to_correct = list(chimeric_genes_to_correct_df["chimeric_geneID"])
+#chimeric_genes_to_correct = list(chimeric_genes_to_correct_df["chimeric_geneID"])
+chimeric_genes_to_correct = list(chimeric_genes_df["chimeric_geneID"])
 #generate a boundary exons df
-res = def_boundary_exon(chimeric_genes_to_correct_df)
+res = def_boundary_exon(chimeric_genes_df)
 boundary_ex_df = res[0]
-#print(boundary_ex_df.shape)
 unresolved_chimeric_df = res[1]
+#Save unresolved_df to file
+unresolved_chimeric_df.to_csv(output_unresolved, sep="\t", index=False, header=True, na_rep="NA")
+
 #create dictionary with correspondence between geneID - left boundary and geneID - right boundary
 geneID_left_bound_dict = pd.Series(boundary_ex_df.boundary_ex_left.values, index=boundary_ex_df.chimeric_geneID).to_dict()
 geneID_right_bound_dict = pd.Series(boundary_ex_df.boundary_ex_right.values, index=boundary_ex_df.chimeric_geneID).to_dict()
