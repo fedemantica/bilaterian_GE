@@ -83,6 +83,7 @@ NEW_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_new_geneIDs.
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
+BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species="BmA")
 
 ######### rules ################
 
@@ -101,7 +102,8 @@ rule all:
 		ALIGNED_FRAGMENT_INFO,
 		CLASSIFIED_CHIMERIC_GENES,
 		FINAL_FRAGMENTS_YAMI,
-		NEW_GENE_IDS
+		NEW_GENE_IDS,
+		BROCHI_CORRECTED_GTF
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -953,19 +955,19 @@ rule generate_new_IDs:
 			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
 		"""
 
-#rule correct_gtf:
-#	input:
-#		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
-#		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab",
-#		chimeric_genes = BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab",
-#		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
-#	output:
-#		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot"
-#	shell:
-#		"""
-#		python {CORRECT_REF_GTF} --gtf {input.gtf} --broken {input.broken} --chimeric {input.chimeric} \
-#			--IDs {input.geneIDs} --params_file {GENEID_PARAMS} --output {output}
-#		"""
+rule correct_gtf:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab",
+		chimeric_genes = BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+	output:
+		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf"
+	shell:
+		"""
+		python {CORRECT_REF_GTF} --species {wildcards.species} --gtf {input.gtf} --broken {input.broken_genes} \
+			--chimeric {input.chimeric_genes} --IDs {input.geneIDs} --params_file {GENEID_PARAMS} --output {output}
+		"""
 
 
 ###############################################

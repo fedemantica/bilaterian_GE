@@ -5,6 +5,7 @@ import pandas as pd
 import re
 import numpy as np
 import math
+import csv
 
 parser = argparse.ArgumentParser(description="Script to correct broken and chimeric genes in the reference gtf")
 parser.add_argument("--species", "-s", required=True, metavar="species", help="Species of interest")
@@ -22,9 +23,13 @@ gtf_file = args.gtf
 broken_genes_file = args.broken
 chimeric_genes_file = args.chimeric
 geneIDs_file = args.IDs
+my_params_file = args.params_file
 output_file = args.output
 
-###### Define functions
+##################################
+###### DEFINE FUNCTIONS ##########
+##################################
+
 #function to separate the gtf atttribute field in a list of tuples, preserving the original order of the entries
 def separate_attributes(attribute_field): #input is a list of attribute entries (9th field of the GTF)
   final_list = []
@@ -82,6 +87,7 @@ def def_boundary_exon(chimeric_df): #input is a dataframe with header: species, 
   my_df = chimeric_df[chimeric_df["chimeric_class"]=="DIFFERENT_EXONS-NO_CONTINUOS"]
   my_df["boundary_ex_left"] = [element.split(";")[0].split("-")[1] for element in list(my_df["first-last_aligned_ex"])]
   my_df["boundary_ex_right"] = [element.split(";")[1].split("-")[0] for element in list(my_df["first-last_aligned_ex"])]
+  final_df = pd.concat([final_df, my_df[["chimeric_geneID", "boundary_ex_left", "boundary_ex_right"]]])
   ########### DIFFERENT_EXONS-OVERLAP: here in case the overlap is only 2 exons, we assign each overlapping to one of the genes
   my_df = chimeric_df[chimeric_df["chimeric_class"]=="DIFFERENT_EXONS-OVERLAP"]
   my_df["ex_stop1"] = [int(element.split(";")[0].split("-")[1]) for element in list(my_df["first-last_aligned_ex"])]
@@ -166,7 +172,7 @@ def renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_ex
   for part in broken_parts[1:]: #access all the broken genes after the first
     second_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==part] #subset by first gene
     ex_number_list = list(sorted(list(set(list(second_broken_exons_df["exon_number"])))))
-    new_exon_number = list(range(last_ex_tmp+1, len(ex_number_list)+3))
+    new_exon_number = list(range(last_ex_tmp+1, last_ex_tmp+1+len(ex_number_list)))
     ex_number_dict = {float(element) : new_exon_number[ex_number_list.index(element)] for element in ex_number_list}
     second_broken_exons_df["exon_number"] = second_broken_exons_df["exon_number"].map(ex_number_dict)
     last_ex_tmp = int(max(list(second_broken_exons_df["exon_number"])))
@@ -181,7 +187,7 @@ def add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex):
       gene_entry["stop"] = list(broken_exons_df[(broken_exons_df["exon_number"]==last_ex) & (broken_exons_df["type"]=="exon")]["stop"])[0] #set stop from last ex
     elif str(list(gene_entry["strand"])[0]) == "-":
       gene_entry["start"] = int(list(broken_exons_df[(broken_exons_df["exon_number"]==last_ex) & (broken_exons_df["type"]=="exon")]["start"])[0]) #set start from last ex
-      gene_entry["stop"] = int(list(second_gene_df[(broken_exons_df["exon_number"]==first_ex) & (broken_exons_df["type"]=="exon")]["stop"])[0])      
+      gene_entry["stop"] = int(list(broken_exons_df[(broken_exons_df["exon_number"]==first_ex) & (broken_exons_df["type"]=="exon")]["stop"])[0])      
     broken_exons_df = pd.concat([broken_exons_df, gene_entry])
   if "transcript" in list(set(list(group["type"]))):
     transcript_entry = group[group["type"]=="transcript"].head(1) #select the first transcript entry, but replace both start and stop just in case.
@@ -193,11 +199,14 @@ def add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex):
 def rebuild_attribute_entry(mod_attribute_field):
   final_list = []
   for field in mod_attribute_field:
-    new_entry = "; ".join([": ".join(element) for element in prova_attr])
-    final_list = final_list+[new_entry]
-  return(new_entry)
+    new_entry = '; '.join([' '.join(element) for element in field])
+    final_list = final_list + [new_entry]
+  return(final_list)
 
-###### Read inputs
+##################################
+###### READ INPUTS ###############
+##################################
+
 gtf_df = pd.read_table(gtf_file, sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute"])
 #gtf_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref/BmA_annot-B.gtf", sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase","attribute"])
 broken_genes_list = list(pd.read_table(broken_genes_file, sep="\t", index_col=False, header=None, names=["broken_genes"])["broken_genes"])
@@ -225,6 +234,9 @@ transcript_suffix = str(list(params_df[params_df["species"]==species]["transcrip
 protein_suffix = str(list(params_df[params_df["species"]==species]["protein_suffix"])[0])
 #params_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/src/snakemake/1_PRELIMINARY_ANNOTATION_FIXES/geneID_params.txt", sep="\t", header=0, index_col=False)
 
+print("%s: %d" % ("broken_genes", len(broken_gene_flatten_list))) #for debugging
+print("%s: %d" % ("chimeric_genes", len(chimeric_genes_list))) #for debugging
+
 ##################################
 ####### HEALTHY GENES ############
 ##################################
@@ -233,6 +245,8 @@ gtf_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in li
 brochi_genes_list = broken_gene_flatten_list + chimeric_genes_list
 #filter out entries of brochi genes from the GTF
 healthy_GTF_df = gtf_df[~(gtf_df["geneID"].isin(brochi_genes_list))] 
+healthy_GTF_df = healthy_GTF_df.rename(columns={"attribute" : "attribute_mod"}) #rename field to match the broken and chimeric gtf dataframes
+healthy_GTF_df = healthy_GTF_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
 
 ##################################
 ####### BROKEN GENES #############
@@ -242,78 +256,86 @@ healthy_GTF_df = gtf_df[~(gtf_df["geneID"].isin(brochi_genes_list))]
 broken_GTF_df = gtf_df.loc[gtf_df["geneID"].isin(broken_gene_flatten_list)]
 #add exon number column and transform the attribute field in a list of tuples
 broken_GTF_df["exon_number"] = add_exon_number(list(broken_GTF_df["attribute"]))
+broken_GTF_df["exon_number"] = broken_GTF_df["exon_number"].astype("Int64") #This is necessary to have integers with NaN
 broken_GTF_df["gene_name"] = add_gene_name(list(broken_GTF_df["attribute"]))
 broken_GTF_df["attribute_mod"] = separate_attributes(list(broken_GTF_df["attribute"])) 
-
 #add new geneID column (use the dict)
 broken_GTF_df["new_geneID"] = broken_GTF_df["geneID"].map(geneIDs_dict)
 
+all_broken_gtf_df = pd.DataFrame() #initialize gtf_df for all broken genes
 #groupby the new geneID column and cycle on the groups.
 grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
-
 for repaired_gene, group in grouped_broken_GTF_df:
-#group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
-#derive variables
-broken_part = reverse_geneID_dict[repaired_gene].split(";") 
-new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
-#add transcriptID and proteinID columns to group.
-group["new_transcriptID"] = group["new_geneID"]+transcript_suffix
-group["new_proteinID"] = group["new_geneID"]+protein_suffix
-#broken_df_exons; select only entries with exons.
-broken_exons_df = group.dropna(subset=["exon_number"])
+  print(repaired_gene) #for debugging
+  #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
+  #derive variables
+  broken_parts = reverse_geneID_dict[repaired_gene].split(";") 
+  new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
+  #add transcriptID and proteinID columns to group.
+  group["new_transcriptID"] = group["new_geneID"]+transcript_suffix
+  group["new_proteinID"] = group["new_geneID"]+protein_suffix
+  #broken_df_exons; select only entries with exons.
+  broken_exons_df = group.dropna(subset=["exon_number"])
 
-#make sure exnos are ordered (by start and stop coords), and re-number them (the second gene will change).
-broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
-first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene. I hope they are always ordered
-last_ex_tmp = int(max(list(first_broken_exons_df["exon_number"])))
+  #make sure exnos are ordered (by start and stop coords), and re-number them (the second gene will change).
+  broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
+  first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene. I hope they are always ordered
+  last_ex_tmp = int(max(list(first_broken_exons_df["exon_number"])))
 
-#renumber the exons (both exons and CDS)
-broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_exons_df)
-first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
-last_ex = int(max(list(broken_exons_df["exon_number"])))
-#If there were start codons entries -> take only the start codon corresponding to new exon 1.
-broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
-#If there were stop codons entries -> take only the stop codon corresponding to the new last exon.
-removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)]
-broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex))]
-#If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
-if remove_stop_codons.shape[0] >= 1:
-  last_stop_coords = list(remove_stop_codons["stop"])
-  broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
-#if originally there were gene and transcript entries, take them and modify the start and stop.
-broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
+  #renumber the exons (both exons and CDS)
+  broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_exons_df)
+  first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
+  last_ex = int(max(list(broken_exons_df["exon_number"])))
+  #If there were start codons entries -> take only the start codon corresponding to new exon 1.
+  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
+  #If there were stop codons entries -> take only the stop codon corresponding to the new last exon.
+  removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)]
+  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex))]
+  #If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
+  if removed_stop_codons.shape[0] >= 1:
+    last_stop_coords = list(removed_stop_codons["stop"])
+    broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
+  #if originally there were gene and transcript entries, take them and modify the start and stop.
+  broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
 
-#update the geneID, transcriptID and proteinID in loco
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_id", list(broken_exons_df["new_geneID"]))
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_id", list(broken_exons_df["new_transcriptID"]))
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "protein_id", list(broken_exons_df["new_proteinID"]))
-#modify source and gene name (new gene name=broken_name1;broken_name2...)
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_name", [new_gene_name for element in list(range(broken_exons_df.shape[0]))])
-#Rebuild the attribute field in the original format
-broken_exons_df["attribute_mod"] rebuild_attribute_entry(list(broken_exons_df["attribute_mod"]))
+  #update the geneID, transcriptID and proteinID in loco
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_id", list(broken_exons_df["new_geneID"]))
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_id", list(broken_exons_df["new_transcriptID"]))
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "protein_id", list(broken_exons_df["new_proteinID"]))
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "exon_number", list(broken_exons_df["exon_number"]))
+  #modify source and gene name (new gene name=broken_name1;broken_name2...)
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
+  broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_name", [new_gene_name for element in list(range(broken_exons_df.shape[0]))])
+  #Rebuild the attribute field in the original format
+  broken_exons_df["attribute_mod"] = rebuild_attribute_entry(list(broken_exons_df["attribute_mod"]))
+  final_broken_exons_df = broken_exons_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
+  all_broken_gtf_df = pd.concat([all_broken_gtf_df, final_broken_exons_df])
 
 ##################################
-####### CHIMERIC GENES #############
+####### CHIMERIC GENES ###########
 ##################################
 
 ###Preprocessing: get exon boundaries for all categories
-chimeric_genes_to_correct_df = chimeric_genes_df[chimeric_genes_df["chimeric_class"]!="COMPLETE_OVERLAP"]
+chimeric_genes_to_correct_df = chimeric_genes_df[~(chimeric_genes_df["chimeric_class"]=="COMPLETE_OVERLAP")]
+#print(chimeric_genes_to_correct_df)
+#print(chimeric_genes_to_correct_df.shape)
 chimeric_genes_to_correct = list(chimeric_genes_to_correct_df["chimeric_geneID"])
 #generate a boundary exons df
 res = def_boundary_exon(chimeric_genes_to_correct_df)
 boundary_ex_df = res[0]
+#print(boundary_ex_df.shape)
 unresolved_chimeric_df = res[1]
 #create dictionary with correspondence between geneID - left boundary and geneID - right boundary
 geneID_left_bound_dict = pd.Series(boundary_ex_df.boundary_ex_left.values, index=boundary_ex_df.chimeric_geneID).to_dict()
 geneID_right_bound_dict = pd.Series(boundary_ex_df.boundary_ex_right.values, index=boundary_ex_df.chimeric_geneID).to_dict()
 
 ###Correct GTF
-
 #subset GTF to chimeric genes to correct
-chimeric_GTF_df = gtf_df.loc[gtf_df["geneID"].isin(chimeric_genes_to_correct)]
+chimeric_genes_to_correct = [element for element in chimeric_genes_to_correct if element not in list(unresolved_chimeric_df["chimeric_geneID"])] #remove "unersolved" genes (these are saved to file separately)
+chimeric_genes_to_correct = [element for element in chimeric_genes_to_correct if element not in broken_gene_flatten_list] #remove those fucking cases where the gene is also broken
 
+chimeric_GTF_df = gtf_df.loc[gtf_df["geneID"].isin(chimeric_genes_to_correct)]
 #add columns with relevant information
 #chimeric_GTF_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(chimeric_GTF_df["attribute"]) for part in element.split(";") if "gene_id" in part]
 chimeric_GTF_df["exon_number"] = add_exon_number(list(chimeric_GTF_df["attribute"]))
@@ -321,65 +343,73 @@ chimeric_GTF_df["attribute_mod"] = separate_attributes(list(chimeric_GTF_df["att
 #add new geneIDs as a separate column
 chimeric_GTF_df["new_geneID"] = chimeric_GTF_df["geneID"].map(geneIDs_dict) #the new geneID for the chimeric gene is in the format "geneID1;geneID2"
 
-
+all_chimeric_gtf_df = pd.DataFrame() #initialize gtf_df for all chimeric genes
 #group by chimeric geneID and cycle on the groups
 grouped_chimeric_GTF_df = chimeric_GTF_df.groupby("geneID")
-for chimeric_gene, group:
+for chimeric_gene, group in grouped_chimeric_GTF_df:
+  print(chimeric_gene) #for debugging
   ### First gene: exon number <= boundary_ex_left
-#Test geneID: BGIBMGA001038
-#group = chimeric_GTF_df[chimeric_GTF_df["geneID"]=="BGIBMGA001038"]
-first_ex = min([int(element) for element in list(group["exon_number"]) if math.isnan(element) == False]) #I have to use min because sometimes the enumeration starts from 2
-last_ex = geneID_left_bound_dict[chimeric_gene]
+  #Test geneID: BGIBMGA001038
+  #group = chimeric_GTF_df[chimeric_GTF_df["geneID"]=="BGIBMGA001038"]
+  first_ex = min([int(element) for element in list(group["exon_number"]) if math.isnan(element) == False]) #I have to use min because sometimes the enumeration starts from 2
+  last_ex = int(geneID_left_bound_dict[chimeric_gene]) #change data type
+  print(last_ex); print(type(last_ex)) 
+ 
+  group_exon_df = group.dropna(subset=["exon_number"])
+  first_gene_df = group_exon_df[group_exon_df["exon_number"] <= last_ex]
+  first_gene_df["exon_number"] = first_gene_df["exon_number"].astype("Int64") #this is necessary to have integers with NaN
+  #generate the geneID, transcriptID and proteinID
+  first_gene_df["new_geneID"] = [element.split(";")[0] for element in list(first_gene_df["new_geneID"])]
+  first_gene_df["new_transcriptID"] = first_gene_df["new_geneID"]+transcript_suffix
+  first_gene_df["new_proteinID"] = first_gene_df["new_geneID"]+protein_suffix
+  #add entries for gene, transcript and start codon (if present in the original)
+  first_gene_df = add_entries_first_gene(first_gene_df, group, first_ex, last_ex, transcript_suffix)
+  #update the geneID, transcriptID and proteinID and exon number
+  first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "gene_id", list(first_gene_df["new_geneID"]))
+  first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "transcript_id", list(first_gene_df["new_transcriptID"]))
+  first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "protein_id", list(first_gene_df["new_proteinID"]))
+  first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "exon_number", list(first_gene_df["exon_number"]))
+  #modify gene name (new gene name=chimeric_geneID_1)
+  first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "gene_name", [chimeric_gene+"_C1" for element in list(range(first_gene_df.shape[0]))])
 
-first_gene_df = group[group["exon_number"] <= last_ex]
-#generate the geneID, transcriptID and proteinID
-first_gene_df["new_geneID"] = [element.split(";")[0] for element in list(first_gene_df["new_geneID"])]
-first_gene_df["new_transcriptID"] = first_gene_df["new_geneID"]+transcript_suffix
-first_gene_df["new_proteinID"] = first_gene_df["new_geneID"]+protein_suffix
-#add entries for gene, transcript and start codon (if present in the original)
-first_gene_df = add_entries_first_gene(first_gene_df, group, first_ex, last_ex, transcript_suffix)
-#update the geneID, transcriptID and proteinID
-first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "gene_id", list(first_gene_df["new_geneID"]))
-first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "transcript_id", list(first_gene_df["new_transcriptID"]))
-first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "protein_id", list(first_gene_df["new_proteinID"]))
-#modify gene name (new gene name=chimeric_geneID_1)
-first_gene_df["attribute_mod"] = modify_value_in_tuple(list(first_gene_df["attribute_mod"]), "gene_name", [chimeric_gene+"_C1" for element in list(range(first_gene_df.shape[0]))])
+  ### Second gene: exon number >= boundary_ex_right
+  second_gene_df = group_exon_df[group_exon_df["exon_number"] >= int(geneID_right_bound_dict[chimeric_gene])]
+  #renumber the exons (both exons and CDS)
+  ex_number_list = list(sorted(list(set(list(second_gene_df["exon_number"])))))
+  ex_number_dict = {float(element) : ex_number_list.index(element)+1 for element in ex_number_list}
+  second_gene_df["exon_number"] = second_gene_df["exon_number"].map(ex_number_dict)
+  second_gene_df["exon_number"] = second_gene_df["exon_number"].astype("Int64") #this is necessary to have integers with NaN
 
-### Second gene: exon number >= boundary_ex_right
-second_gene_df = group[group["exon_number"] >= geneID_right_bound_dict[chimeric_gene]]
-#renumber the exons (both exons and CDS)
-ex_number_list = list(sorted(list(set(list(second_gene_df["exon_number"])))))
-ex_number_dict = {float(element) : ex_number_list.index(element)+1 for element in ex_number_list}
-second_gene_df["exon_number"] = second_gene_df["exon_number"].map(ex_number_dict)
+  #select first and last exon
+  first_ex = 1 #this will always be one after re-numbering
+  last_ex = max([int(element) for element in list(second_gene_df["exon_number"])])
+  #generate the geneID, transcriptID and proteinID
+  second_gene_df["new_geneID"] = [element.split(";")[1] for element in list(second_gene_df["new_geneID"])]
+  second_gene_df["new_transcriptID"] = second_gene_df["new_geneID"]+transcript_suffix
+  second_gene_df["new_proteinID"] = second_gene_df["new_geneID"]+protein_suffix
+  #add entries for gene and transcript
+  second_gene_df = add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript_suffix)
+  #update the geneID, transcriptID and proteinID
+  second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "gene_id", list(second_gene_df["new_geneID"]))
+  second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "transcript_id", list(second_gene_df["new_transcriptID"]))
+  second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "protein_id", list(second_gene_df["new_proteinID"]))
+  second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "exon_number", list(second_gene_df["exon_number"]))
+  #modify gene name (new gene name=chimeric_geneID_1)
+  second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "gene_name", [chimeric_gene+"_C2" for element in list(range(second_gene_df.shape[0]))])
 
-#select first and last exon
-first_ex = 1 #this will always be one after re-numbering
-last_ex = max([int(element) for element in list(second_gene_df["exon_number"])])
-#generate the geneID, transcriptID and proteinID
-second_gene_df["new_geneID"] = [element.split(";")[1] for element in list(second_gene_df["new_geneID"])]
-second_gene_df["new_transcriptID"] = second_gene_df["new_geneID"]+transcript_suffix
-second_gene_df["new_proteinID"] = second_gene_df["new_geneID"]+protein_suffix
-#add entries for gene and transcript
-second_gene_df = add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript_suffix)
-#update the geneID, transcriptID and proteinID
-second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "gene_id", list(second_gene_df["new_geneID"]))
-second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "transcript_id", list(second_gene_df["new_transcriptID"]))
-second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "protein_id", list(second_gene_df["new_proteinID"]))
-#modify gene name (new gene name=chimeric_geneID_1)
-second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "gene_name", [chimeric_gene+"_C2" for element in list(range(second_gene_df.shape[0]))])
+  #join dataframes and correct gene_source and transcript_source
+  joint_chimeric_df = pd.concat([first_gene_df, second_gene_df])
+  joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
+  joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
 
-#join dataframes and correct gene_source and transcript_source
-joint_chimeric_df = pd.concat([first_gene_df, second_gene_df])
-joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
-joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
-
-joint_chimeric_df["attribute_mod"] = rebuild_attribute_entry(list(joint_chimeric_df["attribute_mod"]))
-final_joint_chimeric_df = joint_chimeric_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]] 
+  joint_chimeric_df["attribute_mod"] = rebuild_attribute_entry(list(joint_chimeric_df["attribute_mod"]))
+  final_joint_chimeric_df = joint_chimeric_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]] 
+  all_chimeric_gtf_df = pd.concat([all_chimeric_gtf_df, final_joint_chimeric_df])
 
 #############################################
 ########## JOIN ALL GTF PARTS ###############
 #############################################
 
-final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df])
-
-
+final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
+final_df = final_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
+final_df.to_csv(output_file, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE)  #save to file
