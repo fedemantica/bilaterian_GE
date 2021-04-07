@@ -106,7 +106,11 @@ def def_boundary_exon(chimeric_df): #input is a dataframe with header: species, 
   ######### COMPLETE_OVERLAP: this will not be corrected, I will act at the level of gene orthogroups.
   my_df = chimeric_df[chimeric_df["chimeric_class"]=="COMPLETE_OVERLAP"]
   my_df["ex_overlap"] = "complete"
-  my_df_unselected = pd.concat([my_df_unselected, my_df])  
+  my_df_unselected = pd.concat([my_df_unselected, my_df])
+  ######### INVALID_ALN
+  my_df = chimeric_df[chimeric_df["chimeric_class"]=="INVALID_ALN"]
+  my_df["ex_overlap"] = "invalid"
+  my_df_unselected = pd.concat([my_df_unselected, my_df]) 
   return(final_df, my_df_unselected)
 
 def modify_value_in_tuple(attribute_field, category, new_value):
