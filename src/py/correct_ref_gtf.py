@@ -103,7 +103,8 @@ def modify_value_in_tuple(attribute_field, category, new_value):
     for part in field:
       if part[0] == category:
         sub_index = field.index(part)
-        field[sub_index][1] = new_value[index]
+        #field[sub_index][1] = new_value[index]
+        field[sub_index][1] = f'"{new_value[index]}"' #this prints the string with surrounding quotes
     final_list = final_list+[field]
   return(final_list)
 
@@ -189,8 +190,15 @@ def add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex):
     broken_exons_df = pd.concat([broken_exons_df, transcript_entry])
   return(broken_exons_df) 
 
+def rebuild_attribute_entry(mod_attribute_field):
+  final_list = []
+  for field in mod_attribute_field:
+    new_entry = "; ".join([": ".join(element) for element in prova_attr])
+    final_list = final_list+[new_entry]
+  return(new_entry)
+
 ###### Read inputs
-gtf_df = pd.read_table(gtf_file, sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase","attribute"])
+gtf_df = pd.read_table(gtf_file, sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute"])
 #gtf_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref/BmA_annot-B.gtf", sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase","attribute"])
 broken_genes_list = list(pd.read_table(broken_genes_file, sep="\t", index_col=False, header=None, names=["broken_genes"])["broken_genes"])
 broken_gene_flatten_list = [part for element in broken_genes_list for part in element.split(";")]
@@ -198,6 +206,7 @@ broken_gene_flatten_list = [part for element in broken_genes_list for part in el
 #Header: species, chimeric_geneID, orthogroup_ids, first-last_aligned_ex, first-last_aligned_aa, ex:start|stop_coord, chimeric_class
 chimeric_genes_df = pd.read_table(chimeric_genes_file, sep="\t", index_col=False, header=0)
 chimeric_genes_df = chimeric_genes_df[chimeric_genes_df["species"]==species] #subset for the species of interest
+chimeric_genes_list = list(chimeric_genes_df["chimeric_geneID"])
 #chimeric_genes_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/chimeric_proteins/classified_chimeric_genes.tab", sep="\t", index_col=False, header=0)
 #Header: geneID, new_IDs, category
 geneIDs_df = pd.read_table(geneIDs_file, sep="\t", index_col=False, header=0)
@@ -216,8 +225,79 @@ transcript_suffix = str(list(params_df[params_df["species"]==species]["transcrip
 protein_suffix = str(list(params_df[params_df["species"]==species]["protein_suffix"])[0])
 #params_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/src/snakemake/1_PRELIMINARY_ANNOTATION_FIXES/geneID_params.txt", sep="\t", header=0, index_col=False)
 
+##################################
+####### HEALTHY GENES ############
+##################################
+#add geneID
+gtf_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_df["attribute"]) for part in element.split(";") if "gene_id" in part]
+brochi_genes_list = broken_gene_flatten_list + chimeric_genes_list
+#filter out entries of brochi genes from the GTF
+healthy_GTF_df = gtf_df[~(gtf_df["geneID"].isin(brochi_genes_list))] 
 
-####### CHIMERIC GENES
+##################################
+####### BROKEN GENES #############
+##################################
+
+#subset gtf to broken genes.
+broken_GTF_df = gtf_df.loc[gtf_df["geneID"].isin(broken_gene_flatten_list)]
+#add exon number column and transform the attribute field in a list of tuples
+broken_GTF_df["exon_number"] = add_exon_number(list(broken_GTF_df["attribute"]))
+broken_GTF_df["gene_name"] = add_gene_name(list(broken_GTF_df["attribute"]))
+broken_GTF_df["attribute_mod"] = separate_attributes(list(broken_GTF_df["attribute"])) 
+
+#add new geneID column (use the dict)
+broken_GTF_df["new_geneID"] = broken_GTF_df["geneID"].map(geneIDs_dict)
+
+#groupby the new geneID column and cycle on the groups.
+grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
+
+for repaired_gene, group in grouped_broken_GTF_df:
+#group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
+#derive variables
+broken_part = reverse_geneID_dict[repaired_gene].split(";") 
+new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
+#add transcriptID and proteinID columns to group.
+group["new_transcriptID"] = group["new_geneID"]+transcript_suffix
+group["new_proteinID"] = group["new_geneID"]+protein_suffix
+#broken_df_exons; select only entries with exons.
+broken_exons_df = group.dropna(subset=["exon_number"])
+
+#make sure exnos are ordered (by start and stop coords), and re-number them (the second gene will change).
+broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
+first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene. I hope they are always ordered
+last_ex_tmp = int(max(list(first_broken_exons_df["exon_number"])))
+
+#renumber the exons (both exons and CDS)
+broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_exons_df)
+first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
+last_ex = int(max(list(broken_exons_df["exon_number"])))
+#If there were start codons entries -> take only the start codon corresponding to new exon 1.
+broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
+#If there were stop codons entries -> take only the stop codon corresponding to the new last exon.
+removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)]
+broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex))]
+#If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
+if remove_stop_codons.shape[0] >= 1:
+  last_stop_coords = list(remove_stop_codons["stop"])
+  broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
+#if originally there were gene and transcript entries, take them and modify the start and stop.
+broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
+
+#update the geneID, transcriptID and proteinID in loco
+broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_id", list(broken_exons_df["new_geneID"]))
+broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_id", list(broken_exons_df["new_transcriptID"]))
+broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "protein_id", list(broken_exons_df["new_proteinID"]))
+#modify source and gene name (new gene name=broken_name1;broken_name2...)
+broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
+broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
+broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_name", [new_gene_name for element in list(range(broken_exons_df.shape[0]))])
+#Rebuild the attribute field in the original format
+broken_exons_df["attribute_mod"] rebuild_attribute_entry(list(broken_exons_df["attribute_mod"]))
+
+##################################
+####### CHIMERIC GENES #############
+##################################
+
 ###Preprocessing: get exon boundaries for all categories
 chimeric_genes_to_correct_df = chimeric_genes_df[chimeric_genes_df["chimeric_class"]!="COMPLETE_OVERLAP"]
 chimeric_genes_to_correct = list(chimeric_genes_to_correct_df["chimeric_geneID"])
@@ -230,7 +310,6 @@ geneID_left_bound_dict = pd.Series(boundary_ex_df.boundary_ex_left.values, index
 geneID_right_bound_dict = pd.Series(boundary_ex_df.boundary_ex_right.values, index=boundary_ex_df.chimeric_geneID).to_dict()
 
 ###Correct GTF
-gtf_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_df["attribute"]) for part in element.split(";") if "gene_id" in part]
 
 #subset GTF to chimeric genes to correct
 chimeric_GTF_df = gtf_df.loc[gtf_df["geneID"].isin(chimeric_genes_to_correct)]
@@ -294,59 +373,13 @@ joint_chimeric_df = pd.concat([first_gene_df, second_gene_df])
 joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
 joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
 
+joint_chimeric_df["attribute_mod"] = rebuild_attribute_entry(list(joint_chimeric_df["attribute_mod"]))
+final_joint_chimeric_df = joint_chimeric_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]] 
 
-####### BROKEN GENES
-#subset gtf to broken genes.
-broken_GTF_df = gtf_df.loc[gtf_df["geneID"].isin(broken_gene_flatten_list)]
-#add exon number column and transform the attribute field in a list of tuples
-broken_GTF_df["exon_number"] = add_exon_number(list(broken_GTF_df["attribute"]))
-broken_GTF_df["gene_name"] = add_gene_name(list(broken_GTF_df["attribute"]))
-broken_GTF_df["attribute_mod"] = separate_attributes(list(broken_GTF_df["attribute"])) 
+#############################################
+########## JOIN ALL GTF PARTS ###############
+#############################################
 
-#add new geneID column (use the dict)
-broken_GTF_df["new_geneID"] = broken_GTF_df["geneID"].map(geneIDs_dict)
+final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df])
 
-#groupby the new geneID column and cycle on the groups.
-grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
-
-for repaired_gene, group in grouped_broken_GTF_df:
-#group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
-#derive variables
-broken_part = reverse_geneID_dict[repaired_gene].split(";") 
-new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
-#add transcriptID and proteinID columns to group.
-group["new_transcriptID"] = group["new_geneID"]+transcript_suffix
-group["new_proteinID"] = group["new_geneID"]+protein_suffix
-#broken_df_exons; select only entries with exons.
-broken_exons_df = group.dropna(subset=["exon_number"])
-
-#make sure exnos are ordered (by start and stop coords), and re-number them (the second gene will change).
-broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
-first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene. I hope they are always ordered
-last_ex_tmp = int(max(list(first_broken_exons_df["exon_number"])))
-
-#renumber the exons (both exons and CDS)
-broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_exons_df)
-first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
-last_ex = int(max(list(broken_exons_df["exon_number"])))
-#If there were start codons entries -> take only the start codon corresponding to new exon 1.
-broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
-#If there were stop codons entries -> take only the stop codon corresponding to the new last exon.
-removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)]
-broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex))]
-#If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
-if remove_stop_codons.shape[0] >= 1:
-  last_stop_coords = list(remove_stop_codons["stop"])
-  broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
-#if originally there were gene and transcript entries, take them and modify the start and stop.
-broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
-
-#update the geneID, transcriptID and proteinID in loco
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_id", list(broken_exons_df["new_geneID"]))
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_id", list(broken_exons_df["new_transcriptID"]))
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "protein_id", list(broken_exons_df["new_proteinID"]))
-#modify source and gene name (new gene name=broken_name1;broken_name2...)
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
-broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_name", [new_gene_name for element in list(range(broken_exons_df.shape[0]))])
 
