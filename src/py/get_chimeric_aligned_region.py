@@ -21,7 +21,7 @@ args = parser.parse_args()
 my_input_dir = args.input_dir
 my_exon_positions_dir = args.exon_positions_dir
 my_overlap_stringency = float(args.overlap_stringency)
-my_min_aligned = inr(args.min_aligned)
+my_min_aligned = int(args.min_aligned)
 my_output_file = args.output
 with open(args.alignment, "r") as alignment_prefix_file:
   my_alignment_prefix_list = alignment_prefix_file.readline().rstrip().split(";") #list of chimeric_geneID;orthogroupID
