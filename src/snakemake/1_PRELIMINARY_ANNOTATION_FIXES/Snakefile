@@ -83,7 +83,7 @@ NEW_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_new_geneIDs.
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
-BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species="BmA")
+BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
 
 ######### rules ################
 
@@ -92,16 +92,10 @@ rule all:
 		RUN_BROCCOLI,
 		PARSED_ORTHOGROUPS, 
 		SELECTED_BROKEN_GENES,
-		#CHIMERIC_CLUSTERS,
-		#CHIMERIC_PROT_SIM_SCORES,
-		#LONGEST_FRAGMENT,
-		#COMBINED_EX_POS_INFO,
-		#REF_PROT_AA_POS,
 		CHIMERIC_OG,
 		MULTIPLE_ALN,
 		ALIGNED_FRAGMENT_INFO,
 		CLASSIFIED_CHIMERIC_GENES,
-		FINAL_FRAGMENTS_YAMI,
 		NEW_GENE_IDS,
 		BROCHI_CORRECTED_GTF
 
@@ -962,11 +956,14 @@ rule correct_gtf:
 		chimeric_genes = BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab",
 		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
 	output:
-		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf"
+		unresolved = BROCCOLI+"/{my_version}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab",
+		brochi = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi_only.gtf",
+		gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf"
 	shell:
 		"""
 		python {CORRECT_REF_GTF} --species {wildcards.species} --gtf {input.gtf} --broken {input.broken_genes} \
-			--chimeric {input.chimeric_genes} --IDs {input.geneIDs} --params_file {GENEID_PARAMS} --output {output}
+			--chimeric {input.chimeric_genes} --IDs {input.geneIDs} --params_file {GENEID_PARAMS} \
+			--output {output.gtf} --output_brochi {output.brochi} --output_unresolved {output.unresolved}
 		"""
 
 

@@ -15,6 +15,7 @@ parser.add_argument("--chimeric", "-c", required=True, metavar="length", help="O
 parser.add_argument("--IDs", "-i", required=True, metavar="input", help="File with col1=original gene IDs (of broken or chimeric genes) and col2=new geneID after correction")
 parser.add_argument("--params_file", "-p", required=True, metavar="input", help="Params file with geneID infos for each species (suffix, length)")
 parser.add_argument("--output", "-o", required=True, metavar="output", help="Path to output file for corrected GTF")
+parser.add_argument("--output_brochi", "-ob", required=True, metavar="output_brochi", help="Path where to save only the subsetted gtf with the corrected broken and chimeric genes")
 parser.add_argument("--output_unresolved", "-or", required=True, metavar="output_unresolved", help="Path to output file with unresolved chimeric genes")
 
 ###### Read arguments
@@ -26,6 +27,7 @@ chimeric_genes_file = args.chimeric
 geneIDs_file = args.IDs
 my_params_file = args.params_file
 output_file = args.output
+output_brochi = args.output_brochi
 output_unresolved = args.output_unresolved
 
 ##################################
@@ -423,6 +425,10 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
 #############################################
 ########## JOIN ALL GTF PARTS ###############
 #############################################
+#save only the brochi_gtf to file
+brochi_df = pd.concat([all_broken_gtf_df, all_chimeric_gtf_df])
+brochi_df = brochi_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf
+brochi_df.to_csv(output_brochi, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE) #the csv.QUOTE_NONE avoids extra quotes aroung the attribute field
 
 final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
 final_df = final_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
