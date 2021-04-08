@@ -39,8 +39,8 @@ variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
   my_version: "BmA_version"
   gene_num: ["two_genes", "more_genes"]
-  invertebrate_species: ["BmA", "Bge", "Eba"]
+  invertebrate_species: ["BmA", "Bge", "Eba","Sma"]
   seqsim_cutoff: 0.30
   human_match_cutoff: 0.25
-  overlap_stringency: 0.80
+  overlap_stringency: 0.60
   min_aligned: 10

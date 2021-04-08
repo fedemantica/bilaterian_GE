@@ -2,3 +2,4 @@ species	geneID_prefix	geneID_length	transcript_suffix	protein_suffix
 BmA	BGIBMGA	13	-RA	-TA
 Eba	EBAG	11	_1	_1
 Bge	BGER	10	-RA	-RA
+Sma	SMAR	10	-RA	-PA
