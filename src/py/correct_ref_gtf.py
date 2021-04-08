@@ -305,9 +305,10 @@ for repaired_gene, group in grouped_broken_GTF_df:
   first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
   last_ex = int(max(list(broken_exons_df["exon_number"])))
   #If there were start codons entries -> take only the start codon corresponding to new exon 1.
-  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
+  #broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
   #If there were stop codons entries -> take only the stop codon corresponding to the new last exon.
   if list(broken_exons_df["strand"])[0] == "+":
+    broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))] #only the start codon corresponding to new exon 1
     removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)] #remove all the stop codons apart from the last
     #If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
     if removed_stop_codons.shape[0] >= 1:
@@ -315,7 +316,12 @@ for repaired_gene, group in grouped_broken_GTF_df:
       last_stop_coords = list(removed_stop_codons["stop"])
       broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
   elif list(broken_exons_df["strand"])[0] == "-":
+    #only the start codon corresponding to the second gene
+    removed_start_codons = broken_exons_df.loc[(broken_exons_df["type"]=="start_codon")].sort_values(by="start", ascending=False).iloc[1:]
     removed_stop_codons = broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon")].sort_values(by="start").iloc[1:] #remove all the stop codons apart from the first
+    if removed_start_codons.shape[0] >= 1:
+      removed_start_coord_start = list(removed_start_codons["start"])
+      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["start"].isin(removed_start_coord_start)))]
     if removed_stop_codons.shape[0] >= 1:
       removed_stop_coord_start = list(removed_stop_codons["start"])
       broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["start"].isin(removed_stop_coord_start)))]
