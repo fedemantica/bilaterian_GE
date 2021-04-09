@@ -181,23 +181,33 @@ def add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript
   #Fix here the start of the first exon of the second splitted gene in case the phase is not 0.
     return(second_gene_df)
 
-def adjust_broken_phases(broken_exons_df, last_ex_first, first_ex_second, phases_rest_dict):
+def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_rest_dict):
   broken_exons_df = broken_exons_df.copy() #This is to avoid weird problems with the indexing
   strand = str(list(broken_exons_df["strand"])[0])
-  last_CDS_first_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]
-  first_CDS_second_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==first_ex_second) & (broken_exons_df["type"]=="CDS")]
-  last_ex_first_phase = str(list(last_CDS_first_gene["phase"])[0]) #this works because we still have only the exons in the df
-  first_ex_second_phase = str(list(first_CDS_second_gene["phase"])[0])
-  phase_transition = last_ex_first_phase+"-"+first_ex_second_phase
-  first_ex_len = int(list(last_CDS_first_gene["stop"]-last_CDS_first_gene["start"])[0])
-  rest = first_ex_len%3 #Divide length of the last CDS exon of the first gene by 3
-  if rest != phases_rest_dict[phase_transition]: #if the number of (3n + number) is different from the one required for that phase combination:
-    if strand == "+":
-      current_stop = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]["stop"])[0]
-      broken_exons_df.loc[broken_exons_df["exon_number"]==last_ex_first, "stop"] = current_stop - rest + phases_rest_dict[phase_transition]
-    elif strand == "-":
-      current_start = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]["start"])[0]
-      broken_exons_df.loc[broken_exons_df["exon_number"]==last_ex_first, "start"] = current_start + rest - phases_rest_dict[phase_transition]
+  first_gene = broken_parts[0]
+  for second_gene in broken_parts[1:]: #access all the broken genes after the first
+    first_ex_second = min(list(broken_exons_df[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
+    #this is because I still have  not renumbered
+    print(broken_exons_df.loc[broken_exons_df["geneID"]==first_gene])
+    last_CDS_first_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==first_gene)]
+    first_CDS_second_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==first_ex_second) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==second_gene)]
+    last_ex_first_phase = str(list(last_CDS_first_gene["phase"])[0]) #this works because we still have only the exons in the df
+    #print(broken_exons_df.loc[broken_exons_df["geneID"]==first_gene])
+
+    first_ex_second_phase = str(list(first_CDS_second_gene["phase"])[0])
+    phase_transition = last_ex_first_phase+"-"+first_ex_second_phase
+    first_ex_len = int(list(last_CDS_first_gene["stop"]-last_CDS_first_gene["start"])[0])
+    rest = first_ex_len%3 #Divide length of the last CDS exon of the first gene by 3
+    if rest != phases_rest_dict[phase_transition]: #if the number of (3n + number) is different from the one required for that phase combination:
+      if strand == "+":
+        current_stop = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]["stop"])[0]
+        broken_exons_df.loc[broken_exons_df["exon_number"]==last_ex_first, "stop"] = current_stop - rest + phases_rest_dict[phase_transition]
+      elif strand == "-":
+        current_start = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]["start"])[0]
+        broken_exons_df.loc[broken_exons_df["exon_number"]==last_ex_first, "start"] = current_start + rest - phases_rest_dict[phase_transition]
+    #update variables for next cycle.
+    first_gene = second_gene
+    last_ex_first = max(list(broken_exons_df.loc[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"])) 
   return(broken_exons_df)
 
 
@@ -354,16 +364,22 @@ for repaired_gene, group in grouped_broken_GTF_df:
   broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
   first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene. I hope they are always ordered
   last_ex_first = int(max(list(first_broken_exons_df["exon_number"])))
+  last_ex_first_CDS = int(max(list(first_broken_exons_df[first_broken_exons_df["type"]=="CDS"]["exon_number"])))
+
+  ##########################
+  #first_ex_second = last_ex_first_CDS+1
+  #Adjust exon boundaries depending on phase combinations between last ex of first_broken and first_ex of second broken gene
+  broken_exons_df = adjust_broken_phases(broken_exons_df, last_ex_first_CDS, broken_parts, phases_rest_dict)  
+  ##########################
 
   #renumber the exons (both exons and CDS)
   broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_first, first_broken_exons_df)
   first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
   last_ex = int(max(list(broken_exons_df["exon_number"])))
-  first_ex_second = last_ex_first+1
   #Fix start and stop exons
   broken_exons_df = fix_start_stop_codons(broken_exons_df, last_ex)
-  #Adjust exon boundaries depending on phase combinations between last ex of first_broken and first_ex of second broken gene
-  broken_exons_df = adjust_broken_phases(broken_exons_df, last_ex_first, first_ex_second, phases_rest_dict)  
+
+ 
   #If originally there were gene and transcript entries, take them and modify the start and stop.
   broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
 
