@@ -117,14 +117,14 @@ def def_boundary_exon(chimeric_df): #input is a dataframe with header: species, 
 
 def modify_value_in_tuple(attribute_field, category, new_value):
   final_list = []
+  index = 0
   for field in attribute_field:
-    index = attribute_field.index(field)
     for part in field:
       if part[0] == category:
         sub_index = field.index(part)
-        #field[sub_index][1] = new_value[index]
         field[sub_index][1] = f'"{new_value[index]}"' #this prints the string with surrounding quotes
     final_list = final_list+[field]
+    index = index+1
   return(final_list)
 
 def add_entries_first_gene(first_gene_df, group, first_ex, last_ex, transcript_suffix):
@@ -158,6 +158,22 @@ def add_entries_first_gene(first_gene_df, group, first_ex, last_ex, transcript_s
   return(first_gene_df)
  
 def add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript_suffix):
+  #correct phases
+#  group_strand = str(list(group["strand"])[0])
+#  if "CDS" in list(group["type"]):
+#    first_ex_phase = list(group.loc[(group["exon_number"]==first_ex) & (group["type"=="CDS"])]["phase"])[0] #phase of the first exon to be translated
+#    if group_strand == "+": #if on the positive strand
+#      start_coord_to_change = group.loc[(group["exon_number"]==first_ex) & (group["type"=="CDS"])]["start"]
+#      if first_ex_phase == 1:
+#        second_gene_df["start"] = [element if element not in list(second_gene_df["start"]) else element+2 for element in list(second_gene_df["start"])] #if phase is 1, add 2 so that we start with a whole codon.
+#      if first_ex_phase == 2:
+#        second_gene_df["start"] = [element if element not in list(second_gene_df["start"]) else element+1 for element in list(second_gene_df["start"])] #if phase is 2, add 1 so that we start with a whole codon.
+#    if group_strand == "-": #if on negative strand
+#      stop_coord_to_change = group.loc[(group["exon_number"]==first_ex) & (group["type"=="CDS"])]["stop"]
+#      if first_ex_phase == 1:
+#        second_gene_df["start"] = [element if element not in list(second_gene_df["start"]) else element-2 for element in list(second_gene_df["start"])] #subtract 2 to the stop of the first exon to be translated (last to be transcribed)
+#      if first_ex_phase == 2:
+#        second_gene_df["start"] = [element if element not in list(second_gene_df["start"]) else element-1 for element in list(second_gene_df["start"])] #subtract 2 to the stop of the first exon to be translated (last to be transcribed)
   #add gene entry
   if "gene" in list(set(list(group["type"]))): #if there is a gene entry
      gene_entry = group[group["type"]=="gene"]
@@ -178,8 +194,8 @@ def add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript
     transcript_entry["start"] = int(list(gene_entry["start"])[0])
     transcript_entry["stop"] = int(list(gene_entry["stop"])[0])
     second_gene_df = pd.concat([second_gene_df, transcript_entry])
-  #Fix here the start of the second splitted gene in case the phase is not 0.
-  return(second_gene_df)
+  #Fix here the start of the first exon of the second splitted gene in case the phase is not 0.
+    return(second_gene_df)
 
 def fix_start_stop_codons(broken_exons_df, last_ex):
   if list(broken_exons_df["strand"])[0] == "+":
@@ -202,16 +218,20 @@ def fix_start_stop_codons(broken_exons_df, last_ex):
       broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["start"].isin(removed_stop_coord_start)))]
       last_start_coords = list(removed_stop_codons["start"])
       broken_exons_df["start"] = [element if element not in last_start_coords else element-3 for element in list(broken_exons_df["start"])]
+    #if list(broken_exons_df["new_geneID"])[0] == "BGIBMGAB00388":
+      #print(broken_exons_df)
   return(broken_exons_df)
 
 def renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_exons_df):
   final_df = first_broken_exons_df
   for part in broken_parts[1:]: #access all the broken genes after the first
-    second_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==part] #subset by first gene
+    second_broken_exons_df = broken_exons_df.loc[broken_exons_df["geneID"]==part] #subset by gene
+    second_broken_exons_df = second_broken_exons_df.copy()
+    second_broken_exons_df["exon_number"] = second_broken_exons_df["exon_number"].astype("Int64")
     ex_number_list = list(sorted(list(set(list(second_broken_exons_df["exon_number"])))))
-    new_exon_number = list(range(last_ex_tmp+1, last_ex_tmp+1+len(ex_number_list)))
-    ex_number_dict = {float(element) : new_exon_number[ex_number_list.index(element)] for element in ex_number_list}
-    second_broken_exons_df["exon_number"] = second_broken_exons_df["exon_number"].map(ex_number_dict)
+    new_exon_number = [int(x) for x in list(range(last_ex_tmp+1, last_ex_tmp+1+len(ex_number_list)))]
+    ex_number_dict = {element : new_exon_number[ex_number_list.index(element)] for element in ex_number_list}
+    second_broken_exons_df.loc[:,"exon_number"] = second_broken_exons_df["exon_number"].map(ex_number_dict)
     last_ex_tmp = int(max(list(second_broken_exons_df["exon_number"])))
     final_df = pd.concat([final_df, second_broken_exons_df])
   return(final_df)
@@ -233,6 +253,8 @@ def add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex):
     transcript_entry["start"] = int(list(gene_entry["start"])[0])
     transcript_entry["stop"] = int(list(gene_entry["stop"])[0])
     broken_exons_df = pd.concat([broken_exons_df, transcript_entry])
+  if list(broken_exons_df["new_geneID"])[0] == "BGIBMGAB00388":
+    print(broken_exons_df)
   return(broken_exons_df) 
 
 def rebuild_attribute_entry(mod_attribute_field):
@@ -306,17 +328,19 @@ all_broken_gtf_df = pd.DataFrame() #initialize gtf_df for all broken genes
 grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
 for repaired_gene, group in grouped_broken_GTF_df:
   print(repaired_gene) #for debugging
+  group = group.copy()
   #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
   #derive variables
   broken_parts = reverse_geneID_dict[repaired_gene].split(";")
-  #if list(group["strand"])[0] == "-": #revert the order of the broken parts if the strand is negative
-    #broken_parts = broken_parts[::-1]
+  if list(group["strand"])[0] == "-": #revert the order of the broken parts if the strand is negative
+    broken_parts = broken_parts[::-1]
   new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
   #add transcriptID and proteinID columns to group.
-  group["new_transcriptID"] = group["new_geneID"]+transcript_suffix
-  group["new_proteinID"] = group["new_geneID"]+protein_suffix
+  group["new_transcriptID"] = [element+transcript_suffix for element in list(group["new_geneID"])]
+  group["new_proteinID"] = [element+protein_suffix for element in list(group["new_geneID"])]
   #broken_df_exons; select only entries with exons.
   broken_exons_df = group.dropna(subset=["exon_number"])
+  broken_exons_df = broken_exons_df.copy()
 
   #make sure exnos are ordered (by start and stop coords), and re-number them (the second gene will change).
   broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
@@ -327,11 +351,9 @@ for repaired_gene, group in grouped_broken_GTF_df:
   broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_tmp, first_broken_exons_df)
   first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
   last_ex = int(max(list(broken_exons_df["exon_number"])))
-  #If there were start codons entries -> take only the start codon corresponding to new exon 1.
-  #broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))]
-  #If there were stop codons entries -> take only the stop codon corresponding to the new last exon.
+  #Fix start and stop exons
   broken_exons_df = fix_start_stop_codons(broken_exons_df, last_ex)  
-  #if originally there were gene and transcript entries, take them and modify the start and stop.
+  #Ff originally there were gene and transcript entries, take them and modify the start and stop.
   broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
 
   #update the geneID, transcriptID and proteinID in loco
@@ -339,7 +361,12 @@ for repaired_gene, group in grouped_broken_GTF_df:
   broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_id", list(broken_exons_df["new_transcriptID"]))
   broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "protein_id", list(broken_exons_df["new_proteinID"]))
   broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "exon_number", list(broken_exons_df["exon_number"]))
-  #modify source and gene name (new gene name=broken_name1;broken_name2...)
+  #if repaired_gene == "BGIBMGAB00388":
+    #prova = broken_exons_df
+    #print(list(prova["attribute_mod"]))
+    #prova["attribute_mod"] = rebuild_attribute_entry(list(broken_exons_df["attribute_mod"]))
+    #print(prova[["type", "start", "stop", "attribute_mod"]])
+
   broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
   broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(broken_exons_df.shape[0]))])
   broken_exons_df["attribute_mod"] = modify_value_in_tuple(list(broken_exons_df["attribute_mod"]), "gene_name", [new_gene_name for element in list(range(broken_exons_df.shape[0]))])
@@ -454,5 +481,5 @@ brochi_df = brochi_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf
 brochi_df.to_csv(output_brochi, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE) #the csv.QUOTE_NONE avoids extra quotes aroung the attribute field
 
 final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
-#final_df = final_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
+final_df = final_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
 final_df.to_csv(output_file, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE)  #save to file
