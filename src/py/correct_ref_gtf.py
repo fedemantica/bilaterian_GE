@@ -210,7 +210,6 @@ def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_re
     last_ex_first = max(list(broken_exons_df.loc[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"])) 
   return(broken_exons_df)
 
-
 def fix_start_stop_codons(broken_exons_df, last_ex):
   if list(broken_exons_df["strand"])[0] == "+":
     broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))] #only the start codon corresponding to new exon 1
@@ -275,6 +274,23 @@ def rebuild_attribute_entry(mod_attribute_field):
     new_entry = '; '.join([' '.join(element) for element in field])
     final_list = final_list + [new_entry]
   return(final_list)
+
+#adjust the phase of the first coding exon (if phase != 0)
+#if strand == +: first_CDS_start = first_CDS_start + 1
+#if strand == "-": first_CDS_stop = first_CDS_stop - 1
+def adjust_chimeric_phases(second_gene_df):
+  strand = list(second_gene_df["strand"])[0]
+  first_CDS_exon = min(list(second_gene_df.loc[second_gene_df["type"]=="CDS"]["exon_number"]))
+  first_CDS_exon_entry = second_gene_df.loc[(second_gene_df["type"]=="CDS") & (second_gene_df["exon_number"]==first_CDS_exon)]
+  first_CDS_exon_phase = int(list(first_CDS_exon_entry["phase"])[0]) #only one value here in any case
+  if first_CDS_exon_phase != 0:
+    second_gene_df.loc[(second_gene_df["type"]=="CDS") & (second_gene_df["exon_number"]==first_CDS_exon), "phase"] = "0" #change the phase to 0
+    if strand == "+":
+      second_gene_df.loc[(second_gene_df["type"]=="CDS") & (second_gene_df["exon_number"]==first_CDS_exon), "start"] = first_CDS_exon_entry["start"]+first_CDS_exon_phase
+    elif strand == "-":
+      second_gene_df.loc[(second_gene_df["type"]=="CDS") & (second_gene_df["exon_number"]==first_CDS_exon), "stop"] = first_CDS_exon_entry["stop"]-first_CDS_exon_phase
+  return(second_gene_df) 
+
 
 ##################################
 ###### READ INPUTS ###############
@@ -480,8 +496,11 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
   second_gene_df["new_geneID"] = [element.split(";")[1] for element in list(second_gene_df["new_geneID"])]
   second_gene_df["new_transcriptID"] = second_gene_df["new_geneID"]+transcript_suffix
   second_gene_df["new_proteinID"] = second_gene_df["new_geneID"]+protein_suffix
+  #adjust the phase of the first coding exon (if phase != 0)
+  second_gene_df = adjust_chimeric_phases(second_gene_df)
   #add entries for gene and transcript
   second_gene_df = add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript_suffix)
+
   #update the geneID, transcriptID and proteinID
   second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "gene_id", list(second_gene_df["new_geneID"]))
   second_gene_df["attribute_mod"] = modify_value_in_tuple(list(second_gene_df["attribute_mod"]), "transcript_id", list(second_gene_df["new_transcriptID"]))
