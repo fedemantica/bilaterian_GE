@@ -127,6 +127,16 @@ def modify_value_in_tuple(attribute_field, category, new_value):
     index = index+1
   return(final_list)
 
+def order_broken_genes(group, broken_parts):
+  gene_start_coords_dict = {min(list(group.loc[group["geneID"]==part]["start"])) : part for part in broken_parts}
+  print(gene_start_coords_dict)
+  ordered_broken_genes = [gene_start_coords_dict[value] for value in sorted(list(gene_start_coords_dict.keys()))]
+  print(ordered_broken_genes) 
+  #revert the order of the broken parts if the strand is negative
+  if list(group["strand"])[0] == "-":
+    ordered_broken_genes = ordered_broken_genes[::-1]
+  return(ordered_broken_genes)
+
 def add_entries_first_gene(first_gene_df, group, first_ex, last_ex, transcript_suffix):
   #gene entry and transcript entry: correct the right boundaries
   if "gene" in list(set(list(group["type"]))): #if there is a gene entry
@@ -275,7 +285,7 @@ def fix_start_stop_codons(broken_exons_df, last_ex):
       removed_stop_coord_start = list(removed_stop_codons["start"])
       broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["start"].isin(removed_stop_coord_start)))]
       last_start_coords = list(removed_stop_codons["start"])
-      broken_exons_df["start"] = [element if element not in last_start_coords else element-3 for element in list(broken_exons_df["start"])]
+      broken_exons_df["start"] = [element if element not in last_start_coords else element+3 for element in list(broken_exons_df["start"])]
     #if list(broken_exons_df["new_geneID"])[0] == "BGIBMGAB00388":
       #print(broken_exons_df)
   return(broken_exons_df)
@@ -411,8 +421,10 @@ for repaired_gene, group in grouped_broken_GTF_df:
   #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
   #derive variables
   broken_parts = reverse_geneID_dict[repaired_gene].split(";") #the genes are always ordered according to genomic coordinates
-  if list(group["strand"])[0] == "-": #revert the order of the broken parts if the strand is negative
-    broken_parts = broken_parts[::-1]
+  #make sure that they are ordered based on the coding order (different in case of positive and negative strand)
+  broken_parts = order_broken_genes(group, broken_parts)
+  
+  #add gene_name
   new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
   #add transcriptID and proteinID columns to group.
   group["new_transcriptID"] = [element+transcript_suffix for element in list(group["new_geneID"])]
@@ -421,7 +433,7 @@ for repaired_gene, group in grouped_broken_GTF_df:
   broken_exons_df = group.dropna(subset=["exon_number"])
   broken_exons_df = broken_exons_df.copy()
 
-  #make sure exnos are ordered (by start and stop coords), and re-number them (the second gene will change).
+  #make sure exons are ordered (by start and stop coords), and re-number them (the second gene will change).
   broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
   first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene.
   last_ex_first = int(max(list(first_broken_exons_df["exon_number"])))
