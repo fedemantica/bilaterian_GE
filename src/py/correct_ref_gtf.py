@@ -203,18 +203,17 @@ def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_re
     first_CDS_second_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==first_ex_second) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==second_gene)]
     last_ex_first_phase = str(list(last_CDS_first_gene["phase"])[0]) #this works because we still have only the exons in the df
     #print(broken_exons_df.loc[broken_exons_df["geneID"]==first_gene])
-
     first_ex_second_phase = str(list(first_CDS_second_gene["phase"])[0])
     phase_transition = last_ex_first_phase+"-"+first_ex_second_phase
     first_ex_len = int(list(last_CDS_first_gene["stop"]-last_CDS_first_gene["start"])[0])
     rest = first_ex_len%3 #Divide length of the last CDS exon of the first gene by 3
     if rest != phases_rest_dict[phase_transition]: #if the number of (3n + number) is different from the one required for that phase combination:
       if strand == "+":
-        current_stop = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]["stop"])[0]
-        broken_exons_df.loc[broken_exons_df["exon_number"]==last_ex_first, "stop"] = current_stop - rest + phases_rest_dict[phase_transition]
+        current_stop = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==first_gene)]["stop"])[0]
+        broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["geneID"]==first_gene), "stop"] = current_stop - rest + phases_rest_dict[phase_transition]
       elif strand == "-":
-        current_start = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS")]["start"])[0]
-        broken_exons_df.loc[broken_exons_df["exon_number"]==last_ex_first, "start"] = current_start + rest - phases_rest_dict[phase_transition]
+        current_start = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==first_gene)]["start"])[0]
+        broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["geneID"]==first_gene), "start"] = current_start + rest - phases_rest_dict[phase_transition]
     #update variables for next cycle.
     first_gene = second_gene
     last_ex_first = max(list(broken_exons_df.loc[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"])) 
@@ -265,33 +264,58 @@ def trim_broken_UTRs(broken_exons_df, broken_parts):
       broken_exons_df = trim_5UTR(broken_exons_df, gene)
   return(broken_exons_df) 
 
-def fix_start_stop_codons(broken_exons_df, last_ex):
-  if list(broken_exons_df["strand"])[0] == "+":
-    broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))] #only the start codon corresponding to new exon 1
-    removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)] #remove all the stop codons apart from the last
-    #If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
-    if removed_stop_codons.shape[0] >= 1:
-      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex))]
-      last_stop_coords = list(removed_stop_codons["stop"])
-      broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
-  elif list(broken_exons_df["strand"])[0] == "-":
-    #only the start codon corresponding to the second gene
-    removed_start_codons = broken_exons_df.loc[(broken_exons_df["type"]=="start_codon")].sort_values(by="start", ascending=False).iloc[1:]
-    removed_stop_codons = broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon")].sort_values(by="start").iloc[1:] #remove all the stop codons apart from the first
-    if removed_start_codons.shape[0] >= 1:
-      removed_start_coord_start = list(removed_start_codons["start"])
-      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["start"].isin(removed_start_coord_start)))]
-    if removed_stop_codons.shape[0] >= 1:
-      removed_stop_coord_start = list(removed_stop_codons["start"])
-      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["start"].isin(removed_stop_coord_start)))]
-      last_start_coords = list(removed_stop_codons["start"])
-      broken_exons_df["start"] = [element if element not in last_start_coords else element+3 for element in list(broken_exons_df["start"])]
-    #if list(broken_exons_df["new_geneID"])[0] == "BGIBMGAB00388":
-      #print(broken_exons_df)
+
+def fix_start_stop_codons(broken_exons_df, broken_parts):
+  strand = list(broken_exons_df["strand"])[0]
+  first_gene = broken_parts[0]
+  last_gene = broken_parts[-1]
+  first_CDS = min(list(broken_exons_df[(broken_exons_df["geneID"]==first_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
+  last_CDS = max(list(broken_exons_df[(broken_exons_df["geneID"]==last_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
+  ### remove all the stop codons not belonging to the last gene
+  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]!=last_gene) & (broken_exons_df["type"]=="stop_codon"))]
+  removed_stop_codons = broken_exons_df.loc[(broken_exons_df["geneID"]!=last_gene) & (broken_exons_df["type"]=="stop_codon")]
+  if strand == "+":
+    removed_stop_codons_stop = list(removed_stop_codons["stop"])
+    broken_exons_df["stop"] = [element if element not in removed_stop_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
+  if strand  == "-":
+    removed_stop_codons_start = list(removed_stop_codons["start"])
+    broken_exons_df["start"] = [element if element not in removed_stop_codons_start else element+3 for element in list(broken_exons_df["start"])]
+  ### remove all the start codons not beloning to the first gene
+  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]!=first_gene) & (broken_exons_df["type"]=="start_codon"))]
+  removed_start_codons = broken_exons_df.loc[(broken_exons_df["geneID"]!=first_gene) & (broken_exons_df["type"]=="start_codon")]
+  if strand == "+":
+    removed_start_codons_start = list(removed_start_codons["start"])
+    broken_exons_df["start"] = [element if element not in removed_start_codons_start else element+3 for element in list(broken_exons_df["start"])]
+  if strand == "-":
+    removed_start_codons_stop = list(removed_start_codons["stop"])
+    broken_exons_df["stop"] = [element if element not in removed_start_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
   return(broken_exons_df)
 
-def renumerate_exons(broken_exons_df, broken_parts, last_ex_first, first_broken_exons_df):
-  final_df = first_broken_exons_df
+#def fix_start_stop_codons(broken_exons_df, last_ex):
+#  if list(broken_exons_df["strand"])[0] == "+":
+#    broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["exon_number"] > 1))] #only the start codon corresponding to new exon 1
+#    removed_stop_codons =  broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex)] #remove all the stop codons apart from the last
+#    #If there are removed stop codons, I need to fix the coordinates of the penultimate exon: not sure this should stay all through.
+#    if removed_stop_codons.shape[0] >= 1:
+#      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["exon_number"] < last_ex))]
+#      last_stop_coords = list(removed_stop_codons["stop"])
+#      broken_exons_df["stop"] = [element if element not in last_stop_coords else element-3 for element in list(broken_exons_df["stop"])]
+#  elif list(broken_exons_df["strand"])[0] == "-":
+#    #only the start codon corresponding to the second gene
+#    removed_start_codons = broken_exons_df.loc[(broken_exons_df["type"]=="start_codon")].sort_values(by="start", ascending=False).iloc[1:]
+#    removed_stop_codons = broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon")].sort_values(by="start").iloc[1:] #remove all the stop codons apart from the first
+#    if removed_start_codons.shape[0] >= 1:
+#      removed_start_coord_start = list(removed_start_codons["start"])
+#      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="start_codon") & (broken_exons_df["start"].isin(removed_start_coord_start)))]
+#    if removed_stop_codons.shape[0] >= 1:
+#      removed_stop_coord_start = list(removed_stop_codons["start"])
+#      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="stop_codon") & (broken_exons_df["start"].isin(removed_stop_coord_start)))]
+#      last_start_coords = list(removed_stop_codons["start"])
+#      broken_exons_df["start"] = [element if element not in last_start_coords else element+3 for element in list(broken_exons_df["start"])]
+#  return(broken_exons_df)
+
+def renumerate_exons(broken_exons_df, broken_parts, last_ex_first):
+  final_df = broken_exons_df.loc[broken_exons_df["geneID"]==broken_parts[0]] #select first gene
   for part in broken_parts[1:]: #access all the broken genes after the first
     second_broken_exons_df = broken_exons_df.loc[broken_exons_df["geneID"]==part] #subset by gene
     second_broken_exons_df = second_broken_exons_df.copy()
@@ -352,6 +376,7 @@ def adjust_chimeric_phases(second_gene_df):
 ##################################
 
 gtf_df = pd.read_table(gtf_file, sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute"])
+gtf_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_df["attribute"]) for part in element.split(";") if "gene_id" in part] #add geneID as a separate field
 #gtf_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref/BmA_annot-B.gtf", sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase","attribute"])
 broken_genes_list = list(pd.read_table(broken_genes_file, sep="\t", index_col=False, header=None, names=["broken_genes"])["broken_genes"])
 broken_gene_flatten_list = [part for element in broken_genes_list for part in element.split(";")]
@@ -381,11 +406,11 @@ protein_suffix = str(list(params_df[params_df["species"]==species]["protein_suff
 print("%s: %d" % ("broken_genes", len(broken_gene_flatten_list))) #for debugging
 print("%s: %d" % ("chimeric_genes", len(chimeric_genes_list))) #for debugging
 
+
 ##################################
 ####### HEALTHY GENES ############
 ##################################
 #add geneID
-gtf_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in list(gtf_df["attribute"]) for part in element.split(";") if "gene_id" in part]
 brochi_genes_list = broken_gene_flatten_list + chimeric_genes_list
 #filter out entries of brochi genes from the GTF
 healthy_GTF_df = gtf_df[~(gtf_df["geneID"].isin(brochi_genes_list))] 
@@ -418,7 +443,7 @@ grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
 for repaired_gene, group in grouped_broken_GTF_df:
   print(repaired_gene) #for debugging
   group = group.copy()
-  #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00011"]
+  #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00092"]
   #derive variables
   broken_parts = reverse_geneID_dict[repaired_gene].split(";") #the genes are always ordered according to genomic coordinates
   #make sure that they are ordered based on the coding order (different in case of positive and negative strand)
@@ -435,9 +460,9 @@ for repaired_gene, group in grouped_broken_GTF_df:
 
   #make sure exons are ordered (by start and stop coords), and re-number them (the second gene will change).
   broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
-  first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene.
-  last_ex_first = int(max(list(first_broken_exons_df["exon_number"])))
-  last_ex_first_CDS = int(max(list(first_broken_exons_df[first_broken_exons_df["type"]=="CDS"]["exon_number"])))
+  #first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene.
+  last_ex_first = int(max(list(broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]]["exon_number"])))
+  last_ex_first_CDS = int(max(list(broken_exons_df[(broken_exons_df["geneID"]==broken_parts[0]) & (broken_exons_df["type"]=="CDS")]["exon_number"])))
   #Adjust exon boundaries depending on phase combinations between last ex of first_broken and first_ex of second broken gene
   broken_exons_df = adjust_broken_phases(broken_exons_df, last_ex_first_CDS, broken_parts, phases_rest_dict)  
   #Trim 3'UTR of the first broken gene and 5'UTR of the second broken gene (both for "intermediate") genes
@@ -446,11 +471,11 @@ for repaired_gene, group in grouped_broken_GTF_df:
 #########################  
 
   #renumber the exons (both exons and CDS)
-  broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_first, first_broken_exons_df)
+  broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_first)
   first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
   last_ex = int(max(list(broken_exons_df["exon_number"])))
   #Fix start and stop exons
-  broken_exons_df = fix_start_stop_codons(broken_exons_df, last_ex)
+  broken_exons_df = fix_start_stop_codons(broken_exons_df, broken_parts)
 
  
   #If originally there were gene and transcript entries, take them and modify the start and stop.
