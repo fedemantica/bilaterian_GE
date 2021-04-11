@@ -75,25 +75,36 @@ for key in chimeric_genes_keys:
   for num in list(range(0, len(key.split(";")))):
     reverse_geneID_dict[key.split(";")[num]] = reverse_geneID_dict[key]
 
-
 #gtf_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/corrected_gtfs/Bm0_annot.gtf", sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase","attribute"])
 #brochi_gtf_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/corrected_gtfs/BmA_annot-B-brochi_only.gtf", sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute"])
 #geneIDs_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/corrected_gtfs/BmA_new_geneIDs.txt", sep="\t", index_col=False, header=0)
-gtf_df["attribute"] = separate_attributes(list(gtf_df["attribute"]))
-brochi_gtf_df["attribute"] = separate_attributes(list(brochi_gtf_df["attribute"]))
+#gtf_df["attribute"] = separate_attributes(list(gtf_df["attribute"]))
+#brochi_gtf_df["attribute"] = separate_attributes(list(brochi_gtf_df["attribute"]))
 
 ##################################
 ####### BROKEN GENES #############
 ##################################
 #For the broken genes: I translate the previous geneID and I add the new reference transcript as an extra transcript
 broken_genes = list(geneIDs_df[geneIDs_df["category"]=="broken"]["new_IDs"])
-corrected_broken_genes = [element for element in broken_genes if element in list(brochi_gtf_df["geneID"])]
-broken_genes_to_repair = list(geneIDs_df[geneIDs_df["new_IDs"].isin(corrected_broken_genes)]["geneID"]) #genes to select in the master gtf
+corrected_broken_genes = [element for element in broken_genes if element in list(brochi_gtf_df["geneID"])] #new gene ID of the repaired genes
+broken_genes_to_repair = list(geneIDs_df[geneIDs_df["new_IDs"].isin(corrected_broken_genes)]["geneID"]) #genes to select in the master gtf (broken genes corresponding to repair genes)
 broken_genes_to_repair = [part for element in broken_genes_to_repair for part in element.split(";")]
-#add new geneID for broken genes, leave the others intact
-gtf_df["new_geneID"] = [element if element not in broken_genes_to_repair else geneIDs_dict[element] for element in list(gtf_df["geneID"])]
+gtf_df = gtf_df.loc[~(gtf_df["geneID"].isin(broken_genes_to_repair))]
+
+#filter gtf only on those genes. This is to save RAM.
+#broken_genes_gtf = gtf_df.loc[gtf_df["geneID"].isin(broken_genes_to_repair)]
+#remove gene entries
+#broken_genes_gtf = broken_genes_gtf.loc[broken_genes_gtf["type"]!="gene"]
+#broken_genes_gtf["attribute"] = separate_attributes(list(broken_genes_gtf["attribute"]))
+#remove the filtered genes from the whole gtf.
+#gtf_df = gtf_df.loc[~(gtf_df["geneID"].isin(broken_genes_to_repair))]
+
+#add new geneID for broken genes
+#broken_genes_gtf["geneID"] = broken_genes_gtf["geneID"].map(geneIDs_dict)
 #replace geneID in the attribute field
-gtf_df["attribute"] = modify_value_in_tuple(list(gtf_df["attribute"]), "gene_id", list(gtf_df["new_geneID"])) #Replace gene ID of existing broken transcripts
+#broken_genes_gtf["attribute"] = modify_value_in_tuple(list(broken_genes_gtf["attribute"]), "gene_id", list(broken_genes_gtf["geneID"])) #Replace gene ID of existing broken transcripts
+#rebuild the attribute field
+#broken_genes_gtf["attribute"] = rebuild_attribute_entry(list(broken_genes_gtf["attribute"]))
 
 ##################################
 ####### CHIMERIC GENES ###########
@@ -109,8 +120,11 @@ gtf_df = gtf_df.loc[~(gtf_df["geneID"].isin(chimeric_genes_to_repair))]
 ########## JOIN ALL GTF PARTS ###############
 #############################################
 #combine master and brochi gtf
+#final_df = pd.concat([gtf_df, broken_genes_gtf, brochi_gtf_df]) #join all parts
+print(gtf_df.shape)
+print(brochi_gtf_df.shape)
 final_df = pd.concat([gtf_df, brochi_gtf_df]) #join all parts
-#rebuild the attribute entry
-final_df["attribute"] = rebuild_attribute_entry(list(final_df["attribute"]))
+#remove  geneID column
+final_df = final_df.drop(columns=["geneID"])
 final_df = final_df.sort_values(by=["chr", "start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
 final_df.to_csv(output_file, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE)  #save to file
