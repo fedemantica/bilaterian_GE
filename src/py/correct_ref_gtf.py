@@ -115,10 +115,13 @@ def def_boundary_exon(chimeric_df): #input is a dataframe with header: species, 
   my_df_unselected = pd.concat([my_df_unselected, my_df]) 
   return(final_df, my_df_unselected)
 
-def modify_value_in_tuple(attribute_field, category, new_value):
+def modify_value_in_tuple(attribute_field_raw, category, new_value):
+  #group1["attribute_mod"] = group.attribute_mod.apply(list.copy)
+  attribute_field = attribute_field_raw.copy()
   final_list = []
   index = 0
-  for field in attribute_field:
+  for field_raw in attribute_field:
+    field = field_raw.copy()
     for part in field:
       if part[0] == category:
         sub_index = field.index(part)
@@ -129,9 +132,7 @@ def modify_value_in_tuple(attribute_field, category, new_value):
 
 def order_broken_genes(group, broken_parts):
   gene_start_coords_dict = {min(list(group.loc[group["geneID"]==part]["start"])) : part for part in broken_parts}
-  print(gene_start_coords_dict)
   ordered_broken_genes = [gene_start_coords_dict[value] for value in sorted(list(gene_start_coords_dict.keys()))]
-  print(ordered_broken_genes) 
   #revert the order of the broken parts if the strand is negative
   if list(group["strand"])[0] == "-":
     ordered_broken_genes = ordered_broken_genes[::-1]
@@ -139,57 +140,70 @@ def order_broken_genes(group, broken_parts):
 
 def add_entries_first_gene(first_gene_df, group, first_ex, last_ex, transcript_suffix):
   #gene entry and transcript entry: correct the right boundaries
-  if "gene" in list(set(list(group["type"]))): #if there is a gene entry
-    gene_entry = group[group["type"]=="gene"]
+  group1 = group.copy(deep=True)
+  if "gene" in list(set(list(group1["type"]))): #if there is a gene entry
+    gene_entry = group1.loc[group1["type"]=="gene"].copy(deep=True)
     gene_entry["new_geneID"] = [element.split(";")[0] for element in list(gene_entry["new_geneID"])] #select first geneID
     if str(list(gene_entry["strand"])[0]) == "+":
       gene_entry["stop"] = list(first_gene_df[(first_gene_df["exon_number"]==last_ex) & (first_gene_df["type"]=="exon")]["stop"])[0] #set stop from last exon
     elif str(list(gene_entry["strand"])[0]) == "-":
       gene_entry["start"] = list(first_gene_df[(first_gene_df["exon_number"]==last_ex) & (first_gene_df["type"]=="exon")]["start"])[0] #set start from first exon
     first_gene_df = pd.concat([first_gene_df, gene_entry])
-  if "transcript" in list(set(list(group["type"]))): #if there is a transcript entry
-    transcript_entry = group[group["type"]=="transcript"]
+  if "transcript" in list(set(list(group1["type"]))): #if there is a transcript entry
+    transcript_entry = group1.loc[group1["type"]=="transcript"].copy(deep=True)
     transcript_entry["new_geneID"] = [element.split(";")[0] for element in list(transcript_entry["new_geneID"])] #select first geneID
     transcript_entry["new_transcriptID"] = transcript_entry["new_geneID"]+transcript_suffix
-    #transcript_entry["new_transcriptID"] = [element.split(";")[0]+transcript_suffix for element in list(transcript_entry["new_geneID"])]
     transcript_entry["start"] = int(list(gene_entry["start"])[0])
     transcript_entry["stop"] = int(list(gene_entry["stop"])[0])
     first_gene_df = pd.concat([first_gene_df, transcript_entry])
-    #if str(list(transcript_entry["strand"])[0]) == "+":
-     # transcript_entry["stop"] = list(first_gene_df[(first_gene_df["exon_number"]==last_ex) & (first_gene_df["type"]=="exon")]["stop"])[0] #set stop from last exon
-    #elif str(list(transcript_entry["strand"])[0]) == "-":
-      #transcript_entry["start"] = list(first_gene_df[(first_gene_df["exon_number"]==last_ex) & (first_gene_df["type"]=="exon")]["start"])[0] #set stop from first exon
-    #first_gene_df = pd.concat([first_gene_df, transcript_entry])          
-  #The start codon has an exon number, so it is not necessary to add it.
-  #if there is a start codon in the group, add it to the first_gene_df
-  #if "start_codon" in list(set(list(group["type"]))):
-   # start_codon_entry = group[group["type"]=="start_codon"]
-    #first_gene_df = pd.concat([first_gene_df, start_codon_entry])
   return(first_gene_df)
- 
+
+#"chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute"
 def add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript_suffix):
-  #add gene entry
-  if "gene" in list(set(list(group["type"]))): #if there is a gene entry
-     gene_entry = group[group["type"]=="gene"]
-     gene_entry["new_geneID"] = [element.split(";")[1] for element in list(gene_entry["new_geneID"])] #select the second geneID
-     if str(list(gene_entry["strand"])[0]) == "+":
-       gene_entry["start"] = list(second_gene_df[(second_gene_df["exon_number"]==first_ex) & (second_gene_df["type"]=="exon")]["start"])[0] #set start from first ex
-       gene_entry["stop"] = list(second_gene_df[(second_gene_df["exon_number"]==last_ex) & (second_gene_df["type"]=="exon")]["stop"])[0] #set stop from last ex
-     elif str(list(gene_entry["strand"])[0]) == "-":
-        gene_entry["start"] = int(list(second_gene_df[(second_gene_df["exon_number"]==last_ex) & (second_gene_df["type"]=="exon")]["start"])[0]) #set start from last ex
-        gene_entry["stop"] = int(list(second_gene_df[(second_gene_df["exon_number"]==first_ex) & (second_gene_df["type"]=="exon")]["stop"])[0]) #set stop from first ex
-     second_gene_df = pd.concat([second_gene_df, gene_entry])
-  #add transcript entry
-  if "transcript" in list(set(list(group["type"]))):
-    transcript_entry = group[group["type"]=="transcript"]
-    transcript_entry["new_geneID"] = [element.split(";")[1] for element in list(transcript_entry["new_geneID"])] #select second geneID
-    transcript_entry["new_transcriptID"] = transcript_entry["new_geneID"]+transcript_suffix
-    #transcript_entry["new_transcriptID"] = [element.split(";")[1]+transcript_suffix for element in list(transcript_entry["new_geneID"])]
-    transcript_entry["start"] = int(list(gene_entry["start"])[0])
-    transcript_entry["stop"] = int(list(gene_entry["stop"])[0])
-    second_gene_df = pd.concat([second_gene_df, transcript_entry])
-  #Fix here the start of the first exon of the second splitted gene in case the phase is not 0.
-    return(second_gene_df)
+  #all of this shit is necessary because pandas betrayed me.
+  group2 = group.copy(deep=True)
+  my_chr = list(second_gene_df["chr"])[0]
+  my_db = list(second_gene_df["db"])[0]
+  score = "."
+  strand = list(second_gene_df["strand"])[0]
+  phase = "."
+  new_geneID = list(second_gene_df["new_geneID"])[0] #select the second geneID
+  attribute_mod_gene = [['gene_id', new_geneID]]
+  attribute_mod_transcript = [['gene_id', new_geneID], ['transcript_id', new_geneID+transcript_suffix]]
+  if strand == "+":
+    gene_entry_start = list(second_gene_df[(second_gene_df["exon_number"]==first_ex) & (second_gene_df["type"]=="exon")]["start"])[0] #set start from first ex
+    gene_entry_stop = list(second_gene_df[(second_gene_df["exon_number"]==last_ex) & (second_gene_df["type"]=="exon")]["stop"])[0] #set stop from last ex
+  elif strand == "-":
+    gene_entry_start = int(list(second_gene_df[(second_gene_df["exon_number"]==last_ex) & (second_gene_df["type"]=="exon")]["start"])[0]) #set start from last ex
+    gene_entry_stop = int(list(second_gene_df[(second_gene_df["exon_number"]==first_ex) & (second_gene_df["type"]=="exon")]["stop"])[0]) #set stop from first ex
+  gene_entry = pd.DataFrame({"chr" : [my_chr], "db" : [my_db], "type" : ["gene"], "start" : [gene_entry_start], "stop" : [gene_entry_stop], "score" : [score], "strand" : [strand], "phase" : [phase], "attribute_mod" : [attribute_mod_gene], "new_geneID" : [new_geneID]}).rename(index={0 : 0.5})
+  transcript_entry = pd.DataFrame({"chr" : [my_chr], "db" : [my_db], "type" : ["transcript"], "start" : [gene_entry_start], "stop" : [gene_entry_stop], "score" : [score], "strand" : [strand], "phase" : [phase], "attribute_mod" : [attribute_mod_transcript], "new_geneID" : [new_geneID], "new_transcriptID" : [new_geneID+transcript_suffix]}).rename(index={0 : 1.5})
+  second_gene_df = pd.concat([second_gene_df, gene_entry, transcript_entry])
+  return(second_gene_df)
+
+#def add_entries_second_gene(second_gene_df, group, first_ex, last_ex, transcript_suffix):
+#  #add gene entry
+#  group2 = group.copy(deep=True)
+#  if "gene" in list(set(list(group2["type"]))): #if there is a gene entry
+#     gene_entry = group2.loc[group2["type"]=="gene"].copy(deep=True)
+#     gene_entry["new_geneID"] = [element.split(";")[1] for element in list(gene_entry["new_geneID"])] #select the second geneID
+#     if str(list(gene_entry["strand"])[0]) == "+":
+#       gene_entry["start"] = list(second_gene_df[(second_gene_df["exon_number"]==first_ex) & (second_gene_df["type"]=="exon")]["start"])[0] #set start from first ex
+#       gene_entry["stop"] = list(second_gene_df[(second_gene_df["exon_number"]==last_ex) & (second_gene_df["type"]=="exon")]["stop"])[0] #set stop from last ex
+#     elif str(list(gene_entry["strand"])[0]) == "-":
+#        gene_entry["start"] = int(list(second_gene_df[(second_gene_df["exon_number"]==last_ex) & (second_gene_df["type"]=="exon")]["start"])[0]) #set start from last ex
+#        gene_entry["stop"] = int(list(second_gene_df[(second_gene_df["exon_number"]==first_ex) & (second_gene_df["type"]=="exon")]["stop"])[0]) #set stop from first ex
+#     second_gene_df = pd.concat([second_gene_df, gene_entry])
+#  #add transcript entry
+#  if "transcript" in list(set(list(group2["type"]))):
+#    transcript_entry = group2.loc[group2["type"]=="transcript"].copy(deep=True)
+#    transcript_entry["new_geneID"] = [element.split(";")[1] for element in list(transcript_entry["new_geneID"])] #select second geneID
+#    transcript_entry["new_transcriptID"] = transcript_entry["new_geneID"]+transcript_suffix
+#    #transcript_entry["new_transcriptID"] = [element.split(";")[1]+transcript_suffix for element in list(transcript_entry["new_geneID"])]
+#    transcript_entry["start"] = int(list(gene_entry["start"])[0])
+#    transcript_entry["stop"] = int(list(gene_entry["stop"])[0])
+#    second_gene_df = pd.concat([second_gene_df, transcript_entry])
+#  return(second_gene_df)
 
 def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_rest_dict):
   broken_exons_df = broken_exons_df.copy() #This is to avoid weird problems with the indexing
@@ -198,11 +212,9 @@ def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_re
   for second_gene in broken_parts[1:]: #access all the broken genes after the first
     first_ex_second = min(list(broken_exons_df[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
     #this is because I still have  not renumbered
-    print(broken_exons_df.loc[broken_exons_df["geneID"]==first_gene])
     last_CDS_first_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==first_gene)]
     first_CDS_second_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==first_ex_second) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==second_gene)]
     last_ex_first_phase = str(list(last_CDS_first_gene["phase"])[0]) #this works because we still have only the exons in the df
-    #print(broken_exons_df.loc[broken_exons_df["geneID"]==first_gene])
     first_ex_second_phase = str(list(first_CDS_second_gene["phase"])[0])
     phase_transition = last_ex_first_phase+"-"+first_ex_second_phase
     first_ex_len = int(list(last_CDS_first_gene["stop"]-last_CDS_first_gene["start"])[0])
@@ -442,7 +454,7 @@ all_broken_gtf_df = pd.DataFrame() #initialize gtf_df for all broken genes
 grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
 for repaired_gene, group in grouped_broken_GTF_df:
   print(repaired_gene) #for debugging
-  group = group.copy()
+  group = group.copy(deep=True)
   #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00092"]
   #derive variables
   broken_parts = reverse_geneID_dict[repaired_gene].split(";") #the genes are always ordered according to genomic coordinates
@@ -456,7 +468,7 @@ for repaired_gene, group in grouped_broken_GTF_df:
   group["new_proteinID"] = [element+protein_suffix for element in list(group["new_geneID"])]
   #broken_df_exons; select only entries with exons.
   broken_exons_df = group.dropna(subset=["exon_number"])
-  broken_exons_df = broken_exons_df.copy()
+  broken_exons_df = broken_exons_df.copy(deep=True)
 
   #make sure exons are ordered (by start and stop coords), and re-number them (the second gene will change).
   broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
@@ -544,10 +556,10 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
   #group = chimeric_GTF_df[chimeric_GTF_df["geneID"]=="BGIBMGA001038"]
   first_ex = min([int(element) for element in list(group["exon_number"]) if math.isnan(element) == False]) #I have to use min because sometimes the enumeration starts from 2
   last_ex = int(geneID_left_bound_dict[chimeric_gene]) #change data type
-  print(last_ex); print(type(last_ex)) 
  
   group_exon_df = group.dropna(subset=["exon_number"])
   first_gene_df = group_exon_df[group_exon_df["exon_number"] <= last_ex]
+  first_gene_df = first_gene_df.copy(deep=True)
   first_gene_df["exon_number"] = first_gene_df["exon_number"].astype("Int64") #this is necessary to have integers with NaN
   #generate the geneID, transcriptID and proteinID
   first_gene_df["new_geneID"] = [element.split(";")[0] for element in list(first_gene_df["new_geneID"])]
@@ -565,6 +577,7 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
 
   ### Second gene: exon number >= boundary_ex_right
   second_gene_df = group_exon_df[group_exon_df["exon_number"] >= int(geneID_right_bound_dict[chimeric_gene])]
+  second_gene_df = second_gene_df.copy(deep=True)
   #renumber the exons (both exons and CDS)
   ex_number_list = list(sorted(list(set(list(second_gene_df["exon_number"])))))
   ex_number_dict = {float(element) : ex_number_list.index(element)+1 for element in ex_number_list}
@@ -595,9 +608,12 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
   joint_chimeric_df = pd.concat([first_gene_df, second_gene_df])
   joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "gene_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
   joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "transcript_source", ["brochi_pipe" for element in list(range(joint_chimeric_df.shape[0]))])
+  #joint_chimeric_df["attribute_mod"] = modify_value_in_tuple(list(joint_chimeric_df["attribute_mod"]), "gene_id", list(joint_chimeric_df["new_geneID"]))
 
   joint_chimeric_df["attribute_mod"] = rebuild_attribute_entry(list(joint_chimeric_df["attribute_mod"]))
-  final_joint_chimeric_df = joint_chimeric_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]] 
+  print(joint_chimeric_df)
+  final_joint_chimeric_df = joint_chimeric_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
+  print(final_joint_chimeric_df) 
   all_chimeric_gtf_df = pd.concat([all_chimeric_gtf_df, final_joint_chimeric_df])
 
 #############################################
@@ -605,7 +621,7 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
 #############################################
 #save only the brochi_gtf to file
 brochi_df = pd.concat([all_broken_gtf_df, all_chimeric_gtf_df])
-brochi_df = brochi_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf
+brochi_df = brochi_df.sort_values(by=["chr", "start", "stop", "type"]) #order gtf
 brochi_df.to_csv(output_brochi, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE) #the csv.QUOTE_NONE avoids extra quotes aroung the attribute field
 
 final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
