@@ -625,5 +625,5 @@ brochi_df = brochi_df.sort_values(by=["chr", "start", "stop", "type"]) #order gt
 brochi_df.to_csv(output_brochi, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE) #the csv.QUOTE_NONE avoids extra quotes aroung the attribute field
 
 final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
-final_df = final_df.sort_values(by=["chr","start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
+final_df = final_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf (still need to figure out the exon-CDS order)
 final_df.to_csv(output_file, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE)  #save to file

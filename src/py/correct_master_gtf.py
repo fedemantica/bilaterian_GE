@@ -126,5 +126,5 @@ print(brochi_gtf_df.shape)
 final_df = pd.concat([gtf_df, brochi_gtf_df]) #join all parts
 #remove  geneID column
 final_df = final_df.drop(columns=["geneID"])
-final_df = final_df.sort_values(by=["chr", "start", "stop", "type"]) #order gtf (still need to figure out the exon-CDS order)
+final_df = final_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf (still need to figure out the exon-CDS order)
 final_df.to_csv(output_file, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE)  #save to file
