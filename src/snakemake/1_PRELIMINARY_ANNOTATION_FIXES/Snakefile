@@ -7,6 +7,7 @@ BROCCOLI = config["paths"]["broccoli"]
 DATABASE = config["paths"]["database"]
 GENOME_DIR = config["paths"]["genome_dir"]
 GTF_REF_DIR = config["paths"]["gtf_ref_dir"]
+GTF_MASTER_DIR = config["paths"]["gtf_master_dir"]
 EXINT_REF_DIR = config["paths"]["exint_ref_dir"]
 GENEID_PARAMS = config["paths"]["geneID_params"]
 
@@ -63,6 +64,7 @@ GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
 CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
 GENERATE_CHIMERIC_GENE_IDS = config["tools"]["generate_chimeric_geneIDs"]
 CORRECT_REF_GTF = config["tools"]["correct_ref_gtf"]
+CORRECT_MASTER_GTF = config["tools"]["correct_master_gtf"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -83,7 +85,8 @@ NEW_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_new_geneIDs.
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
-BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species="BmA")
+CORRECTED_MASTER_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species="BmA")
 
 ######### rules ################
 
@@ -97,7 +100,8 @@ rule all:
 		ALIGNED_FRAGMENT_INFO,
 		CLASSIFIED_CHIMERIC_GENES,
 		NEW_GENE_IDS,
-		BROCHI_CORRECTED_GTF
+		BROCHI_CORRECTED_GTF,
+		CORRECTED_MASTER_GTF
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -880,7 +884,7 @@ rule generate_multiple_alignments:
 		BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log"
 	params:
 		fastas_dir = BROCCOLI+"/{my_version}/fastas",
-		chimeric_genes = lambda wildcards: str(CHIMERIC_GENES[int(wildcards.batch_index)]),
+		chimeric_genes = lambda wildcards: str(CHIMERIC_GENES[int(wildcards.batch_index)][0]),
 		output_dir = BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln"
 	conda:
 		CONDA_ENVS+"/broccoli_1.2.yml"
@@ -949,7 +953,7 @@ rule generate_new_IDs:
 			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
 		"""
 
-rule correct_gtf:
+rule correct_ref_gtf:
 	input:
 		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
 		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab",
@@ -964,6 +968,18 @@ rule correct_gtf:
 		python {CORRECT_REF_GTF} --species {wildcards.species} --gtf {input.gtf} --broken {input.broken_genes} \
 			--chimeric {input.chimeric_genes} --IDs {input.geneIDs} --params_file {GENEID_PARAMS} \
 			--output {output.gtf} --output_brochi {output.brochi} --output_unresolved {output.unresolved}
+		"""
+
+rule correct_master_gtf:
+	input:
+		gtf = GTF_MASTER_DIR+"/{species}_annot.gtf",
+		brochi_ref_gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi_only.gtf",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+	output:
+		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf"
+	shell:
+		"""
+		python {CORRECT_MASTER_GTF} --species {wildcards.species} --gtf {input.gtf} --brochi_gtf {input.brochi_ref_gtf} --IDs {input.geneIDs} --output {output}
 		"""
 
 

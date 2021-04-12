@@ -9,6 +9,7 @@ paths:
   database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
   genome_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/genomes"
   gtf_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref"
+  gtf_master_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/master"
   exint_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/exint/ref"
   geneID_params: "./geneID_params.txt"  
 
@@ -34,6 +35,7 @@ tools:
   classify_chimeric_genes: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/classify_chimeric_genes.py"
   generate_chimeric_geneIDs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/generate_chimeric_geneIDs.py"
   correct_ref_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_ref_gtf.py"
+  correct_master_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_master_gtf.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
