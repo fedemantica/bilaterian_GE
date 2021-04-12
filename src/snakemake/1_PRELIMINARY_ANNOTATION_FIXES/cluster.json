@@ -26,7 +26,7 @@
   "extract_aligned_fragments" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "7G",
+    "ram" : "10G",
     "time" : "03:00:00",
     "disk" : "2G",
     "queue" : "short-sl7" 
