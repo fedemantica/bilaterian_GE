@@ -621,7 +621,7 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
 #############################################
 #save only the brochi_gtf to file
 brochi_df = pd.concat([all_broken_gtf_df, all_chimeric_gtf_df])
-brochi_df = brochi_df.sort_values(by=["chr", "start", "stop", "type"]) #order gtf
+brochi_df = brochi_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf
 brochi_df.to_csv(output_brochi, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE) #the csv.QUOTE_NONE avoids extra quotes aroung the attribute field
 
 final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
