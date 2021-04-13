@@ -455,6 +455,7 @@ grouped_broken_GTF_df = broken_GTF_df.groupby("new_geneID")
 for repaired_gene, group in grouped_broken_GTF_df:
   print(repaired_gene) #for debugging
   group = group.copy(deep=True)
+  strand = list(group["strand"])[0]
   #group = broken_GTF_df[broken_GTF_df["new_geneID"]=="BGIBMGAB00092"]
   #derive variables
   broken_parts = reverse_geneID_dict[repaired_gene].split(";") #the genes are always ordered according to genomic coordinates
@@ -510,6 +511,11 @@ for repaired_gene, group in grouped_broken_GTF_df:
   #Rebuild the attribute field in the original format
   broken_exons_df["attribute_mod"] = rebuild_attribute_entry(list(broken_exons_df["attribute_mod"]))
   final_broken_exons_df = broken_exons_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
+  #order base on strand:
+  if strand == "+":
+    final_broken_exons_df = final_broken_exons_df.sort_values(["start", "type"], ascending=[True,False])
+  elif strand == "-":
+    final_broken_exons_df = final_broken_exons_df.sort_values(["stop", "type"], ascending=[False,False])
   all_broken_gtf_df = pd.concat([all_broken_gtf_df, final_broken_exons_df])
 
 ##################################
@@ -550,6 +556,7 @@ all_chimeric_gtf_df = pd.DataFrame() #initialize gtf_df for all chimeric genes
 #group by chimeric geneID and cycle on the groups
 grouped_chimeric_GTF_df = chimeric_GTF_df.groupby("geneID")
 for chimeric_gene, group in grouped_chimeric_GTF_df:
+  strand = list(group["strand"])[0]
   print(chimeric_gene) #for debugging
   ### First gene: exon number <= boundary_ex_left
   #Test geneID: BGIBMGA001038
@@ -614,16 +621,22 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
   print(joint_chimeric_df)
   final_joint_chimeric_df = joint_chimeric_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
   print(final_joint_chimeric_df) 
+  #order depending on strand
+  if strand == "+":
+    final_joint_chimeric_df = final_joint_chimeric_df.sort_values(["start", "type"], ascending=[True,False])
+  elif strand == "-":
+    final_joint_chimeric_df = final_joint_chimeric_df.sort_values(["stop", "type"], ascending=[False,False])
   all_chimeric_gtf_df = pd.concat([all_chimeric_gtf_df, final_joint_chimeric_df])
+  
 
 #############################################
 ########## JOIN ALL GTF PARTS ###############
 #############################################
 #save only the brochi_gtf to file
 brochi_df = pd.concat([all_broken_gtf_df, all_chimeric_gtf_df])
-brochi_df = brochi_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf
+#brochi_df = brochi_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf
 brochi_df.to_csv(output_brochi, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE) #the csv.QUOTE_NONE avoids extra quotes aroung the attribute field
 
 final_df = pd.concat([healthy_GTF_df, all_broken_gtf_df, all_chimeric_gtf_df]) #join all parts
-final_df = final_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf (still need to figure out the exon-CDS order)
+#final_df = final_df.sort_values(by=["chr", "start", "type"], ascending=[True,True,False]) #order gtf (still need to figure out the exon-CDS order)
 final_df.to_csv(output_file, sep="\t", index=False, header=False, na_rep="NA", quoting=csv.QUOTE_NONE)  #save to file
