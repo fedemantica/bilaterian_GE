@@ -936,7 +936,7 @@ rule classify_chimeric_genes:
 		"""
 
 ##############################################
-############ Correct gtf #####################
+############ CORRECT GTF #####################
 ##############################################
 #Correct the gtf taking into account the broken and the chimeric genes
 #Generate new geneIDs for the broken and the chimeric genes
@@ -980,6 +980,57 @@ rule correct_master_gtf:
 	shell:
 		"""
 		python {CORRECT_MASTER_GTF} --species {wildcards.species} --gtf {input.gtf} --brochi_gtf {input.brochi_ref_gtf} --IDs {input.geneIDs} --output {output}
+		"""
+
+##############################################
+########### CORRECT ORTHOGROUPS ##############
+##############################################
+
+#join together the files generated for the different species separately
+rule join_species_files:
+	input:
+		geneIDs = expand("{path}/{{my_version}}/corrected_gtfs/{species}_new_geneIDs.txt", path=BROCCOLI, species=ALL_SPECIES),
+		unresolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab", path=BROCCOLI, species=ALL_SPECIES)
+		resolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-resolved_chimeric_genes.tab", path=BROCCOLI, species=ALL_SPECIES)
+	output:
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt",
+		unresolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-unresolved_chimeric_genes.tab",
+		resolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-resolved_chimeric_genes.tab"
+	run:
+		import pandas as pd
+		#geneIDs
+		complete_geneIDs_df = pd.DataFrame()
+		for my_file in list(input.geneIDs):
+		  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=0)
+		  complete_geneIDs_df = pd.concat([complete_geneIDs_df, my_df])
+		complete_geneIDs_df.to_csv(str(output.geneIDs), sep="\t", index=False, header=True, na_rep="NA")
+		#unresolved chimeric
+		unresolved_chimeric_df = pd.DataFrame()
+		for my_file in list(input.unresolved_chimeric):
+		  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=0)
+		  unresolved_chimeric_df = pd.concat([unresolved_chimeric_df, my_df])
+		unresolved_chimeric_df.to_csv(str(output.unresolved_chimeric), sep="\t", index=False, header=True, na_rep="NA")
+		#resolved_chimeric
+		resolved_chimeric_df = pd.DataFrame()
+		for my_file in list(input.resolved_chimeric):
+		  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=0)
+		  resolved_chimeric_df = pd.concat([resolved_chimeric_df, my_df])
+		resolved_chimeric_df.to_csv(str(output.resolved_chimeric), sep="\t", index=False, header=True, na_rep="NA")
+
+
+rule correct_orthogroups:
+	input:
+		orthogroups = ,
+		geneIDs = ,
+		unresolved_chimeric = ,
+		resolved_chimeric = 
+	output:
+		BROCCOLI+"/{my_version}/corrected_orthogroups.txt"
+	shell:
+		"""
+		python {CORRECT_ORTHOGROUPS} 	--orthogroups {input.orthogroups} --geneIDs {input.geneIDs} \
+						--unresolved_chimeric {input.unresolved_chimeric} --resolved_chimeric {input.resolved_chimeric} \
+						--output {output}
 		"""
 
 
