@@ -39,7 +39,7 @@ tools:
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
-  my_version: "BmA_version"
+  my_version: "BmA_version1"
   gene_num: ["two_genes", "more_genes"]
   invertebrate_species: ["BmA", "Bge", "Eba","Sma"]
   seqsim_cutoff: 0.30
