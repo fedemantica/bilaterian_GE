@@ -67,66 +67,69 @@ for my_alignment_prefix in my_alignment_prefix_list:
   #Get a list of all the entries in the alignment 
   my_aln = list(list(SeqIO.parse(my_alignment_file, "fasta")))
   total_genes = len(my_aln) #Count total amount of genes in the orthogroup
-  chimeric_gene_aln_seq = [element for element in my_aln if element.id == my_chimeric_gene][0] #Isolate the chimeric gene entry
+  if my_chimeric_gene in [element.id for element in my_aln]: #ugly patch for those few cases where the multiple alignment does not work for some reason
+    chimeric_gene_aln_seq = [element for element in my_aln if element.id == my_chimeric_gene][0] #Isolate the chimeric gene entry
 
-  #Create a dataframe with row = alignment_position, column = gene
-  alignment_df = pd.DataFrame()
-  for entry in my_aln:
-    alignment_df[entry.id] = list(entry.seq)
-  transposed_alignment_df = alignment_df.transpose() #Transpose the dataframe (row=gene, column=alignment position)
+    #Create a dataframe with row = alignment_position, column = gene
+    alignment_df = pd.DataFrame()
+    for entry in my_aln:
+      alignment_df[entry.id] = list(entry.seq)
+    transposed_alignment_df = alignment_df.transpose() #Transpose the dataframe (row=gene, column=alignment position)
 
-  #Get a dictionary with key=alignment position, value=percentage of genes that align there (i.e. position != "-")
-  max_aln_positions = transposed_alignment_df.shape[0] #number of species
-  percent_aln_positions = transposed_alignment_df.apply(lambda x: len([element for element in x if element != "-"])/max_aln_positions, axis=0) #this returns a series
-  position_percent_aln_dict = percent_aln_positions.to_dict()
-  #Get a dictionary with key=alignment position, value=length of the aligned  fragment to which the position belongs
-  aligned_pos_len_list = [aligned_pos_in_string("".join(list(entry.seq)), x) for x in list(range(len("".join(list(entry.seq)))))]
-  aligned_pos_num_dict = {index: value for index,value in enumerate(aligned_pos_len_list)}
+    #Get a dictionary with key=alignment position, value=percentage of genes that align there (i.e. position != "-")
+    max_aln_positions = transposed_alignment_df.shape[0] #number of species
+    percent_aln_positions = transposed_alignment_df.apply(lambda x: len([element for element in x if element != "-"])/max_aln_positions, axis=0) #this returns a series
+    position_percent_aln_dict = percent_aln_positions.to_dict()
+    #Get a dictionary with key=alignment position, value=length of the aligned  fragment to which the position belongs
+    aligned_pos_len_list = [aligned_pos_in_string("".join(list(entry.seq)), x) for x in list(range(len("".join(list(entry.seq)))))]
+    aligned_pos_num_dict = {index: value for index,value in enumerate(aligned_pos_len_list)}
   
-  #Select the lowest and highest key which are aligned and in chimeric gene for which value >= %stringency
-  #first and last aligned aminoacid, respectively
-  chimeric_gene_aln_pos = transposed_alignment_df.loc[my_chimeric_gene,]
-  chimeric_gene_aligned_pos = list(chimeric_gene_aln_pos[chimeric_gene_aln_pos != "-"].index.values)
-  valid_positions = [key for key in list(position_percent_aln_dict.keys()) if key in chimeric_gene_aligned_pos]
-  valid_positions_with_length = [position for position in valid_positions if aligned_pos_num_dict[position] >= my_min_aligned] #the position is in a string of at least n aligned AA
-  valid_positions_with_coverage = [position for position in valid_positions_with_length if position_percent_aln_dict[position] >= my_overlap_stringency] #at least one positions that aligns with a certain percentage of the orthogroup
-  if len(valid_positions_with_coverage) >=1:
-    first_aligned_pos = min(valid_positions_with_coverage)
-    last_aligned_pos = max(valid_positions_with_coverage)
+    #Select the lowest and highest key which are aligned and in chimeric gene for which value >= %stringency
+    #first and last aligned aminoacid, respectively
+    chimeric_gene_aln_pos = transposed_alignment_df.loc[my_chimeric_gene,]
+    chimeric_gene_aligned_pos = list(chimeric_gene_aln_pos[chimeric_gene_aln_pos != "-"].index.values)
+    valid_positions = [key for key in list(position_percent_aln_dict.keys()) if key in chimeric_gene_aligned_pos]
+    valid_positions_with_length = [position for position in valid_positions if aligned_pos_num_dict[position] >= my_min_aligned] #the position is in a string of at least n aligned AA
+    valid_positions_with_coverage = [position for position in valid_positions_with_length if position_percent_aln_dict[position] >= my_overlap_stringency] #at least one positions that aligns with a certain percentage of the orthogroup
+    if len(valid_positions_with_coverage) >=1:
+      first_aligned_pos = min(valid_positions_with_coverage)
+      last_aligned_pos = max(valid_positions_with_coverage)
 
-    #Translate from alignment position to chimeric gene position. Create a dictionary between the two "coordinate" systems (the chimeric gene aln with and without indels)
-    aln_chimeric_gene_pos_dict = {key: value for value, key in enumerate(valid_positions)}
-    first_aligned_aa = aln_chimeric_gene_pos_dict[first_aligned_pos]+1 #first aa in the fragment. Add one because the other aa_pos are in a 1-based system
-    last_aligned_aa = aln_chimeric_gene_pos_dict[last_aligned_pos]+1 #last aa in the fragment. Add one because other aa_post are in a 1-based system
+      #Translate from alignment position to chimeric gene position. Create a dictionary between the two "coordinate" systems (the chimeric gene aln with and without indels)
+      aln_chimeric_gene_pos_dict = {key: value for value, key in enumerate(valid_positions)}
+      first_aligned_aa = aln_chimeric_gene_pos_dict[first_aligned_pos]+1 #first aa in the fragment. Add one because the other aa_pos are in a 1-based system
+      last_aligned_aa = aln_chimeric_gene_pos_dict[last_aligned_pos]+1 #last aa in the fragment. Add one because other aa_post are in a 1-based system
 
-    #Subset the exon positions dataframe to only the chimeric gene of interest
-    chimeric_gene_exon_pos = all_exon_pos_df[all_exon_pos_df["geneID"]==my_chimeric_gene]
-    chimeric_gene_exon_pos_dict = pd.Series(chimeric_gene_exon_pos.exon_num.values, index=chimeric_gene_exon_pos.aa_coords).to_dict() #dictionary with key=aa_pos, value=exon_num
-    chimeric_gene_exon_pos_ranges = [range(int(element.split("-")[0]), int(element.split("-")[1])) for element in list(chimeric_gene_exon_pos_dict.keys())]
-    overlapping_exons = [element for element in chimeric_gene_exon_pos_ranges if set(range(first_aligned_aa, last_aligned_aa)).intersection(element)]
-    if len(overlapping_exons) >= 1:
-      first_overlapping_exon = overlapping_exons[0]
-      last_overlapping_exon = overlapping_exons[len(overlapping_exons)-1]
-      #Transform ranges back to coordinates
-      first_overlapping_exon_aa = str(first_overlapping_exon[0])+"-"+str(first_overlapping_exon[len(first_overlapping_exon)-1]+1)
-      last_overlapping_exon_aa = str(last_overlapping_exon[0])+"-"+str(last_overlapping_exon[len(last_overlapping_exon)-1]+1)
-      #Intersect with the aminoacid positions to get the correspondent exon numer
-      first_overlapping_exon_num = chimeric_gene_exon_pos_dict[first_overlapping_exon_aa]
-      last_overlapping_exon_num = chimeric_gene_exon_pos_dict[last_overlapping_exon_aa]
+      #Subset the exon positions dataframe to only the chimeric gene of interest
+      chimeric_gene_exon_pos = all_exon_pos_df[all_exon_pos_df["geneID"]==my_chimeric_gene]
+      chimeric_gene_exon_pos_dict = pd.Series(chimeric_gene_exon_pos.exon_num.values, index=chimeric_gene_exon_pos.aa_coords).to_dict() #dictionary with key=aa_pos, value=exon_num
+      chimeric_gene_exon_pos_ranges = [range(int(element.split("-")[0]), int(element.split("-")[1])) for element in list(chimeric_gene_exon_pos_dict.keys())]
+      overlapping_exons = [element for element in chimeric_gene_exon_pos_ranges if set(range(first_aligned_aa, last_aligned_aa)).intersection(element)]
+      if len(overlapping_exons) >= 1:
+        first_overlapping_exon = overlapping_exons[0]
+        last_overlapping_exon = overlapping_exons[len(overlapping_exons)-1]
+        #Transform ranges back to coordinates
+        first_overlapping_exon_aa = str(first_overlapping_exon[0])+"-"+str(first_overlapping_exon[len(first_overlapping_exon)-1]+1)
+        last_overlapping_exon_aa = str(last_overlapping_exon[0])+"-"+str(last_overlapping_exon[len(last_overlapping_exon)-1]+1)
+        #Intersect with the aminoacid positions to get the correspondent exon numer
+        first_overlapping_exon_num = chimeric_gene_exon_pos_dict[first_overlapping_exon_aa]
+        last_overlapping_exon_num = chimeric_gene_exon_pos_dict[last_overlapping_exon_aa]
+      else:
+        first_overlapping_exon_aa = "NA"; last_overlapping_exon_aa = "NA"; first_overlapping_exon_num = "NA"; last_overlapping_exon_num = "NA"
     else:
-      first_overlapping_exon_aa = "NA"; last_overlapping_exon_aa = "NA"; first_overlapping_exon_num = "NA"; last_overlapping_exon_num = "NA"
+      first_aligned_aa = "NA"; last_aligned_aa = "NA"; first_overlapping_exon_aa = "NA"; last_overlapping_exon_aa = "NA"; first_overlapping_exon_num = "NA"; last_overlapping_exon_num = "NA"
+
+    #Save output file with header:
+    #1. Chimeric geneID
+    #2. OG ID
+    #3. First aligned aa
+    #4. Last aligned aa
+    #5. First aligned exon (exon num: aa coords)
+    #6. Last aligned exon (exon num: aa coords)
+    final_string = "%s\t%s\t%s\t%s\t%s:%s\t%s:%s\n" % (my_chimeric_gene, my_orthogroupID, first_aligned_aa, last_aligned_aa, first_overlapping_exon_num, first_overlapping_exon_aa, last_overlapping_exon_num, last_overlapping_exon_aa)
+    with open(my_output_file, "a") as my_output:
+       my_output.write(final_string)
+
+    print(final_string)
   else:
-    first_aligned_aa = "NA"; last_aligned_aa = "NA"; first_overlapping_exon_aa = "NA"; last_overlapping_exon_aa = "NA"; first_overlapping_exon_num = "NA"; last_overlapping_exon_num = "NA"
-
-  #Save output file with header:
-  #1. Chimeric geneID
-  #2. OG ID
-  #3. First aligned aa
-  #4. Last aligned aa
-  #5. First aligned exon (exon num: aa coords)
-  #6. Last aligned exon (exon num: aa coords)
-  final_string = "%s\t%s\t%s\t%s\t%s:%s\t%s:%s\n" % (my_chimeric_gene, my_orthogroupID, first_aligned_aa, last_aligned_aa, first_overlapping_exon_num, first_overlapping_exon_aa, last_overlapping_exon_num, last_overlapping_exon_aa)
-  with open(my_output_file, "a") as my_output:
-     my_output.write(final_string)
-
-  print(final_string)
+    continue
