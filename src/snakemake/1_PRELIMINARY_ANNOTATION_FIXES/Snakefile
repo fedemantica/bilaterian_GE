@@ -65,6 +65,7 @@ CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
 GENERATE_CHIMERIC_GENE_IDS = config["tools"]["generate_chimeric_geneIDs"]
 CORRECT_REF_GTF = config["tools"]["correct_ref_gtf"]
 CORRECT_MASTER_GTF = config["tools"]["correct_master_gtf"]
+CORRECT_ORTHOGROUPS = config["tools"]["correct_gene_orthogroups"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -85,8 +86,11 @@ NEW_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_new_geneIDs.
 
 REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
 FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
-BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species="BmA")
-CORRECTED_MASTER_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species="BmA")
+BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+CORRECTED_MASTER_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+
+JOINT_FILES = expand("{path}/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt", path=BROCCOLI, my_version=MY_VERSION)
+CORRECTED_OG = expand("{path}/{my_version}/corrected_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
 
 ######### rules ################
 
@@ -101,7 +105,9 @@ rule all:
 		CLASSIFIED_CHIMERIC_GENES,
 		#NEW_GENE_IDS,
 		BROCHI_CORRECTED_GTF,
-		CORRECTED_MASTER_GTF
+		CORRECTED_MASTER_GTF,
+		JOINT_FILES,
+		CORRECTED_OG
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -961,13 +967,14 @@ rule correct_ref_gtf:
 		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
 	output:
 		unresolved = BROCCOLI+"/{my_version}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab",
+		resolved = BROCCOLI+"/{my_version}/corrected_gtfs/{species}-resolved_chimeric_genes.tab",
 		brochi = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi_only.gtf",
 		gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf"
 	shell:
 		"""
 		python {CORRECT_REF_GTF} --species {wildcards.species} --gtf {input.gtf} --broken {input.broken_genes} \
 			--chimeric {input.chimeric_genes} --IDs {input.geneIDs} --params_file {GENEID_PARAMS} \
-			--output {output.gtf} --output_brochi {output.brochi} --output_unresolved {output.unresolved}
+			--output {output.gtf} --output_brochi {output.brochi} --output_unresolved {output.unresolved} --output_resolved {output.resolved}
 		"""
 
 rule correct_master_gtf:
@@ -989,9 +996,9 @@ rule correct_master_gtf:
 #join together the files generated for the different species separately
 rule join_species_files:
 	input:
-		geneIDs = expand("{path}/{{my_version}}/corrected_gtfs/{species}_new_geneIDs.txt", path=BROCCOLI, species=ALL_SPECIES),
-		unresolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab", path=BROCCOLI, species=ALL_SPECIES)
-		resolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-resolved_chimeric_genes.tab", path=BROCCOLI, species=ALL_SPECIES)
+		geneIDs = expand("{path}/{{my_version}}/corrected_gtfs/{species}_new_geneIDs.txt", path=BROCCOLI, species=INVERTEBRATE_SPECIES),
+		unresolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab", path=BROCCOLI, species=INVERTEBRATE_SPECIES),
+		resolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-resolved_chimeric_genes.tab", path=BROCCOLI, species=INVERTEBRATE_SPECIES)
 	output:
 		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt",
 		unresolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-unresolved_chimeric_genes.tab",
@@ -1017,13 +1024,12 @@ rule join_species_files:
 		  resolved_chimeric_df = pd.concat([resolved_chimeric_df, my_df])
 		resolved_chimeric_df.to_csv(str(output.resolved_chimeric), sep="\t", index=False, header=True, na_rep="NA")
 
-
 rule correct_orthogroups:
 	input:
-		orthogroups = ,
-		geneIDs = ,
-		unresolved_chimeric = ,
-		resolved_chimeric = 
+		orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt",
+		unresolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-unresolved_chimeric_genes.tab",
+		resolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-resolved_chimeric_genes.tab"
 	output:
 		BROCCOLI+"/{my_version}/corrected_orthogroups.txt"
 	shell:
