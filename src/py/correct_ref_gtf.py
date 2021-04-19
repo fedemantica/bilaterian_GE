@@ -16,7 +16,8 @@ parser.add_argument("--IDs", "-i", required=True, metavar="input", help="File wi
 parser.add_argument("--params_file", "-p", required=True, metavar="input", help="Params file with geneID infos for each species (suffix, length)")
 parser.add_argument("--output", "-o", required=True, metavar="output", help="Path to output file for corrected GTF")
 parser.add_argument("--output_brochi", "-ob", required=True, metavar="output_brochi", help="Path where to save only the subsetted gtf with the corrected broken and chimeric genes")
-parser.add_argument("--output_unresolved", "-or", required=True, metavar="output_unresolved", help="Path to output file with unresolved chimeric genes")
+parser.add_argument("--output_unresolved", "-ou", required=True, metavar="output_unresolved", help="Path to output file with unresolved chimeric genes")
+parser.add_argument("--output_resolved", "-or", required=True, metavar="output_resolved", help="Path to output file with 'resolved' chimeric genes")
 
 ###### Read arguments
 args = parser.parse_args()
@@ -29,6 +30,7 @@ my_params_file = args.params_file
 output_file = args.output
 output_brochi = args.output_brochi
 output_unresolved = args.output_unresolved
+output_resolved = args.output_resolved
 
 ##################################
 ###### DEFINE FUNCTIONS ##########
@@ -112,8 +114,11 @@ def def_boundary_exon(chimeric_df): #input is a dataframe with header: species, 
   ######### INVALID_ALN
   my_df = chimeric_df[chimeric_df["chimeric_class"]=="INVALID_ALN"]
   my_df["ex_overlap"] = "invalid"
-  my_df_unselected = pd.concat([my_df_unselected, my_df]) 
-  return(final_df, my_df_unselected)
+  my_df_unselected = pd.concat([my_df_unselected, my_df])
+  ####### Generate a dataframe with all the selected entries to save to output
+  selected_chimeric = list(final_df["chimeric_geneID"])
+  my_df_selected = chimeric_df.loc[chimeric_df["chimeric_geneID"].isin(selected_chimeric)] 
+  return(final_df, my_df_unselected, my_df_selected)
 
 def modify_value_in_tuple(attribute_field_raw, category, new_value):
   #group1["attribute_mod"] = group.attribute_mod.apply(list.copy)
@@ -532,8 +537,12 @@ chimeric_genes_to_correct = list(chimeric_genes_df["chimeric_geneID"])
 res = def_boundary_exon(chimeric_genes_df)
 boundary_ex_df = res[0]
 unresolved_chimeric_df = res[1]
+resolved_chimeric_df = res[2]
 #Save unresolved_df to file
 unresolved_chimeric_df.to_csv(output_unresolved, sep="\t", index=False, header=True, na_rep="NA")
+#Save resolved_df to file
+resolved_chimeric_df.to_csv(output_resolved, sep="\t", index=False, header=True, na_rep="NA")
+
 
 #create dictionary with correspondence between geneID - left boundary and geneID - right boundary
 geneID_left_bound_dict = pd.Series(boundary_ex_df.boundary_ex_left.values, index=boundary_ex_df.chimeric_geneID).to_dict()
