@@ -4,7 +4,7 @@ Eba	EBAG	11	_1	_1
 Bge	BGER	10	-RA	-RA
 Sma	SMAR	10	-RA	-PA
 Ame	GB	7	-RA	-PA
-Spu	WHL22.	12	.1	.1	
+Spu	WHL22.	12	.1	.1
 Bla	BLAG	12	_1	_1
 Obi	Ocbimv	15	_1	_1
 Tca	TC	8	_001	_001
