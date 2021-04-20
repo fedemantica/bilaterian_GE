@@ -216,7 +216,7 @@ def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_re
   first_gene = broken_parts[0]
   for second_gene in broken_parts[1:]: #access all the broken genes after the first
     first_ex_second = min(list(broken_exons_df[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
-    #this is because I still have  not renumbered
+    #this is because I still have not renumbered
     last_CDS_first_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==first_gene)]
     first_CDS_second_gene = broken_exons_df.loc[(broken_exons_df["exon_number"]==first_ex_second) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==second_gene)]
     last_ex_first_phase = str(list(last_CDS_first_gene["phase"])[0]) #this works because we still have only the exons in the df
@@ -231,6 +231,10 @@ def adjust_broken_phases(broken_exons_df, last_ex_first, broken_parts, phases_re
       elif strand == "-":
         current_start = list(broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["type"]=="CDS") & (broken_exons_df["geneID"]==first_gene)]["start"])[0]
         broken_exons_df.loc[(broken_exons_df["exon_number"]==last_ex_first) & (broken_exons_df["geneID"]==first_gene), "start"] = current_start + rest - phases_rest_dict[phase_transition]
+    #############
+    #Remove all exon entries where the exon number is greater than last_ex_first(which is the last coding exon)
+    broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]==first_gene) & (broken_exons_df["exon_number"] > last_ex_first) & (broken_exons_df["type"]=="exon"))] #the exon filter should not be necessary, but just in case
+    #############
     #update variables for next cycle.
     first_gene = second_gene
     last_ex_first = max(list(broken_exons_df.loc[(broken_exons_df["geneID"]==second_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"])) 
@@ -479,7 +483,7 @@ for repaired_gene, group in grouped_broken_GTF_df:
   #make sure exons are ordered (by start and stop coords), and re-number them (the second gene will change).
   broken_exons_df = broken_exons_df.sort_values(by=["start", "stop"])
   #first_broken_exons_df = broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]] #subset by the first gene.
-  last_ex_first = int(max(list(broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]]["exon_number"])))
+  #last_ex_first = int(max(list(broken_exons_df[broken_exons_df["geneID"]==broken_parts[0]]["exon_number"])))
   last_ex_first_CDS = int(max(list(broken_exons_df[(broken_exons_df["geneID"]==broken_parts[0]) & (broken_exons_df["type"]=="CDS")]["exon_number"])))
   #Adjust exon boundaries depending on phase combinations between last ex of first_broken and first_ex of second broken gene
   broken_exons_df = adjust_broken_phases(broken_exons_df, last_ex_first_CDS, broken_parts, phases_rest_dict)  
@@ -489,7 +493,7 @@ for repaired_gene, group in grouped_broken_GTF_df:
 #########################  
 
   #renumber the exons (both exons and CDS)
-  broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_first)
+  broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_first_CDS)
   first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
   last_ex = int(max(list(broken_exons_df["exon_number"])))
   #Fix start and stop exons
