@@ -91,6 +91,7 @@ CORRECTED_MASTER_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_anno
 
 JOINT_FILES = expand("{path}/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt", path=BROCCOLI, my_version=MY_VERSION)
 CORRECTED_OG = expand("{path}/{my_version}/corrected_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
+CORRECTED_FASTAS = expand("{path}/{my_version}/corrected_fastas/{species}_ref_exint.fasta", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
 
 ######### rules ################
 
@@ -107,7 +108,8 @@ rule all:
 		BROCHI_CORRECTED_GTF,
 		CORRECTED_MASTER_GTF,
 		JOINT_FILES,
-		CORRECTED_OG
+		CORRECTED_OG,
+		CORRECTED_FASTAS
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -1039,6 +1041,22 @@ rule correct_orthogroups:
 						--output {output}
 		"""
 
+
+##############################################
+########### GENERATE NEW FASTAS ##############
+##############################################
+#Generate new protein fasta files starting from the corrected_ref_gtf
+
+rule generate_corrected_fastas:
+	input:
+		gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf",
+		genome = GENOME_DIR+"/{species}_gDNA.fasta"
+	output:
+		BROCCOLI+"/{my_version}/corrected_fastas/{species}_ref_exint.fasta"
+	shell:
+		"""
+		perl {GET_EXINT_FASTA} -GTF {input.gtf} -G {input.genome} -out {output}
+		"""
 
 ###############################################
 ########### CHIMERIC GENES OLD ################
