@@ -62,8 +62,8 @@ resolved_chimeric_dict.update(OG2_dict)
 
 #### Modify the unresolved chimeric to determine the OG with the longest overlap
 #this code works, but it is not super easy to read...
-unresolved_chimeric_df["first_fragment"] = [int(element.split(";")[0].split("-")[1])-int(element.split(";")[0].split("-")[0]) for element in list(unresolved_chimeric_df["first-last_aligned_aa"])]
-unresolved_chimeric_df["second_fragment"] = [int(element.split(";")[1].split("-")[1])-int(element.split(";")[1].split("-")[0]) for element in list(unresolved_chimeric_df["first-last_aligned_aa"])]
+unresolved_chimeric_df["first_fragment"] = [float(element.split(";")[0].split("-")[1])-float(element.split(";")[0].split("-")[0]) for element in list(unresolved_chimeric_df["first-last_aligned_aa"])]
+unresolved_chimeric_df["second_fragment"] = [float(element.split(";")[1].split("-")[1])-float(element.split(";")[1].split("-")[0]) for element in list(unresolved_chimeric_df["first-last_aligned_aa"])]
 unresolved_chimeric_df["longest_fragment"] = ["OG1" if list(unresolved_chimeric_df["first_fragment"])[index] > list(unresolved_chimeric_df["second_fragment"])[index] else "OG2" for index in list(unresolved_chimeric_df.index.values)]
 unresolved_chimeric_df["selected_orthogroup"] = [list(unresolved_chimeric_df["orthogroup_ids"])[index].split(";")[0] if list(unresolved_chimeric_df["longest_fragment"])[index]=="OG1" else list(unresolved_chimeric_df["orthogroup_ids"])[index].split(";")[1] for index in list(unresolved_chimeric_df.index.values)]
 #create a list with chimericID;OG_to_save
