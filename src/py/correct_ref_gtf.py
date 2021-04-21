@@ -6,6 +6,7 @@ import re
 import numpy as np
 import math
 import csv
+from itertools import groupby
 
 parser = argparse.ArgumentParser(description="Script to correct broken and chimeric genes in the reference gtf")
 parser.add_argument("--species", "-s", required=True, metavar="species", help="Species of interest")
@@ -349,6 +350,32 @@ def renumerate_exons(broken_exons_df, broken_parts, last_ex_first):
     final_df = pd.concat([final_df, second_broken_exons_df])
   return(final_df)
 
+#This function is an extra check that fixes the cases where there are overlapping exons between the broken genes
+#(i.e. some Cterminal exons of geneID downstream of the Nterminal exons of gene2)
+def renumerate_exons_overlapping_entries(broken_exons_df, strand):
+  if strand == "+":
+    broken_exons_df = broken_exons_df.sort_values(["start", "type"], ascending=[True,False])
+  elif strand == "-":
+    broken_exons_df = broken_exons_df.sort_values(["stop", "type"], ascending=[False,False])
+  #remove duplicates for consecutive CDS and exon entries (physically overlapping exons from two different genes)
+  broken_exons_df = broken_exons_df.loc[broken_exons_df["type"].shift(-1) != broken_exons_df["type"]]
+  #broken_exons_df = broken_exons_df.loc[(broken_exons_df["type"].shift(-1) != broken_exons_df["type"]) & (broken_exons_df["start"].shift(-1) != broken_exons_df["start"]) & (broken_exons_df["stop"].shift(-1) != broken_exons_df["stop"])] #also require start and stop to be different for it to be saved, otherwise we remove consecutive non-coding exons.
+  #order list of the exon numbers as they appear
+  ex_number_list = [x[0] for x in groupby(list(broken_exons_df["exon_number"]))]
+  new_exon_number = [int(x) for x in list(range(1, len(ex_number_list)+1))]
+  ex_number_dict = {element : new_exon_number[ex_number_list.index(element)] for element in ex_number_list}   
+  broken_exons_df.loc[:,"exon_number"] = broken_exons_df["exon_number"].map(ex_number_dict)
+  return(broken_exons_df)
+
+
+ # if all(ex_number_list[i] <= ex_number_list[i+1] for i in range(len(ex_number_list)-1)): #check if the exon number is ordered
+ #   return(broken_exons_df)
+ # else: #if not, assign a new exon number
+ #   new_exon_number = [int(x) for x in list(range(1, len(ex_number_list)+1))]
+ #   ex_number_dict = {element : new_exon_number[ex_number_list.index(element)] for element in ex_number_list}   
+ #   broken_exons_df.loc[:,"exon_number"] = broken_exons_df["exon_number"].map(ex_number_dict)
+ #   return(broken_exons_df)
+
 def add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex):
   if "gene" in list(set(list(group["type"]))):
     gene_entry = group[group["type"]=="gene"].head(1) #select the first gene entry, but replace both start and stop just in case.
@@ -499,7 +526,9 @@ for repaired_gene, group in grouped_broken_GTF_df:
   #Fix start and stop exons
   broken_exons_df = fix_start_stop_codons(broken_exons_df, broken_parts)
 
- 
+  #extra check necessary in case of overlapping exon entries between broken genes
+  broken_exons_df = renumerate_exons_overlapping_entries(broken_exons_df, strand)
+
   #If originally there were gene and transcript entries, take them and modify the start and stop.
   broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
 
