@@ -287,30 +287,67 @@ def trim_broken_UTRs(broken_exons_df, broken_parts):
   return(broken_exons_df) 
 
 
+#def fix_start_stop_codons(broken_exons_df, broken_parts):
+#  strand = list(broken_exons_df["strand"])[0]
+#  first_gene = broken_parts[0]
+#  last_gene = broken_parts[-1]
+#  first_CDS = min(list(broken_exons_df[(broken_exons_df["geneID"]==first_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
+#  last_CDS = max(list(broken_exons_df[(broken_exons_df["geneID"]==last_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
+#  ### remove all the stop codons not belonging to the last gene
+#  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]!=last_gene) & (broken_exons_df["type"]=="stop_codon"))] #remove all stop codons not belonging to the last gene
+#  removed_stop_codons = broken_exons_df.loc[(broken_exons_df["geneID"]!=last_gene) & (broken_exons_df["type"]=="stop_codon")] #isolate all the stop codons not belonging to the last gene
+#  if strand == "+":
+#    removed_stop_codons_stop = list(removed_stop_codons["stop"]) #list of the stop coordinates of the removed stop codons
+#    broken_exons_df["stop"] = [element if element not in removed_stop_codons_stop else element-3 for element in list(broken_exons_df["stop"])] #correct the exon and CDS entries stop sharing those coordinates
+#  if strand  == "-":
+#    removed_stop_codons_start = list(removed_stop_codons["start"])
+#    broken_exons_df["start"] = [element if element not in removed_stop_codons_start else element+3 for element in list(broken_exons_df["start"])]
+#  ### remove all the start codons not beloning to the first gene
+#  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]!=first_gene) & (broken_exons_df["type"]=="start_codon"))] 
+#  removed_start_codons = broken_exons_df.loc[(broken_exons_df["geneID"]!=first_gene) & (broken_exons_df["type"]=="start_codon")]
+#  if strand == "+":
+#    removed_start_codons_start = list(removed_start_codons["start"])
+#    broken_exons_df["start"] = [element if element not in removed_start_codons_start else element+3 for element in list(broken_exons_df["start"])]
+#  if strand == "-":
+#    removed_start_codons_stop = list(removed_start_codons["stop"])
+#    broken_exons_df["stop"] = [element if element not in removed_start_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
+#  return(broken_exons_df)
+
+#### different version of fix_start_stop_codons: keep only the start_codon with the lowest start (+ strand) or with the highest stop ()
 def fix_start_stop_codons(broken_exons_df, broken_parts):
   strand = list(broken_exons_df["strand"])[0]
-  first_gene = broken_parts[0]
-  last_gene = broken_parts[-1]
-  first_CDS = min(list(broken_exons_df[(broken_exons_df["geneID"]==first_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
-  last_CDS = max(list(broken_exons_df[(broken_exons_df["geneID"]==last_gene) & (broken_exons_df["type"]=="CDS")]["exon_number"]))
-  ### remove all the stop codons not belonging to the last gene
-  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]!=last_gene) & (broken_exons_df["type"]=="stop_codon"))]
-  removed_stop_codons = broken_exons_df.loc[(broken_exons_df["geneID"]!=last_gene) & (broken_exons_df["type"]=="stop_codon")]
+  #positive strand
   if strand == "+":
-    removed_stop_codons_stop = list(removed_stop_codons["stop"])
-    broken_exons_df["stop"] = [element if element not in removed_stop_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
-  if strand  == "-":
-    removed_stop_codons_start = list(removed_stop_codons["start"])
-    broken_exons_df["start"] = [element if element not in removed_stop_codons_start else element+3 for element in list(broken_exons_df["start"])]
-  ### remove all the start codons not beloning to the first gene
-  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["geneID"]!=first_gene) & (broken_exons_df["type"]=="start_codon"))]
-  removed_start_codons = broken_exons_df.loc[(broken_exons_df["geneID"]!=first_gene) & (broken_exons_df["type"]=="start_codon")]
-  if strand == "+":
-    removed_start_codons_start = list(removed_start_codons["start"])
-    broken_exons_df["start"] = [element if element not in removed_start_codons_start else element+3 for element in list(broken_exons_df["start"])]
+    if "start_codon" in list(broken_exons_df["type"]):
+      #start codons
+      min_start_codon_start = min(list(broken_exons_df.loc[(broken_exons_df["type"]=="start_codon")]["start"])) #get min start codon entry
+      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["start"] != min_start_codon_start) & (broken_exons_df["type"]=="start_codon"))] #remove the removed start codons
+      removed_start_codons = broken_exons_df.loc[(broken_exons_df["start"] != min_start_codon_start) & (broken_exons_df["type"]=="start_codon")] #isolate the removed start codons
+      removed_start_codons_start = list(removed_start_codons["start"])
+      broken_exons_df["start"] = [element if element not in removed_start_codons_start else element+3 for element in list(broken_exons_df["start"])]
+    if "stop_codon" in list(broken_exons_df["type"]):
+      #stop codons
+      max_stop_codon_stop = max(list(broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon")]["stop"]))
+      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["stop"] != max_stop_codon_stop) & (broken_exons_df["type"]=="stop_codon"))] #remove the removed stop codons
+      removed_stop_codons = broken_exons_df.loc[(broken_exons_df["stop"] != max_stop_codon_stop) & (broken_exons_df["type"]=="stop_codon")] #isolate the removed start codons
+      removed_stop_codons_stop = list(removed_stop_codons["stop"])
+      broken_exons_df["stop"] = [element if element not in removed_stop_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
+  #negative strand
   if strand == "-":
-    removed_start_codons_stop = list(removed_start_codons["stop"])
-    broken_exons_df["stop"] = [element if element not in removed_start_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
+    if "start_codon" in list(broken_exons_df["type"]):
+      #start codons
+      max_start_codon_stop = max(list(broken_exons_df.loc[(broken_exons_df["type"]=="start_codon")]["stop"]))
+      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["stop"] != max_start_codon_stop) & (broken_exons_df["type"]=="start_codon"))]
+      removed_start_codons = broken_exons_df.loc[(broken_exons_df["stop"] != max_start_codon_stop) & (broken_exons_df["type"]=="start_codon")]
+      removed_start_codons_stop = list(removed_start_codons["stop"])
+      broken_exons_df["stop"] = [element if element not in removed_start_codons_stop else element-3 for element in list(broken_exons_df["stop"])]
+    if "stop_codon" in list(broken_exons_df["type"]):
+      #stop codons
+      min_stop_codon_start = min(list(broken_exons_df.loc[(broken_exons_df["type"]=="stop_codon")]["start"]))
+      broken_exons_df = broken_exons_df.loc[~((broken_exons_df["start"] != min_stop_codon_start) & (broken_exons_df["type"]=="stop_codon"))]
+      removed_stop_codons = broken_exons_df.loc[(broken_exons_df["start"] != min_stop_codon_start) & (broken_exons_df["type"]=="stop_codon")]
+      removed_stop_codons_start = list(removed_stop_codons["start"])
+      broken_exons_df["start"] = [element if element not in removed_stop_codons_start else element+3 for element in list(broken_exons_df["start"])]
   return(broken_exons_df)
 
 #def fix_start_stop_codons(broken_exons_df, last_ex):
@@ -428,12 +465,12 @@ gtf_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", part)) for element in li
 #gtf_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/ref/BmA_annot-B.gtf", sep="\t", index_col=False, header=None, names=["chr", "db", "type", "start", "stop", "score", "strand", "phase","attribute"])
 broken_genes_list = list(pd.read_table(broken_genes_file, sep="\t", index_col=False, header=None, names=["broken_genes"])["broken_genes"])
 broken_gene_flatten_list = [part for element in broken_genes_list for part in element.split(";")]
-#broken_genes_list = list(pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/broken_genes/BmA-selected_broken_genes.tab", sep="\t", index_col=False, header=None, names=["broken_genes"])["broken_genes"])
+#broken_genes_list = list(pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version1/broken_genes/BmA-selected_broken_genes.tab", sep="\t", index_col=False, header=None, names=["broken_genes"])["broken_genes"])
 #Header: species, chimeric_geneID, orthogroup_ids, first-last_aligned_ex, first-last_aligned_aa, ex:start|stop_coord, chimeric_class
 chimeric_genes_df = pd.read_table(chimeric_genes_file, sep="\t", index_col=False, header=0)
 chimeric_genes_df = chimeric_genes_df[chimeric_genes_df["species"]==species] #subset for the species of interest
 chimeric_genes_list = list(chimeric_genes_df["chimeric_geneID"])
-#chimeric_genes_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/chimeric_proteins/classified_chimeric_genes.tab", sep="\t", index_col=False, header=0)
+#chimeric_genes_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version1/chimeric_proteins/classified_chimeric_genes.tab", sep="\t", index_col=False, header=0)
 #Header: geneID, new_IDs, category
 geneIDs_df = pd.read_table(geneIDs_file, sep="\t", index_col=False, header=0)
 geneIDs_dict = pd.Series(geneIDs_df.new_IDs.values, index=geneIDs_df.geneID).to_dict()
@@ -443,7 +480,7 @@ broken_genes_keys = [key for key in list(geneIDs_dict.keys()) if ";" in key]
 for key in broken_genes_keys:
   for num in list(range(0, len(key.split(";")))):
     geneIDs_dict[key.split(";")[num]] = geneIDs_dict[key]
-#geneIDs_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version/corrected_gtfs/BmA_new_geneIDs.txt", sep="\t", index_col=False, header=0)
+#geneIDs_df = pd.read_table("/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version1/corrected_gtfs/BmA_new_geneIDs.txt", sep="\t", index_col=False, header=0)
 
 #Header: species, geneID_prefix, geneID_length, transcript_suffix, protein_suffix
 params_df = pd.read_table(my_params_file, sep="\t", header=0, index_col=False)
@@ -521,15 +558,15 @@ for repaired_gene, group in grouped_broken_GTF_df:
 
   #renumber the exons (both exons and CDS)
   broken_exons_df = renumerate_exons(broken_exons_df, broken_parts, last_ex_first_CDS)
-  first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
-  last_ex = int(max(list(broken_exons_df["exon_number"])))
   #Fix start and stop exons
-  broken_exons_df = fix_start_stop_codons(broken_exons_df, broken_parts)
-
+  broken_exons_df = fix_start_stop_codons(broken_exons_df, broken_parts) 
   #extra check necessary in case of overlapping exon entries between broken genes
   broken_exons_df = renumerate_exons_overlapping_entries(broken_exons_df, strand)
+ 
 
   #If originally there were gene and transcript entries, take them and modify the start and stop.
+  first_ex = int(min(list(broken_exons_df["exon_number"]))) #this should be one in the majority of cases, but who knows
+  last_ex = int(max(list(broken_exons_df["exon_number"])))
   broken_exons_df = add_entries_broken_genes(broken_exons_df, group, first_ex, last_ex)
 
   #update the geneID, transcriptID and proteinID in loco
