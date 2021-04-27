@@ -33,7 +33,7 @@ tools:
   align_chimeric_OG: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/align_chimeric_OG.py"
   get_chimeric_aligned_region: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_chimeric_aligned_region.py"
   classify_chimeric_genes: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/classify_chimeric_genes.py"
-  generate_chimeric_geneIDs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/generate_chimeric_geneIDs.py"
+  generate_brochi_geneIDs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/generate_brochi_geneIDs.py"
   correct_ref_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_ref_gtf.py"
   correct_master_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_master_gtf.py"
   correct_gene_orthogroups: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_gene_orthogroups.py"
@@ -42,7 +42,7 @@ variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
   my_version: "BmA_version1"
   gene_num: ["two_genes", "more_genes"]
-  invertebrate_species: ["BmA", "Eba", "Bge", "Sma", "Ame", "Bla", "Obi", "Tca"]
+  invertebrate_species: ["BmA", "Eba", "Bge", "Sma", "Ame", "Bla", "Obi", "Tca", "Aae", "Cdi", "Spu"]
   seqsim_cutoff: 0.30
   human_match_cutoff: 0.25
   overlap_stringency: 0.60

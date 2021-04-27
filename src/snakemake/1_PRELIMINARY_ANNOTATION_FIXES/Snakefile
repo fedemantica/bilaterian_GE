@@ -62,7 +62,7 @@ GET_AA_POSITIONS = config["tools"]["get_aa_position"]
 ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
 GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
 CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
-GENERATE_CHIMERIC_GENE_IDS = config["tools"]["generate_chimeric_geneIDs"]
+GENERATE_BROCHI_GENE_IDS = config["tools"]["generate_brochi_geneIDs"]
 CORRECT_REF_GTF = config["tools"]["correct_ref_gtf"]
 CORRECT_MASTER_GTF = config["tools"]["correct_master_gtf"]
 CORRECT_ORTHOGROUPS = config["tools"]["correct_gene_orthogroups"]
@@ -957,7 +957,7 @@ rule generate_new_IDs:
 		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
 	shell:
 		"""
-		python {GENERATE_CHIMERIC_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} \
+		python {GENERATE_BROCHI_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} \
 			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
 		"""
 
