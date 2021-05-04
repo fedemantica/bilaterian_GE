@@ -10,6 +10,7 @@ GTF_REF_DIR = config["paths"]["gtf_ref_dir"]
 GTF_MASTER_DIR = config["paths"]["gtf_master_dir"]
 EXINT_REF_DIR = config["paths"]["exint_ref_dir"]
 GENEID_PARAMS = config["paths"]["geneID_params"]
+PROBLEMATIC_GENES = config["paths"]["problematic_genes"]
 
 ########## variables ###########
 ALL_SPECIES = config["variables"]["all_species"]
@@ -949,7 +950,12 @@ rule classify_chimeric_genes:
 #Correct the gtf taking into account the broken and the chimeric genes
 #Generate new geneIDs for the broken and the chimeric genes
 #Header: geneID, new_IDs, category (chimeric, broken)
-rule generate_new_IDs:
+
+#Generate conditional rules in case problematic genes have been identified or not
+
+#import os
+#if (os.path.exists(PROBLEMATIC_GENES)):
+rule generate_new_IDs_and_filter:
 	input:
 		chimeric = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
 		broken = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab"
@@ -958,9 +964,23 @@ rule generate_new_IDs:
 	shell:
 		"""
 		python {GENERATE_BROCHI_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} \
-			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
+			--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output} \
+			--problematic_genes {PROBLEMATIC_GENES}
 		"""
+#else:
+#	rule generate_new_IDs:
+#		input:
+#			chimeric = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+#			broken = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab"
+#		output:
+#			BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+#		shell:
+#			"""
+#			python {GENERATE_BROCHI_GENE_IDS} --species {wildcards.species} --params_file {GENEID_PARAMS} \
+#				--input_chimeric {input.chimeric} --input_broken {input.broken} --output {output}
+#			"""
 
+#Correct gtf
 rule correct_ref_gtf:
 	input:
 		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",

@@ -12,6 +12,7 @@ paths:
   gtf_master_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/gtf/master"
   exint_ref_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/exint/ref"
   geneID_params: "./geneID_params.txt"  
+  problematic_genes: "/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli/BmA_version1/corrected_gtfs/problematic_genes-original_geneIDs.txt"
 
 tools:
   broccoli_main: "/users/mirimia/fmantica/software/Broccoli-master-2/broccoli.py"
