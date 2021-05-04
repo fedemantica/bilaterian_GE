@@ -10,6 +10,7 @@ parser.add_argument("--params_file", "-p", required=True, metavar="species", hel
 parser.add_argument("--input_broken", "-ib", required=True, metavar="input_broken", help="Selected broken genes by species")
 parser.add_argument("--input_chimeric", "-ic", required=True, metavar="input_chimeric", help="Chimeric orthogroups file")
 parser.add_argument("--output", "-o", required=True, metavar="output", help="Path to output file")
+parser.add_argument("--problematic_genes", required=False, metavar="problematic_genes", help="Handmade-generated file with problematic geneIDs from the previous runs")
 
 #Read arguments
 args = parser.parse_args()
@@ -18,6 +19,7 @@ my_params_file = args.params_file
 my_input_broken = args.input_broken
 my_input_chimeric = args.input_chimeric
 my_output_file = args.output
+problematic_genes_file = args.problematic_genes
 
 #Read params file
 #Header: species, geneID_prefix, geneID_length, transcript_suffix, protein_suffix
@@ -25,9 +27,14 @@ params_df = pd.read_table(my_params_file, sep="\t", header=0, index_col=False)
 prefix = str(list(params_df[params_df["species"]==my_species]["geneID_prefix"])[0])
 length = int(list(params_df[params_df["species"]==my_species]["geneID_length"])[0])
 
+########## Problematic genes
+problematic_genes_list = list(pd.read_table(problematic_genes_file, sep="\t", index_col=False, header=None, names=["geneID"])["geneID"])
+print(problematic_genes_list)
+
 ########## Broken genes
 #Read input
 species_broken_df = pd.read_table(my_input_broken, sep="\t", index_col=False, header=None, names=["geneID"])
+species_broken_df = species_broken_df.loc[~(species_broken_df["geneID"].isin(problematic_genes_list))] #remove the problematic genes from the list of broken genes
 broken_prefix = prefix+"B"
 new_IDs_num = species_broken_df.shape[0] #how many new broken IDs need to be generated
 new_IDs_suffix = [str(element) for element in list(range(1, new_IDs_num+1))]
@@ -42,7 +49,6 @@ species_broken_df["category"] = "broken"
 chimeric_input_df = pd.read_table(my_input_chimeric, sep="\t", index_col=False, header=0)
 chimeric_input_df = chimeric_input_df.loc[(chimeric_input_df["species"]==my_species) & (chimeric_input_df["chimeric_label"]=="chimeric")]
 species_chimeric_genes = list(set(list(chimeric_input_df["geneID"])))
-
 #Generate the new chimeric geneIDs
 chimeric_prefix = prefix+"C"
 new_IDs_num = len(species_chimeric_genes)*2 #how many new chimeric IDs need to be generated
