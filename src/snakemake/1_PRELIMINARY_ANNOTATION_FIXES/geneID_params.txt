@@ -8,3 +8,5 @@ Spu	WHL22.	12	.1	.1
 Bla	BLAG	12	_1	_1
 Obi	Ocbimv	15	_1	_1
 Tca	TC	8	_001	_001
+Cdi	CD	7	.1	.1
+Aae	AAEL	10	-RA	-PA
