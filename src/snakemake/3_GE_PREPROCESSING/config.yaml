@@ -1,0 +1,19 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
+  fastq_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing/fastq"
+  fastQC_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing/fastQC"
+  quantification: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing/kallisto_out"
+  genome_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/genomes"
+  gtf_ref: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/corrected_gtf/ref"
+  
+tools:
+
+variables:
+  all_species: ["Xtr"]
+  download_threads_num: 8
+  min_read_len: 49
