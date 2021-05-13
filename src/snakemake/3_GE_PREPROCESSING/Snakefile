@@ -44,8 +44,6 @@ for species in ALL_SPECIES:
   in_house_samples_PE_dict[species] = in_house_samples_PE
   in_house_samples_SE_dict[species] = in_house_samples_SE
   
-print(SE_SRA_dict["Xtr"])
-
 #create variable with fastq types
 FASTQ_TYPES = ["fastq-downloaded_renamed", "fastq-in_house"]
 #fastq-related parameters
@@ -76,20 +74,16 @@ for species in ALL_SPECIES:
   MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_PE_dict[species])
   MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_PE_dict[species])
 
-#FASTQC_OUT = QUALITY_CONTROL+"/completed_jobs.txt"
-#MAP_MICS = expand("{path}/mic/{sample}/abundance.tsv", path=QUANTIFICATION, sample=MIC_MAPPING_SAMPLES)
-#MAP_SRRM = expand("{path}/srrm/{sample}/abundance.tsv", path=QUANTIFICATION, sample=SRRM_MAPPING_SAMPLES) 
+MAPPING_STATS = expand("{path}/{species}/mapping_stats.txt", path= QUANTIFICATION, species=ALL_SPECIES)
 
 ####### rules ############
 rule all:	
 	input:
 		SE_FASTQ, PE_FASTQ, IN_HOUSE_SAMPLES_SE, IN_HOUSE_SAMPLES_PE, RENAMED_FASTQ, FASTQC_OUT
-
 		#This part will need to run separately because I still have not found a clever way to connect all the dependencies
 		#MAP_READS_SE, MAP_READS_PE
 
 ############# DOWNLOAD FASTQS ######################
-
 rule prefetch_fastq:		
 	output:
 		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra"
@@ -158,9 +152,6 @@ rule rename_fastq:
 		SE = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.fastq.gz", path=FASTQ_DIR, SRA=SE_SRA_dict[wildcards.species]),
 		metadata = METADATA+"/{species}_samples_info.tab"
 	output:
-		#PE_forward = expand(FASTQ_DIR+"/{{species}}/fastq-downloaded_renamed/{sample}_1.fastq.gz", sample=downloaded_samples_PE_dict[wildcards.species]),
-		#PE_reverse = expand(FASTQ_DIR+"/{{species}}/fastq-downloaded_renamed/{sample}_2.fastq.gz", sample=downloaded_samples_PE_dict[wildcards.species]),
-		#SE = expand(FASTQ_DIR+"/{{species}}/fastq-downloaded_renamed/{sample}.fastq.gz", sample=downloaded_samples_SE_dict[wildcards.species]),
 		my_log = FASTQ_DIR+"/{species}/fastq-downloaded_renamed/renamed_fastq.txt"
 	params:
 		output_dir = FASTQ_DIR+"/{species}/fastq-downloaded_renamed"
@@ -219,7 +210,6 @@ rule link_PE_fastq:
 		"""
 
 ############# QUALITY CONTROL ######################
-
 rule run_fastQC:
 	input:
 		in_house = FASTQ_DIR+"/{species}/fastq-downloaded_renamed/renamed_fastq.txt", #this is just to make the connection with the previous rule.
@@ -334,27 +324,29 @@ rule expr_tables:
 		"""
 
 ############ MAPPING STATISTICS ##################
-##This will have to be automatized.
-##transcriptome length: 106184004 (count the number of bp in the initial fasta)
-#rule mapping_stats:
-#	input:
-#		mic_input = expand("{path}/mic/{sample}/run_info.json", path=QUANTIFICATION, sample=MIC_MAPPING_SAMPLES),
-#		srrm_input = expand("{path}/srrm/{sample}/run_info.json", path=QUANTIFICATION, sample=SRRM_MAPPING_SAMPLES)
-#	output:
-#		QUANTIFICATION+"/mapping_stats.txt"
-#	shell:
-#		"""
-#		echo -e "Sample\tTOT_reads\tTOT_pseudoaligned_reads\tPERC_pseudoaligned_reads\tTOT_unique_reads\tPERC_unique_reads\tCoverage" > {output}
-#		for file in {input}; do \
-#			sample=$(basename $(dirname $file)); \
-#			type=$(basename $(dirname $(dirname $file))); \
-#			paste <(echo $sample) \
-#			<(cat $file | grep "n_processed" | sed 's/ /\t/; s/,//' | cut -f3) \
-#			<(cat $file | grep "n_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
-#			<(cat $file | grep "p_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
-#			<(cat $file | grep "n_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
-#			<(cat $file | grep "p_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
-#			| awk -v my_type=$type -v OFS="\t" 'BEGIN {{read_len=125; if(my_type=="mic") {{read_len=50}}}} \
-#			{{print $1,$2,$3,$4,$5,$6,($2*read_len)/106184004}}'; \
-#		done >> {output}	
-#		"""
+#This will have to be automatized.
+#transcriptome length: 106184004 (count the number of bp in the initial fasta)
+rule mapping_stats:
+	input:
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+	output:
+		QUANTIFICATION+"/{species}/mapping_stats.txt"
+	shell:
+		"""
+		echo -e "Sample\tTOT_reads\tTOT_pseudoaligned_reads\tPERC_pseudoaligned_reads\tTOT_unique_reads\tPERC_unique_reads\tCoverage" > {output}
+		for file in {input}; do \
+			sample=$(basename $(dirname $file)); \
+			type=$(basename $(dirname $(dirname $file))); \
+			paste <(echo $sample) \
+			<(cat $file | grep "n_processed" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "n_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "p_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "n_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "p_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
+			| awk -v my_type=$type -v OFS="\t" 'BEGIN {{read_len=125; if(my_type=="mic") {{read_len=50}}}} \
+			{{print $1,$2,$3,$4,$5,$6,($2*read_len)/106184004}}'; \
+		done >> {output}	
+		"""
