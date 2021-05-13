@@ -14,7 +14,6 @@ GTF_REF_DIR = config["paths"]["gtf_ref"]
 
 ######## tools ############
 
-
 ###### variables ###########
 ALL_SPECIES = config["variables"]["all_species"]
 #generate list of samples of different categories for each species: in_house, PE, SE.
@@ -47,9 +46,12 @@ for species in ALL_SPECIES:
   
 print(SE_SRA_dict["Xtr"])
 
+#create variable with fastq types
+FASTQ_TYPES = ["fastq-downloaded_renamed", "fastq-in_house"]
 #fastq-related parameters
 DOWNLOAD_THREADS_NUM = config["variables"]["download_threads_num"]
 MIN_READ_LEN = config["variables"]["min_read_len"]
+
 
 ###### targets ##########
 SE_FASTQ = []
@@ -62,9 +64,17 @@ for my_species in ALL_SPECIES:
   IN_HOUSE_SAMPLES_SE = IN_HOUSE_SAMPLES_SE + expand("{path}/{species}/fastq-in_house/{sample}.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_SE_dict[species])
   IN_HOUSE_SAMPLES_PE = IN_HOUSE_SAMPLES_PE + expand("{path}/{species}/fastq-in_house/{sample}_1.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_PE_dict[species])
 
-RENAMED_FASTQ = expand("{path}/{species}/fastq-downloaded/renamed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
+RENAMED_FASTQ = expand("{path}/{species}/fastq-downloaded_renamed/renamed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
 FASTQC_OUT = expand("{path}/{species}/fastQC_log.txt", path=FASTQC_DIR, species=ALL_SPECIES)
 MULTIQC_OUT = expand("{path}/all_species_multiQC/{species}_multiqc.html", path=FASTQC_DIR, species=ALL_SPECIES)
+
+MAP_READS_SE = []
+MAP_READS_PE = []
+for species in ALL_SPECIES:
+  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_SE_dict[species])
+  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_SE_dict[species])
+  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_PE_dict[species])
+  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_PE_dict[species])
 
 #FASTQC_OUT = QUALITY_CONTROL+"/completed_jobs.txt"
 #MAP_MICS = expand("{path}/mic/{sample}/abundance.tsv", path=QUANTIFICATION, sample=MIC_MAPPING_SAMPLES)
@@ -74,6 +84,9 @@ MULTIQC_OUT = expand("{path}/all_species_multiQC/{species}_multiqc.html", path=F
 rule all:	
 	input:
 		SE_FASTQ, PE_FASTQ, IN_HOUSE_SAMPLES_SE, IN_HOUSE_SAMPLES_PE, RENAMED_FASTQ, FASTQC_OUT
+
+		#This part will need to run separately because I still have not found a clever way to connect all the dependencies
+		#MAP_READS_SE, MAP_READS_PE
 
 ############# DOWNLOAD FASTQS ######################
 
@@ -145,12 +158,12 @@ rule rename_fastq:
 		SE = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.fastq.gz", path=FASTQ_DIR, SRA=SE_SRA_dict[wildcards.species]),
 		metadata = METADATA+"/{species}_samples_info.tab"
 	output:
-		PE_forward = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/{sample}_1.fastq.gz"),
-		PE_reverse = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/{sample}_2.fastq.gz"),
-		SE = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/{sample}.fastq.gz"),
-		my_log = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/renamed_fastq.txt")
+		#PE_forward = expand(FASTQ_DIR+"/{{species}}/fastq-downloaded_renamed/{sample}_1.fastq.gz", sample=downloaded_samples_PE_dict[wildcards.species]),
+		#PE_reverse = expand(FASTQ_DIR+"/{{species}}/fastq-downloaded_renamed/{sample}_2.fastq.gz", sample=downloaded_samples_PE_dict[wildcards.species]),
+		#SE = expand(FASTQ_DIR+"/{{species}}/fastq-downloaded_renamed/{sample}.fastq.gz", sample=downloaded_samples_SE_dict[wildcards.species]),
+		my_log = FASTQ_DIR+"/{species}/fastq-downloaded_renamed/renamed_fastq.txt"
 	params:
-		output_dir = FASTQ_DIR+"/{species}/fastq-downloaded"
+		output_dir = FASTQ_DIR+"/{species}/fastq-downloaded_renamed"
 	run:
 		import pandas as pd
 		import os
@@ -206,25 +219,22 @@ rule link_PE_fastq:
 		"""
 
 ############# QUALITY CONTROL ######################
+
 rule run_fastQC:
 	input:
-		#in_house = FASTQ_DIR+"/{species}/fastq-downloaded/renamed_fastq.txt", #this is just to make the connection with the previous rule.
-		downloaded_PE_forward = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/{sample}_1.fastq.gz"),
-		downloaded_PE_reverse = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/{sample}_2.fastq.gz"),
-		downloaded_SE = dynamic(FASTQ_DIR+"/{species}/fastq-downloaded/{sample}.fastq.gz"),
-		#downloaded_PE = lambda wildcards: expand(FASTQ_DIR+"/{{species}}/fastq-downloaded/{sample}_{num}.fastq.gz", species=ALL_SPECIES, sample=downloaded_samples_PE_dict[wildcards.species], num=[1,2]),
-		#downloaded_SE = lambda wildcards: expand(FASTQ_DIR+"/{{species}}/fastq-downloaded/{sample}.fastq.gz", species=ALL_SPECIES, sample=downloaded_samples_SE_dict[wildcards.species]),
+		in_house = FASTQ_DIR+"/{species}/fastq-downloaded_renamed/renamed_fastq.txt", #this is just to make the connection with the previous rule.
 		in_house_PE = lambda wildcards: expand(FASTQ_DIR+"/{{species}}/fastq-in_house/{sample}_{num}.fastq.gz", species=ALL_SPECIES, sample=in_house_samples_PE_dict[wildcards.species], num=[1,2]),
 		in_house_SE = lambda wildcards: expand(FASTQ_DIR+"/{{species}}/fastq-in_house/{sample}.fastq.gz", species=ALL_SPECIES, sample=in_house_samples_SE_dict[wildcards.species])
 	output:
 		FASTQC_DIR+"/{species}/fastQC_log.txt"
 	params:
+		downloded_dir = FASTQ_DIR+"/{species}/fastq-downloaded",
 		output_dir = FASTQC_DIR+"/{species}"
 	conda:
 		CONDA_ENVS+"/fastq_mapping.yml"
 	shell:
 		"""		
-		fastqc {input.downloaded_PE_forward} {input.downloaded_PE_reverse} {input.downloaded_SE} {input.in_house_PE} {input.in_house_SE} -o {params.output_dir} --extract; \
+		fastqc $(ls {params.downloded_dir} | grep ".fastq.gz") {input.in_house_PE} {input.in_house_SE} -o {params.output_dir} --extract; \
 		echo "all fastqc completed" > {output}
 		"""
 
@@ -245,7 +255,7 @@ rule run_multiQC:
 		"""
 
 ############# GET TRANSCRIPTOME FASTA ##############
-
+#start from the reference GTF
 rule get_transcriptome_fasta:
 	input:
 		gtf = GTF_REF_DIR+"/{species}_annot-B-brochi.gtf",
@@ -276,12 +286,14 @@ rule map_reads_SE:
 		fastq = FASTQ_DIR+"/{species}/{type}/{sample}.fastq.gz",
 		index = QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
 	output:
-		QUANTIFICATION+"/{species}/{type}/{sample}/abundance.tsv"
+		QUANTIFICATION+"/{species}/SE/{type}/{sample, .+(?<!_[1,2])}/abundance.tsv"
 	params:
-		out_dir = QUANTIFICATION+"/{species}/{type}/{sample}"
+		out_dir = QUANTIFICATION+"/{species}/SE/{type}/{sample}"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
 	shell:
 		"""
-		{KALLISTO} quant -i {input.index} -o {params.out_dir} -b 100 --single -l 190 -s 20 {input} 
+		kallisto quant -i {input.index} -o {params.out_dir} -b 100 --single -l 190 -s 20 {input} 
 		"""
 
 rule map_reads_PE:
@@ -290,14 +302,36 @@ rule map_reads_PE:
 		fastq2 = FASTQ_DIR+"/{species}/{type}/{sample}_2.fastq.gz",
 		index = QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
 	output:
-		QUANTIFICATION+"/{species}/{type}/{sample}/abundance.tsv"
+		QUANTIFICATION+"/{species}/PE/{type}/{sample}/abundance.tsv"
 	params:
-		out_dir = QUANTIFICATION+"/{species}/{type}/{sample}"
+		out_dir = QUANTIFICATION+"/{species}/PE/{type}/{sample}"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
 	shell:
 		"""
-		{KALLISTO} quant -i {input.index} -o {params.out_dir} -b 100 <(zcat {input.fastq1}) <(zcat {input.fastq2}) 
+		kallisto quant -i {input.index} -o {params.out_dir} -b 100 <(zcat {input.fastq1}) <(zcat {input.fastq2}) 
 		"""
 
+########### GENE EXPRESSION TABLES ################
+#Get two tables with info from all samples: counts and TPM.
+rule expr_tables:
+	input:
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+	output:
+		counts = QUANTIFICATION+"/{species}/all_samples_counts.tab",
+		TPMs = QUANTIFICATION+"/{species}/all_samples_TPMs.tab"
+	shell:
+		"""
+		for file in {input}; do \
+			sample=$(basename $(dirname $file));
+			tail -n+2 $file | awk -v my_sample=$sample -v OFS="\t" '{{print $1,my_sample,$4}}' >> {output.counts}.tmp; \
+			tail -n+2 $file | awk -v my_sample=$sample -v OFS="\t" '{{print $1,my_sample,$5}}' >> {output.TPMs}.tmp; \
+		done; cat {output.counts}.tmp | tab2matrix > {output.counts}; cat {output.TPMs}.tmp | tab2matrix > {output.TPMs}; \
+		rm {output.counts}.tmp {output.TPMs}.tmp
+		"""
 
 ############ MAPPING STATISTICS ##################
 ##This will have to be automatized.
@@ -324,22 +358,3 @@ rule map_reads_PE:
 #			{{print $1,$2,$3,$4,$5,$6,($2*read_len)/106184004}}'; \
 #		done >> {output}	
 #		"""
-#
-########### GENE EXPRESSION TABLES ################
-#Get two tables with info from all samples: counts and TPM.
-rule expr_tables:
-	input:
-		#mic_input = expand("{path}/mic/{sample}/abundance.tsv", path=QUANTIFICATION, sample=MIC_MAPPING_SAMPLES),
-		#srrm_input = expand("{path}/srrm/{sample}/abundance.tsv", path=QUANTIFICATION, sample=SRRM_MAPPING_SAMPLES)
-	output:
-		counts = QUANTIFICATION+"/{species}/all_samples_counts.tab",
-		TPMs = QUANTIFICATION+"/{species}/all_samples_TPMs.tab"
-	shell:
-		"""
-		for file in {input}; do \
-			sample=$(basename $(dirname $file));
-			tail -n+2 $file | awk -v my_sample=$sample -v OFS="\t" '{{print $1,my_sample,$4}}' >> {output.counts}.tmp; \
-			tail -n+2 $file | awk -v my_sample=$sample -v OFS="\t" '{{print $1,my_sample,$5}}' >> {output.TPMs}.tmp; \
-		done; cat {output.counts}.tmp | tab2matrix > {output.counts}; cat {output.TPMs}.tmp | tab2matrix > {output.TPMs}; \
-		rm {output.counts}.tmp {output.TPMs}.tmp
-		"""
