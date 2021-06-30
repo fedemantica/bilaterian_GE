@@ -58,7 +58,7 @@ IN_HOUSE_SAMPLES_PE = []
 IN_HOUSE_SAMPLES_SE = []
 for my_species in ALL_SPECIES:
   SE_FASTQ = SE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}.fastq", path=FASTQ_DIR, species=my_species, SRA=SE_SRA_dict[my_species])
-  PE_FASTQ = PE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}_1.fastq", path=FASTQ_DIR, species=my_species, SRA=PE_SRA_dict[my_species]) #just creating for forwardread. The rule will work for both.
+  PE_FASTQ = PE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}.sra_1.fastq", path=FASTQ_DIR, species=my_species, SRA=PE_SRA_dict[my_species]) #just creating for forwardread. The rule will work for both.
   IN_HOUSE_SAMPLES_SE = IN_HOUSE_SAMPLES_SE + expand("{path}/{species}/fastq-in_house/{sample}.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_SE_dict[species])
   IN_HOUSE_SAMPLES_PE = IN_HOUSE_SAMPLES_PE + expand("{path}/{species}/fastq-in_house/{sample}_1.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_PE_dict[species])
 
@@ -75,13 +75,16 @@ for species in ALL_SPECIES:
   MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_PE_dict[species])
 
 MAPPING_STATS = expand("{path}/{species}/mapping_stats.txt", path= QUANTIFICATION, species=ALL_SPECIES)
+EXPR_TABLES = expand("{path}/{species}/all_samples_TPMs.tab", path= QUANTIFICATION, species=ALL_SPECIES)
+CLEAN_UP_FASTQ = expand("{path}/{species}/fastq-downloaded/processed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
 
 ####### rules ############
 rule all:	
 	input:
-		SE_FASTQ, PE_FASTQ, IN_HOUSE_SAMPLES_SE, IN_HOUSE_SAMPLES_PE, RENAMED_FASTQ, FASTQC_OUT
+		#IN_HOUSE_SAMPLES_PE, IN_HOUSE_SAMPLES_SE, SE_FASTQ, PE_FASTQ, IN_HOUSE_SAMPLES_SE, IN_HOUSE_SAMPLES_PE
+		RENAMED_FASTQ
 		#This part will need to run separately because I still have not found a clever way to connect all the dependencies
-		#MAP_READS_SE, MAP_READS_PE
+		#MAP_READS_SE, MAP_READS_PE, MAPPING_STATS, EXPR_TABLES, CLEAN_UP_FASTQ
 
 ############# DOWNLOAD FASTQS ######################
 rule prefetch_fastq:		
@@ -118,8 +121,8 @@ rule download_PE_fastq:
 	input:
 		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra"
 	output:
-		forward_reads = FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}_1.fastq",
-		rerverse_reads = FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}_2.fastq",
+		forward_reads = FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra_1.fastq",
+		rerverse_reads = FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra_2.fastq",
 	params:
 		output_dir = FASTQ_DIR+"/{species}/fastq-downloaded"
 	conda:
@@ -147,8 +150,8 @@ rule compress_fastq:
 
 rule rename_fastq:
 	input:
-		PE_forward = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}_1.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
-		PE_reverse = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}_2.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		PE_forward = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.sra_1.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		PE_reverse = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.sra_2.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
 		SE = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.fastq.gz", path=FASTQ_DIR, SRA=SE_SRA_dict[wildcards.species]),
 		metadata = METADATA+"/{species}_samples_info.tab"
 	output:
@@ -164,27 +167,27 @@ rule rename_fastq:
 		output_log = open(output.my_log, "w")
 		metadata_df = pd.read_table(input.metadata, sep="\t", index_col=False, header=0)
 		for my_file in input.PE_forward:
-		  SRA_ID = re.sub("_1.fastq.gz", "", os.path.basename(my_file))
-		  sample_name = metadata_df.loc[metadata_df["SRA"]==SRA_ID,"Sample"]
-		  new_filename = output_dir+"/"+sample_name+"_1.fastq.gz"
+		  SRA_ID = re.sub(".sra_1.fastq.gz", "", os.path.basename(my_file))
+		  sample_name = list(metadata_df.loc[metadata_df["SRA"]==SRA_ID]["Sample"])[0]
+		  new_filename = params.output_dir+"/"+sample_name+"_1.fastq.gz"
 		  ln_command = "ln -s %s %s" % (my_file, new_filename)
 		  os.system(ln_command)
-		  print(new_filename+"\n", output_log)
+		  output_log.write(my_file+"\t"+new_filename+"\n")
 		for my_file in input.PE_reverse:
-		  SRA_ID = re.sub("_2.fastq.gz", "", os.path.basename(my_file))
-		  sample_name = metadata_df.loc[metadata_df["SRA"]==SRA_ID,"Sample"]
-		  new_filename = output_dir+"/"+sample_name+"_2.fastq.gz"
+		  SRA_ID = re.sub(".sra_2.fastq.gz", "", os.path.basename(my_file))
+		  sample_name = list(metadata_df.loc[metadata_df["SRA"]==SRA_ID]["Sample"])[0]
+		  new_filename = params.output_dir+"/"+sample_name+"_2.fastq.gz"
 		  ln_command = "ln -s %s %s" % (my_file, new_filename)
 		  os.system(ln_command)
-		  print(new_filename+"\n", output_log)
+		  output_log.write(my_file+"\t"+new_filename+"\n")
 		for my_file in input.SE:
 		  SRA_ID = re.sub(".fastq.gz", "", os.path.basename(my_file))
-		  sample_name = metadata_df.loc[metadata_df["SRA"]==SRA_ID,"Sample"]
-		  new_filename = output_dir+"/"+sample_name+".fastq.gz"
+		  sample_name = list(metadata_df.loc[metadata_df["SRA"]==SRA_ID]["Sample"])[0]
+		  new_filename = params.output_dir+"/"+sample_name+".fastq.gz"
 		  ln_command = "ln -s %s %s" % (my_file, new_filename)
 		  os.system(ln_command)
-		  print(new_filename+"\n", output_log)
-		close.output_log()
+		  output_log.write(my_file+"\t"+new_filename+"\n")
+		output_log.close()
 
 #For the in-house samples, just create links to the desired folder:
 rule link_SE_fastq:
@@ -194,7 +197,9 @@ rule link_SE_fastq:
 		FASTQ_DIR+"/{species}/fastq-in_house/{sample, .+(?<!_[1,2])}.fastq.gz"
 	shell:
 		"""
-		ln -s $(ls $(cat {input} | grep {wildcards.sample} | awk -v my_sample="{wildcards.sample}" '{{print $NF}}') ${output}
+		original_folder=$(cat {input} | grep {wildcards.sample} | awk '{{print $NF}}'); \
+		original_file=$(ls $original_folder | grep {wildcards.sample}); \
+		ln -s $original_folder/$original_file ${output}
 		"""
 
 rule link_PE_fastq:
@@ -205,9 +210,18 @@ rule link_PE_fastq:
 		reverse_reads = FASTQ_DIR+"/{species}/fastq-in_house/{sample}_2.fastq.gz",
 	shell:
 		"""
-		ln -s $(ls $(cat {input} | grep {wildcards.sample} | awk -v my_sample=$sample '{{print $NF}}') | grep {wildcards.sample}*1*) ${output.forward_reads}; \
-		ln -s $(ls $(cat {input} | grep {wildcards.sample} | awk -v my_sample=$sample '{{print $NF}}') | grep {wildcards.sample}*2*) ${output.reverse_reads}; \
+		original_folder=$(cat {input} | grep {wildcards.sample} | awk '{{print $NF}}'); \
+		original_file_1=$(ls $original_folder | grep "{wildcards.sample}" | grep R1); \
+		original_file_2=$(ls $original_folder | grep "{wildcards.sample}" | grep R2); \
+		ln -s ${{original_folder}}/${{original_file_1}} {output.forward_reads}; \
+		ln -s ${{original_folder}}/${{original_file_2}} {output.reverse_reads};
 		"""
+
+#	shell:
+#		"""
+#		ln -s $(ls $(cat {input} | grep {wildcards.sample} | awk -v my_sample=$sample '{{print $NF}}') | grep {wildcards.sample}*1*) ${output.forward_reads}; \
+#		ln -s $(ls $(cat {input} | grep {wildcards.sample} | awk -v my_sample=$sample '{{print $NF}}') | grep {wildcards.sample}*2*) ${output.reverse_reads}; \
+#		"""
 
 ############# QUALITY CONTROL ######################
 rule run_fastQC:
@@ -328,10 +342,10 @@ rule expr_tables:
 #transcriptome length: 106184004 (count the number of bp in the initial fasta)
 rule mapping_stats:
 	input:
-		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
-		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
-		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
-		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/run_info.json", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/run_info.json", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/run_info.json", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/run_info.json", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
 	output:
 		QUANTIFICATION+"/{species}/mapping_stats.txt"
 	shell:
@@ -349,4 +363,24 @@ rule mapping_stats:
 			| awk -v my_type=$type -v OFS="\t" 'BEGIN {{read_len=125; if(my_type=="mic") {{read_len=50}}}} \
 			{{print $1,$2,$3,$4,$5,$6,($2*read_len)/106184004}}'; \
 		done >> {output}	
+		"""
+
+########## CHECK RULE ##################
+#After everything finished running, remove the downloaded fastqs.
+rule clean_up_fastq:
+	input:
+		TPM_table = QUANTIFICATION+"/{species}/all_samples_TPMs.tab",
+		mapping_stats = QUANTIFICATION+"/{species}/mapping_stats.txt",
+		PE_forward = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.sra_1.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		PE_reverse = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.sra_2.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		SE = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.fastq.gz", path=FASTQ_DIR, SRA=SE_SRA_dict[wildcards.species])	
+	output:
+		FASTQ_DIR+"/{species}/fastq-downloaded/processed_fastq.txt"
+	shell:
+		"""
+		touch {output};
+		for file in {input.PE_forward} {input.PE_reverse} {input.SE}; do \
+			echo $file >> {output}; \
+			rm $file; \
+		done
 		"""

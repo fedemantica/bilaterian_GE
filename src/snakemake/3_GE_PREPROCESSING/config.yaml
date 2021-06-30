@@ -14,6 +14,6 @@ paths:
 tools:
 
 variables:
-  all_species: ["Xtr"]
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi"]
   download_threads_num: 8
   min_read_len: 49
