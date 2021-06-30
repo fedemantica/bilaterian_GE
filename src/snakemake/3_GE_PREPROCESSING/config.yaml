@@ -5,7 +5,7 @@ general_paths:
 
 paths:
   metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
-  fastq_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing/fastq"
+  fastq_dir: "/no_backup/mirimia/fmantica/bilaterian_GE_fastq"
   fastQC_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing/fastQC"
   quantification: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing/kallisto_out"
   genome_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/genomes"
