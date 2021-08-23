@@ -63,14 +63,21 @@ filt_gene_pairs = [[gene[0], gene[1]] for gene in filt_gene_pairs]
 for gene_pair in filt_gene_pairs:
   geneID1 = gene_pair[0]
   geneID2 = gene_pair[1]
-  fastas_entries = [element for element in all_fastas_entries if element.id in gene_pair]
-  geneID1_original = str(fastas_entries[0].id)
-  geneID2_original = str(fastas_entries[1].id)
+  #This is to maintain the order of the IDs
+  fastas_entries_1 = [element for element in all_fastas_entries if element.id==geneID1][0]
+  fastas_entries_2 = [element for element in all_fastas_entries if element.id==geneID2][0]
+  fastas_entries = [fastas_entries_1, fastas_entries_2]
+  print(len(fastas_entries))
+  print(type(fastas_entries))
+  print(fastas_entries)
+  #geneID1_original = str(fastas_entries[0].id)
+  #geneID2_original = str(fastas_entries[1].id)
   #Change ids of fastas entries to geneID1_geneID2
-  geneID1_new_ID = fastas_entries[0].id+"_"+fastas_entries[1].id
-  geneID2_new_ID = fastas_entries[1].id+"_"+fastas_entries[0].id
-  fastas_entries[0].id = geneID1_new_ID
-  fastas_entries[1].id = geneID2_new_ID
+  #geneID1_new_ID = fastas_entries[0].id+"_"+fastas_entries[1].id
+  #geneID2_new_ID = fastas_entries[1].id+"_"+fastas_entries[0].id
+  fastas_entries[0].id = geneID1+"_"+geneID2
+  fastas_entries[1].id = geneID2+"_"+geneID1
+  print(fastas_entries)
   #Save fastas entries to temporary file
   input_temp = output_dir+"/"+geneID1+"-"+geneID2+"-input_fasta_tmp.fa"
   with open(input_temp, "w") as input_to_aln:
@@ -84,15 +91,17 @@ for gene_pair in filt_gene_pairs:
   with open(output_file, "w") as output:
     p = subprocess.Popen([my_mafft, "--quiet", "--retree", "2", "--localpair", "--maxiterate", "1000", input_temp], stdout=output)
   #This is necessary because the I can't copy the SeqIO object
-  fastas_entries[0].id = geneID1_original
-  fastas_entries[1].id = geneID2_original
+  fastas_entries[0].id = geneID1
+  fastas_entries[1].id = geneID2
   #remove temporary input
-  remove_command = "rm %s" % (input_temp)
-  os.system(remove_command)
+  #remove_command = "rm %s" % (input_temp)
+  #os.system(remove_command)
 
 #Cat all files from the single alignments into a final one
 cat_command = "cat %s/*-%s-pairwise_aln > %s/%s-all_pairwise_aln" % (output_dir, my_orthogroup, output_dir, my_orthogroup)
 os.system(cat_command)
 #Remove the single alignment files
-final_remove_command = "rm %s/*-%s-pairwise_aln" % (output_dir, my_orthogroup)
-os.system(final_remove_command)
+single_pairwise_remove_command = "rm %s/*-%s-pairwise_aln" % (output_dir, my_orthogroup)
+input_remove_command = "rm %s/*-input_fasta_tmp.fa" % (output_dir)
+os.system(single_pairwise_remove_command)
+os.system(input_remove_command)
