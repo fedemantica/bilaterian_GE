@@ -9,10 +9,17 @@ METADATA = config["paths"]["metadata"]
 FASTQ_DIR = config["paths"]["fastq_dir"]
 FASTQC_DIR = config["paths"]["fastQC_dir"]
 QUANTIFICATION = config["paths"]["quantification"]
+SVA_CORRECTION = config["paths"]["sva_correction"]
 GENOME_DIR = config["paths"]["genome_dir"]
 GTF_REF_DIR = config["paths"]["gtf_ref"] 
+METASAMPLES_DIR = config["paths"]["metasamples_dir"]
 
 ######## tools ############
+COMPUTE_LOG2 = config["tools"]["compute_log2"]
+GENERATE_SVA_METADATA = config["tools"]["generate_sva_metadata"]
+APPLY_SVA_CORRECTION = config["tools"]["apply_sva_correction"]
+GET_GENE_LEVEL_QUANTIFICATION = config["tools"]["get_gene_level_quantification"]
+GENERATE_METASAMPLES_KMEANS = config["tools"]["generate_metasamples_kmeans"]
 
 ###### variables ###########
 ALL_SPECIES = config["variables"]["all_species"]
@@ -49,18 +56,18 @@ FASTQ_TYPES = ["fastq-downloaded_renamed", "fastq-in_house"]
 #fastq-related parameters
 DOWNLOAD_THREADS_NUM = config["variables"]["download_threads_num"]
 MIN_READ_LEN = config["variables"]["min_read_len"]
-
+SVA_TISSUES = config["variables"]["sva_tissues"]
 
 ###### targets ##########
-SE_FASTQ = []
-PE_FASTQ = []
-IN_HOUSE_SAMPLES_PE = []
-IN_HOUSE_SAMPLES_SE = []
-for my_species in ALL_SPECIES:
-  SE_FASTQ = SE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}.fastq", path=FASTQ_DIR, species=my_species, SRA=SE_SRA_dict[my_species])
-  PE_FASTQ = PE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}.sra_1.fastq", path=FASTQ_DIR, species=my_species, SRA=PE_SRA_dict[my_species]) #just creating for forwardread. The rule will work for both.
-  IN_HOUSE_SAMPLES_SE = IN_HOUSE_SAMPLES_SE + expand("{path}/{species}/fastq-in_house/{sample}.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_SE_dict[species])
-  IN_HOUSE_SAMPLES_PE = IN_HOUSE_SAMPLES_PE + expand("{path}/{species}/fastq-in_house/{sample}_1.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_PE_dict[species])
+#SE_FASTQ = []
+#PE_FASTQ = []
+#IN_HOUSE_SAMPLES_PE = []
+#IN_HOUSE_SAMPLES_SE = []
+#for my_species in ALL_SPECIES:
+#  SE_FASTQ = SE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}.fastq", path=FASTQ_DIR, species=my_species, SRA=SE_SRA_dict[my_species])
+#  PE_FASTQ = PE_FASTQ + expand("{path}/{species}/fastq-downloaded/{SRA}.sra_1.fastq", path=FASTQ_DIR, species=my_species, SRA=PE_SRA_dict[my_species]) #just creating for forwardread. The rule will work for both.
+#  IN_HOUSE_SAMPLES_SE = IN_HOUSE_SAMPLES_SE + expand("{path}/{species}/fastq-in_house/{sample}.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_SE_dict[species])
+#  IN_HOUSE_SAMPLES_PE = IN_HOUSE_SAMPLES_PE + expand("{path}/{species}/fastq-in_house/{sample}_1.fastq.gz", path=FASTQ_DIR, species=my_species, sample=in_house_samples_PE_dict[species])
 
 RENAMED_FASTQ = expand("{path}/{species}/fastq-downloaded_renamed/renamed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
 FASTQC_OUT = expand("{path}/{species}/fastQC_log.txt", path=FASTQC_DIR, species=ALL_SPECIES)
@@ -68,15 +75,20 @@ MULTIQC_OUT = expand("{path}/all_species_multiQC/{species}_multiqc.html", path=F
 
 MAP_READS_SE = []
 MAP_READS_PE = []
-for species in ALL_SPECIES:
-  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_SE_dict[species])
-  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_SE_dict[species])
-  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_PE_dict[species])
-  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_PE_dict[species])
+for my_species in ALL_SPECIES:
+  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_SE_dict[my_species])
+  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_SE_dict[my_species])
+  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_PE_dict[my_species])
+  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_PE_dict[my_species])
 
-MAPPING_STATS = expand("{path}/{species}/mapping_stats.txt", path= QUANTIFICATION, species=ALL_SPECIES)
-EXPR_TABLES = expand("{path}/{species}/all_samples_TPMs.tab", path= QUANTIFICATION, species=ALL_SPECIES)
+MAPPING_STATS = expand("{path}/{species}/mapping_stats.txt", path=QUANTIFICATION, species=ALL_SPECIES)
+EXPR_TABLES = expand("{path}/{species}/all_samples_transcript_TPMs.tab", path=QUANTIFICATION, species=ALL_SPECIES)
 CLEAN_UP_FASTQ = expand("{path}/{species}/fastq-downloaded/processed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
+
+GENE_LEVEL_QUANT = expand("{path}/{species}/all_samples_gene_TPMs.tab", path=QUANTIFICATION, species=ALL_SPECIES)
+LOG2_TPM = expand("{path}/{species}/all_samples_gene_log2-TPMs.tab", path=QUANTIFICATION, species=ALL_SPECIES)
+SVA_LOG2_TPM = expand("{path}/{species}-selected_samples_gene_SVA-log2-TPMs.tab", path=SVA_CORRECTION, species=ALL_SPECIES)
+
 
 ####### rules ############
 rule all:	
@@ -84,7 +96,9 @@ rule all:
 		#IN_HOUSE_SAMPLES_PE, IN_HOUSE_SAMPLES_SE, SE_FASTQ, PE_FASTQ, IN_HOUSE_SAMPLES_SE, IN_HOUSE_SAMPLES_PE
 		RENAMED_FASTQ
 		#This part will need to run separately because I still have not found a clever way to connect all the dependencies
-		#MAP_READS_SE, MAP_READS_PE, MAPPING_STATS, EXPR_TABLES, CLEAN_UP_FASTQ
+		#MAP_READS_SE, MAP_READS_PE, EXPR_TABLES, GENE_LEVEL_QUANT, LOG2_TPM, SVA_LOG2_TPM
+		#MAPPING_STATS
+		#CLEAN_UP_FASTQ
 
 ############# DOWNLOAD FASTQS ######################
 rule prefetch_fastq:		
@@ -96,8 +110,10 @@ rule prefetch_fastq:
 		
 	shell:
 		"""
-		prefetch {wildcards.SRA} --output-file {output} --check-all --log-level info
+		prefetch {wildcards.SRA} --output-file {output} --check-all --max-size 100000000 --log-level info
 		"""
+
+#--max-size: Maximum file size to download in KB (exclusive). Default: 20G
 
 rule download_SE_fastq:
 	input:
@@ -129,14 +145,19 @@ rule download_PE_fastq:
 		CONDA_ENVS+"/fastq_mapping.yml"
 	shell:
 		"""
-		fasterq-dump {input} \
+		fastq-dump {input} \
 				--outdir {params.output_dir} \
-				--split-3 \
-				--threads {DOWNLOAD_THREADS_NUM} \
-				--min-read-len {MIN_READ_LEN} \
+				--split-e \
+				--minReadLen {MIN_READ_LEN} \
 				--log-level info; \
 		rm {input}
 		"""
+
+#Temporarily changing in the above rule for 35 fastqs which give me not 0 exit status
+#fasterq-dump {input}
+#--split-3
+#--threads {DOWNLOAD_THREADS_NUM}
+#--min-read-len {MIN_READ_LEN}
 
 rule compress_fastq:
 	input:
@@ -197,7 +218,7 @@ rule link_SE_fastq:
 		FASTQ_DIR+"/{species}/fastq-in_house/{sample, .+(?<!_[1,2])}.fastq.gz"
 	shell:
 		"""
-		original_folder=$(cat {input} | grep {wildcards.sample} | awk '{{print $NF}}'); \
+		original_folder=$(cat {input} | grep {wildcards.sample} | awk '$4=="{wildcards.sample}" {{print $NF}}'); \
 		original_file=$(ls $original_folder | grep {wildcards.sample}); \
 		ln -s $original_folder/$original_file ${output}
 		"""
@@ -210,7 +231,7 @@ rule link_PE_fastq:
 		reverse_reads = FASTQ_DIR+"/{species}/fastq-in_house/{sample}_2.fastq.gz",
 	shell:
 		"""
-		original_folder=$(cat {input} | grep {wildcards.sample} | awk '{{print $NF}}'); \
+		original_folder=$(cat {input} | awk '$4=="{wildcards.sample}" {{print $NF}}'); \
 		original_file_1=$(ls $original_folder | grep "{wildcards.sample}" | grep R1); \
 		original_file_2=$(ls $original_folder | grep "{wildcards.sample}" | grep R2); \
 		ln -s ${{original_folder}}/${{original_file_1}} {output.forward_reads}; \
@@ -290,6 +311,7 @@ rule map_reads_SE:
 		fastq = FASTQ_DIR+"/{species}/{type}/{sample}.fastq.gz",
 		index = QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
 	output:
+		#QUANTIFICATION+"/{species}/PE/{type}/{sample, .+(?<!_[1,2])}/run_info.json",
 		QUANTIFICATION+"/{species}/SE/{type}/{sample, .+(?<!_[1,2])}/abundance.tsv"
 	params:
 		out_dir = QUANTIFICATION+"/{species}/SE/{type}/{sample}"
@@ -306,6 +328,7 @@ rule map_reads_PE:
 		fastq2 = FASTQ_DIR+"/{species}/{type}/{sample}_2.fastq.gz",
 		index = QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
 	output:
+		#QUANTIFICATION+"/{species}/PE/{type}/{sample}/run_info.json",
 		QUANTIFICATION+"/{species}/PE/{type}/{sample}/abundance.tsv"
 	params:
 		out_dir = QUANTIFICATION+"/{species}/PE/{type}/{sample}"
@@ -325,8 +348,8 @@ rule expr_tables:
 		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
 		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
 	output:
-		counts = QUANTIFICATION+"/{species}/all_samples_counts.tab",
-		TPMs = QUANTIFICATION+"/{species}/all_samples_TPMs.tab"
+		counts = QUANTIFICATION+"/{species}/all_samples_transcript_counts.tab",
+		TPMs = QUANTIFICATION+"/{species}/all_samples_transcript_TPMs.tab"
 	shell:
 		"""
 		for file in {input}; do \
@@ -365,11 +388,11 @@ rule mapping_stats:
 		done >> {output}	
 		"""
 
-########## CHECK RULE ##################
+########## CHECK RULE ####################
 #After everything finished running, remove the downloaded fastqs.
 rule clean_up_fastq:
 	input:
-		TPM_table = QUANTIFICATION+"/{species}/all_samples_TPMs.tab",
+		TPM_table = QUANTIFICATION+"/{species}/all_samples_transcript_TPMs.tab",
 		mapping_stats = QUANTIFICATION+"/{species}/mapping_stats.txt",
 		PE_forward = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.sra_1.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
 		PE_reverse = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.sra_2.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
@@ -383,4 +406,112 @@ rule clean_up_fastq:
 			echo $file >> {output}; \
 			rm $file; \
 		done
+		"""
+
+######### GET GENE-LEVEL QUANTIFICATION ###
+
+rule build_transcript_gene_dict:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B-brochi.gtf"
+	output:
+		QUANTIFICATION+"/{species}/transcript_gene_dict.tab"
+	run:
+		import pandas as pd
+		import re
+
+		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None)
+		input_df = input_df.loc[input_df[8].str.contains("transcript_id")]
+		attribute_field = input_df.iloc[:,8]
+		gene_id_list_raw = [part for element in list(attribute_field) for part in element.split(";") if "gene_id" in part]
+		input_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in gene_id_list_raw]
+		transcript_id_list_raw = [part for element in list(attribute_field) for part in element.split(";") if "transcript_id" in part]
+		input_df["transcriptID"] = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in transcript_id_list_raw]
+		final_df = input_df[["transcriptID", "geneID"]].drop_duplicates()		
+		final_df.to_csv(str(output), sep="\t", header=True, index=False, na_rep="NA")
+
+rule get_gene_level_quantification:
+	input:
+		transcript_gene_dict = QUANTIFICATION+"/{species}/transcript_gene_dict.tab",
+                SE_downloaded = lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+                SE_in_house = lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+                PE_downloaded = lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+                PE_in_house = lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+	output:
+		counts = QUANTIFICATION+"/{species}/all_samples_gene_counts.tab",
+		TPMs = QUANTIFICATION+"/{species}/all_samples_gene_TPMs.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {GET_GENE_LEVEL_QUANTIFICATION}	{input.transcript_gene_dict} \
+								{output.TPMs} {output.counts} \
+								{input.SE_downloaded} {input.SE_in_house} {input.PE_in_house} {input.PE_downloaded}
+		"""
+
+#{input.SE_downloaded} {input.SE_in_house} {input.PE_in_house}
+############ COMPUTE LOG2 ##################
+rule compute_log2:
+	input:
+		QUANTIFICATION+"/{species}/all_samples_gene_TPMs.tab"	
+	output:
+		QUANTIFICATION+"/{species}/all_samples_gene_log2-TPMs.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"	
+	shell:
+		"""
+		Rscript {COMPUTE_LOG2} {input} {output}
+		"""
+
+############ APPLY SVA CORRECTION #########
+#Here I am generating a metadata table as needed by the SVA correction script.
+#The easiest is to do it in R.
+rule generate_metadata_for_sva:
+	input:
+		METADATA+"/{species}_samples_info.tab"
+	output:
+		METADATA+"/sva_metadata/{species}_samples_info.tab"
+	shell:
+		"""
+		Rscript {GENERATE_SVA_METADATA} {input} {output}
+		"""
+
+#0.2: mapping_rate_cutoff
+#0: min_dif
+#1: plot_intermediate
+rule apply_sva_correction:
+	input:
+		log2_data = QUANTIFICATION+"/{species}/all_samples_gene_log2-TPMs.tab",
+		metadata = METADATA+"/sva_metadata/{species}_samples_info.tab"
+	output:
+		SVA_CORRECTION+"/{species}-selected_samples_gene_SVA-log2-TPMs.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	params:
+		out_dir = SVA_CORRECTION+"/{species}",
+		out_file = SVA_CORRECTION+"/{species}/{species}.tc.tsv" 
+	shell:
+		"""
+		Rscript {APPLY_SVA_CORRECTION} 	{input.log2_data} \
+						{input.metadata} \
+						{params.out_dir} \
+						pearson \
+						0.2 0 1 \
+						"Neural|Muscle|Testis|Ovary|Kidney|Epithelial|DigestiveTract|Adipose"; \
+		cp {params.out_file} {output};
+		"""
+
+########## APPLY K-MEANS CLUSTERING ###############
+
+rule apply_kmeans_clustering:
+	input:
+		expr_table = SVA_CORRECTION+"/{species}-selected_samples_gene_SVA-log2-TPMs.tab",
+		metadata = METADATA+"/{species}_samples_info.tab"
+	output:
+		expr_table = METASAMPLES_DIR+"/{species}-metasamples_median_expr.tab",
+		metadata = METASAMPLES_DIR+"/{species}-metasamples_metadata.txt"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {GENERATE_METASAMPLES_KMEANS} {input.expr_table} {input.metadata} {output.expr_table} {output.metadata}
 		"""

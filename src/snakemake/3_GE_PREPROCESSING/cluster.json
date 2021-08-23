@@ -2,15 +2,15 @@
   "__default__" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "4G",
-    "time" : "01:00:00",
+    "ram" : "2G",
+    "time" : "00:10:00",
     "disk" : "1G",
     "queue" : "short-sl7"
   },
   "prefetch_fastq" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "6G",
+    "ram" : "15G",
     "time" : "10:00:00",
     "disk" : "2G",
     "queue" : "long-sl7"
@@ -18,7 +18,7 @@
   "download_SE_fastq" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "6G",
+    "ram" : "8G",
     "time" : "10:00:00",
     "disk" : "2G",
     "queue" : "long-sl7"
@@ -26,19 +26,19 @@
   "download_PE_fastq" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "6G",
+    "ram" : "10G",
     "time" : "10:00:00",
-    "disk" : "2G",
+    "disk" : "4G",
     "queue" : "long-sl7"
-  }, 
-  "run_fastQC" :
+  },
+  "compress_fastq" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "4G",
-    "time" : "03:30:00",
-    "disk" : "2G",
-    "queue" : "short-sl7"
-  },
+    "ram" : "8G",
+    "time" : "02:00:00",
+    "disk" : "4G",
+    "queue" : "long-sl7"
+  }, 
   "run_fastQC" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
@@ -58,20 +58,25 @@
   "map_reads_SE" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "4G",
-    "time" : "01:30:00",
+    "ram" : "6G",
+    "time" : "03:00:00",
     "disk" : "2G",
     "queue" : "short-sl7"
   },
   "map_reads_PE" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
-    "ram" : "4G",
-    "time" : "01:30:00",
+    "ram" : "6G",
+    "time" : "04:00:00",
+    "disk" : "2G",
+    "queue" : "short-sl7"
+  },
+  "get_gene_level_quantification":
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "10G",
+    "time" : "00:30:00",
     "disk" : "2G",
     "queue" : "short-sl7"
   }
 }
-
-
-
