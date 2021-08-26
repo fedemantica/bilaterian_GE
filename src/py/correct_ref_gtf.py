@@ -508,17 +508,6 @@ protein_suffix = str(list(params_df[params_df["species"]==species]["protein_suff
 print("%s: %d" % ("broken_genes", len(broken_gene_flatten_list))) #for debugging
 print("%s: %d" % ("chimeric_genes", len(chimeric_genes_list))) #for debugging
 
-
-##################################
-####### HEALTHY GENES ############
-##################################
-#add geneID
-brochi_genes_list = broken_gene_flatten_list + chimeric_genes_list
-#filter out entries of brochi genes from the GTF
-healthy_GTF_df = gtf_df[~(gtf_df["geneID"].isin(brochi_genes_list))] 
-healthy_GTF_df = healthy_GTF_df.rename(columns={"attribute" : "attribute_mod"}) #rename field to match the broken and chimeric gtf dataframes
-healthy_GTF_df = healthy_GTF_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
-
 ##################################
 ####### BROKEN GENES #############
 ##################################
@@ -724,6 +713,18 @@ for chimeric_gene, group in grouped_chimeric_GTF_df:
     final_joint_chimeric_df = final_joint_chimeric_df.sort_values(["stop", "type"], ascending=[False,False])
   all_chimeric_gtf_df = pd.concat([all_chimeric_gtf_df, final_joint_chimeric_df])
   
+
+##################################
+####### HEALTHY GENES ############
+##################################
+#add geneID
+brochi_genes_list = broken_gene_flatten_list + chimeric_genes_list
+#Consider as "healthy" the chimeric genes that cannot be fixed
+brochi_genes_list = [gene for gene in brochi_genes_list if gene not in list(unresolved_chimeric_df["chimeric_geneID"])]
+#filter out entries of brochi genes from the GTF
+healthy_GTF_df = gtf_df[~(gtf_df["geneID"].isin(brochi_genes_list))] 
+healthy_GTF_df = healthy_GTF_df.rename(columns={"attribute" : "attribute_mod"}) #rename field to match the broken and chimeric gtf dataframes
+healthy_GTF_df = healthy_GTF_df[["chr", "db", "type", "start", "stop", "score", "strand", "phase", "attribute_mod"]]
 
 #############################################
 ########## JOIN ALL GTF PARTS ###############
