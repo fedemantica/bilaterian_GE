@@ -112,6 +112,8 @@ resolved_chimeric_genes = list(resolved_chimeric_df["chimeric_geneID"])
 resolved_chimeric_orthogroups_df = orthogroup_df.loc[orthogroup_df["geneID"].isin(resolved_chimeric_genes)]
 resolved_chimeric_orthogroups_df["geneID;OG_ID"] = [element[0]+";"+element[1] for element in list(zip(list(resolved_chimeric_orthogroups_df["geneID"]), list(resolved_chimeric_orthogroups_df["OG_ID"])))]
 resolved_chimeric_orthogroups_df["geneID"] = resolved_chimeric_orthogroups_df["geneID;OG_ID"].map(resolved_chimeric_dict)
+#08/09/21: remove all the entries whose geneID translation is NA (i.e. chimeric genes shared between more than 2 orthogroups, which can only be splitted only in two parts. The original entries for the other parts have to be remove)
+resolved_chimeric_orthogroups_df = resolved_chimeric_orthogroups_df.dropna(subset=["geneID"])
 
 #####################
 #### Rejoin parts ###
