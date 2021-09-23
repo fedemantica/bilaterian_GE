@@ -67,6 +67,7 @@ GENERATE_BROCHI_GENE_IDS = config["tools"]["generate_brochi_geneIDs"]
 CORRECT_REF_GTF = config["tools"]["correct_ref_gtf"]
 CORRECT_MASTER_GTF = config["tools"]["correct_master_gtf"]
 CORRECT_ORTHOGROUPS = config["tools"]["correct_gene_orthogroups"]
+FORMAT_ORTHOPAIRS = config["tools"]["format_orthopairs"]
 
 ########## targets #############
 RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
@@ -93,24 +94,26 @@ CORRECTED_MASTER_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_anno
 JOINT_FILES = expand("{path}/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt", path=BROCCOLI, my_version=MY_VERSION)
 CORRECTED_OG = expand("{path}/{my_version}/corrected_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
 CORRECTED_FASTAS = expand("{path}/{my_version}/corrected_fastas/{species}_ref_exint.fasta", path=BROCCOLI, my_version=MY_VERSION, species=INVERTEBRATE_SPECIES)
+FORMATTED_ORTHOPAIRS = expand("{path}/{my_version}/formatted_orthopairs.txt", path=BROCCOLI, my_version=MY_VERSION)
 
 ######### rules ################
 
 rule all:
 	input:
-		RUN_BROCCOLI,
-		PARSED_ORTHOGROUPS, 
-		SELECTED_BROKEN_GENES,
-		CHIMERIC_OG,
-		MULTIPLE_ALN,
-		ALIGNED_FRAGMENT_INFO,
-		CLASSIFIED_CHIMERIC_GENES,
+		#RUN_BROCCOLI,
+		#PARSED_ORTHOGROUPS, 
+		#SELECTED_BROKEN_GENES,
+		#CHIMERIC_OG,
+		#MULTIPLE_ALN,
+		#ALIGNED_FRAGMENT_INFO,
+		#CLASSIFIED_CHIMERIC_GENES,
 		#NEW_GENE_IDS,
 		BROCHI_CORRECTED_GTF,
 		CORRECTED_MASTER_GTF,
 		JOINT_FILES,
 		CORRECTED_OG,
-		CORRECTED_FASTAS
+		CORRECTED_FASTAS,
+		FORMATTED_ORTHOPAIRS
 
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
@@ -994,9 +997,16 @@ rule correct_ref_gtf:
 		gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf"
 	shell:
 		"""
-		python {CORRECT_REF_GTF} --species {wildcards.species} --gtf {input.gtf} --broken {input.broken_genes} \
-			--chimeric {input.chimeric_genes} --IDs {input.geneIDs} --params_file {GENEID_PARAMS} \
-			--output {output.gtf} --output_brochi {output.brochi} --output_unresolved {output.unresolved} --output_resolved {output.resolved}
+		python {CORRECT_REF_GTF}	--species {wildcards.species} \
+						--gtf {input.gtf} --broken {input.broken_genes} \
+						--chimeric {input.chimeric_genes} \
+						--IDs {input.geneIDs} \
+						--params_file {GENEID_PARAMS} \
+						--output {output.gtf} \
+						--output_brochi {output.brochi} \
+						--output_unresolved {output.unresolved} \
+						--output_resolved {output.resolved} \
+						--problematic_genes {PROBLEMATIC_GENES}
 		"""
 
 rule correct_master_gtf:
@@ -1008,7 +1018,11 @@ rule correct_master_gtf:
 		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf"
 	shell:
 		"""
-		python {CORRECT_MASTER_GTF} --species {wildcards.species} --gtf {input.gtf} --brochi_gtf {input.brochi_ref_gtf} --IDs {input.geneIDs} --output {output}
+		python {CORRECT_MASTER_GTF} 	--species {wildcards.species} \
+						--gtf {input.gtf} \
+						--brochi_gtf {input.brochi_ref_gtf} \
+						--IDs {input.geneIDs} \
+						--output {output}
 		"""
 
 ##############################################
@@ -1057,10 +1071,37 @@ rule correct_orthogroups:
 	shell:
 		"""
 		python {CORRECT_ORTHOGROUPS} 	--orthogroups {input.orthogroups} --geneIDs {input.geneIDs} \
-						--unresolved_chimeric {input.unresolved_chimeric} --resolved_chimeric {input.resolved_chimeric} \
+						--unresolved_chimeric {input.unresolved_chimeric} \
+						--resolved_chimeric {input.resolved_chimeric} \
 						--output {output}
 		"""
 
+rule format_orthopairs:
+	input:
+		parsed_orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt",
+		corrected_orthogroups = BROCCOLI+"/{my_version}/corrected_orthogroups.txt",
+		orthopairs = BROCCOLI+"/{my_version}/dir_step4/orthologous_pairs.txt",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt" 
+	output:
+		BROCCOLI+"/{my_version}/formatted_orthopairs.txt"
+	shell:
+		"""
+		python {FORMAT_ORTHOPAIRS}	--orthogroups {input.parsed_orthogroups} \
+						--corrected_orthogroups {input.corrected_orthogroups} \
+						--orthopairs {input.orthopairs} \
+						--geneIDs {input.geneIDs} \
+						--output {output}
+		"""
+
+rule orthopairs_by_species:
+	input:
+		BROCCOLI+"/{my_version}/formatted_orthopairs.txt"
+	output:
+		BROCCOLI+"/{my_version}/species_orthopairs/{species}_orthopairs.txt"
+	shell:
+		"""
+		cat {input} | awk -v OFS="\t" '$1=="{wildcards.species}" {{print $2,$3,$4}}' > {output}
+		"""
 
 ##############################################
 ########### GENERATE NEW FASTAS ##############

@@ -38,6 +38,7 @@ tools:
   correct_ref_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_ref_gtf.py"
   correct_master_gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_master_gtf.py"
   correct_gene_orthogroups: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/correct_gene_orthogroups.py"
+  format_orthopairs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/format_orthopairs-v1.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dr2", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
