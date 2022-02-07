@@ -1,0 +1,371 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+CORRECTED_GTFS_DIR = config["paths"]["corrected_gtfs"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+METASAMPLES_DIR = config["paths"]["metasamples_dir"]
+AVERAGE_EXPR_DIR = config["paths"]["average_expr_dir"]
+PCA_ANALYSIS_DIR = config["paths"]["pca_analysis"]
+SPLSDA_ANALYSIS_DIR = config["paths"]["splsda_analysis"]
+TS_CALL_DIR = config["paths"]["ts_call_dir"]
+
+######## tools ############
+COMPUTE_TAU = config["tools"]["compute_tau"]
+COMPUTE_CV = config["tools"]["compute_cv"]
+COMPUTE_RELATIVE_TS = config["tools"]["compute_relative_ts"] 
+GET_PROTEIN_CODING_GENES_FROM_GTF = config["tools"]["get_protein_coding_genes_from_gtf"]
+ASSOCIATE_TISSUE_WITH_TS = config["tools"]["associate_tissue_with_ts"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+TAU_CUTOFF = config["variables"]["tau_cutoff"]
+
+###### targets ##########
+PROTEIN_CODING_MEASURES = expand("{path}/{type}/{my_version}/{species}-protein_coding_{type}.tab", path=TS_CALL_DIR, type=["taus", "cv"], my_version=MY_VERSION, species=ALL_SPECIES)
+RELATIVE_TS = expand("{path}/taus/{my_version}/{species}-tau{tau_cutoff}_relative_ts.tab", path=TS_CALL_DIR, my_version=MY_VERSION, species=ALL_SPECIES, tau_cutoff=TAU_CUTOFF)
+TS_ASSOCIATED_TISSUE = expand("{path}/taus/{my_version}/{species}-tau{tau_cutoff}-associated_tissue.tab", path=TS_CALL_DIR, my_version=MY_VERSION, species=ALL_SPECIES, tau_cutoff="0.45")
+HEATMAP_INPUT = expand("{path}/{my_type}/{my_version}/Bilateria_conserved-reclustered_orthogroups-BH_genes-{my_type}.tab", path=TS_CALL_DIR, my_version=MY_VERSION, my_type=["relative_expr", "taus", "relative_tissue"])
+#RANDOMIZATIONS = expand("{path}/randomizations/{my_version}/Bilateria/rand_{rand_type}/Bilateria_conserved_orthogroups-ALL_genes-randomization_{number}.txt", path=TS_CALL_DIR, my_version=MY_VERSION, rand_type=["all", "cutoff"], number=list(range(1, 11)))
+RANDOMIZATIONS = expand("{path}/randomizations/{my_version}/Bilateria/rand_{rand_type}/Bilateria_conserved_orthogroups-BH_genes-randomization_{number}.txt", path=TS_CALL_DIR, my_version=MY_VERSION, rand_type=["all", "cutoff"], number=list(range(1, 11)))
+HIGHEST_TAU_HEATMAP_INPUT = expand("{path}/randomizations/{my_version}/Bilateria/Bilateria_conserved_orthogroups-BestTau_genes-TS_labels.txt",  path=TS_CALL_DIR, my_version=MY_VERSION)
+
+
+####### rules ############
+rule all:	
+	input:
+		PROTEIN_CODING_MEASURES,
+		RELATIVE_TS,
+		TS_ASSOCIATED_TISSUE,
+		HEATMAP_INPUT,
+		RANDOMIZATIONS,
+		HIGHEST_TAU_HEATMAP_INPUT
+
+rule get_protein_coding_genes:
+	input:
+		CORRECTED_GTFS_DIR+"/{my_version}/ref/{species}_annot-B-brochi.gtf"		
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-protein_coding_genes.txt"
+	shell:
+		"""
+		python {GET_PROTEIN_CODING_GENES_FROM_GTF} --input {input} --output {output}
+		"""
+
+##################################################
+####### COMPUTE TAU BY SPECIES ###################
+##################################################
+
+rule compute_Tau:
+	input:
+		AVERAGE_EXPR_DIR+"/{species}-tissue_average_expr.tab"
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-all_taus.tab"
+	shell:
+		"""
+		python {COMPUTE_TAU} --input {input} --output {output}
+		"""
+
+rule filter_tau_by_protein_coding:
+	input:
+		tau = TS_CALL_DIR+"/taus/{my_version}/{species}-all_taus.tab",
+		protein_coding = TS_CALL_DIR+"/taus/{my_version}/{species}-protein_coding_genes.txt" 
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-protein_coding_taus.tab"
+	shell:
+		"""
+		cat {input.tau} | filter_1col 1 {input.protein_coding} > {output}
+		"""
+
+##################################################
+####### COMPUTE CV BY SPECIES ####################
+##################################################
+
+rule compute_cv:
+	input:
+		AVERAGE_EXPR_DIR+"/{species}-tissue_average_expr.tab"
+	output:
+		TS_CALL_DIR+"/cv/{my_version}/{species}-all_cv.tab"
+	shell:
+		"""
+		python {COMPUTE_CV} --input {input} --output {output}
+		"""
+
+rule filter_cv_by_protein_coding:
+	input:
+		tau = TS_CALL_DIR+"/cv/{my_version}/{species}-all_cv.tab",
+		protein_coding = TS_CALL_DIR+"/taus/{my_version}/{species}-protein_coding_genes.txt" 
+	output:
+		TS_CALL_DIR+"/cv/{my_version}/{species}-protein_coding_cv.tab"
+	shell:
+		"""
+		cat {input.tau} | filter_1col 1 {input.protein_coding} > {output}
+		"""
+
+##################################################
+####### COMPUTE RELATIVE TS ######################
+##################################################
+
+rule compute_relative_ts:
+	input:
+		AVERAGE_EXPR_DIR+"/{species}-tissue_average_expr.tab"
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-all_relative_ts.tab"
+	shell:
+		"""
+		python {COMPUTE_RELATIVE_TS} --input {input} --output {output}
+		"""
+
+rule filter_relative_ts_by_TS_genes:
+	input:
+		relative_ts = TS_CALL_DIR+"/taus/{my_version}/{species}-all_relative_ts.tab",
+		protein_coding_taus = TS_CALL_DIR+"/taus/{my_version}/{species}-protein_coding_taus.tab"
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-tau{tau_cutoff}_relative_ts.tab"
+	shell:
+		"""
+		awk 'NR==1' {input.relative_ts} > {output}; \
+		cat {input.relative_ts} | filter_1col 1 <(cat {input.protein_coding_taus} | grep -v NA | awk '$2>={wildcards.tau_cutoff} {{print $1}}') >> {output}
+		"""
+
+##################################################
+####### ASSOCIATE TISSUE WITH TS ###################
+##################################################
+
+rule associate_tissue_with_ts:
+	input:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-tau{tau_cutoff}_relative_ts.tab"
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{species}-tau{tau_cutoff}-associated_tissue.tab"
+	shell:
+		"""
+		python {ASSOCIATE_TISSUE_WITH_TS} --input {input} --output {output}
+		"""
+
+##################################################
+####### FILTER ORTHOGROUPS BY TS GENES ###########
+##################################################
+
+#Here I am creating the input for a heatmap with:
+#rows=bilaterian conserved orthogroups (BH)
+#columns=tissue_species
+#value=scaled expression
+
+rule generate_BH_tissue_table_rel_expr:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/STRICT/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.tab",
+		tissues_expression = expand("{path}/taus/{{my_version}}/{species}-all_relative_ts.tab", path=TS_CALL_DIR, species=ALL_SPECIES)
+	output:
+		TS_CALL_DIR+"/relative_expr/{my_version}/{clade}_conserved-reclustered_orthogroups-BH_genes-relative_expr.tab"
+	params:
+		input_expr_dir = TS_CALL_DIR+"/taus/{my_version}",
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade]
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		orthologs_expr_df = orthologs_expr_df.rename(columns={"BmA" : "Bmo"})
+		for species in params.clade_species:
+		  #Careful with this line: it calls a file that in principle it's been defined in the input.
+		  expr_file = str(params.input_expr_dir)+"/"+species+"-all_relative_ts.tab" 
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_samples_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_sample in species_samples_list:
+		    sample = species_sample.split("_", 1)[1]
+		    sample_expr_dict = pd.Series(expr_df[sample], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_sample] = orthologs_expr_df[species].map(sample_expr_dict)  #for each sample replace with the sample_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+rule generate_BH_tissue_table_tau:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/STRICT/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.tab",
+		tissues_expression = expand("{path}/taus/{{my_version}}/{species}-all_taus.tab", path=TS_CALL_DIR, species=ALL_SPECIES)
+	output:
+		TS_CALL_DIR+"/taus/{my_version}/{clade}_conserved-reclustered_orthogroups-BH_genes-taus.tab"
+	params:
+		input_tau_dir = TS_CALL_DIR+"/taus/{my_version}",
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade]
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		orthologs_expr_df = orthologs_expr_df.rename(columns={"BmA" : "Bmo"})
+		for species in params.clade_species:
+		  #Careful with this line: it calls a file that in principle it's been defined in the input.
+		  tau_file = str(params.input_tau_dir)+"/"+species+"-all_taus.tab" 
+		  tau_df = pd.read_table(tau_file, sep="\t", index_col=False, header=None, names=["GeneID", "Tau"]) 
+		  gene_tau_dict = pd.Series(tau_df.Tau.values, index=tau_df.GeneID).to_dict()
+		  orthologs_expr_df[species] = orthologs_expr_df[species].map(gene_tau_dict)  #for each sample replace with the sample_species annotation
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+#Here I want row=OG_ID, col=species, value=tissue with the highest relative expression.
+rule generate_BH_tissue_table_rel_tissue:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/STRICT/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.tab",
+		tissues_expression = expand("{path}/taus/{{my_version}}/{species}-all_relative_ts.tab", path=TS_CALL_DIR, species=ALL_SPECIES)
+	output:
+		TS_CALL_DIR+"/relative_tissue/{my_version}/{clade}_conserved-reclustered_orthogroups-BH_genes-relative_tissue.tab"
+	params:
+		input_expr_dir = TS_CALL_DIR+"/taus/{my_version}",
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade]
+	run:
+		import pandas as pd
+		import numpy as np
+
+		def get_tissue_with_highest_expr(x):
+		  tissue_expr_dict = {x[index] : tissues[index] for index in list(range(0,len(x)))}
+		  max_expr = max(x)
+		  if np.isnan(max_expr) == False:
+		    my_tissue = tissue_expr_dict[max_expr]
+		  else:
+		    my_tissue = "NA"
+
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		orthologs_expr_df = orthologs_expr_df.rename(columns={"BmA" : "Bmo"})
+		for species in params.clade_species:
+		  expr_file = str(params.input_expr_dir)+"/"+species+"-all_relative_ts.tab"
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  tissues = list(expr_df.columns.values)
+		  final_species_df = pd.DataFrame(expr_df.apply(get_tissue_with_highest_expr, axis=1))
+		  final_species_df = final_species_df.rename(columns={0 : "Tissue"})
+		  final_species_df["GeneID"] = list(final_species_df.index.values)
+		  gene_tissue_dict = pd.Series(final_species_df.Tissue.values, index=final_species_df.GeneID).to_dict()
+		  orthologs_expr_df[species] = orthologs_expr_df[species].map(gene_tissue_dict)
+
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+##################################################
+####### RANDOMIZE TS LABELS  #####################
+##################################################
+
+rule get_randomization_input:
+	input:
+		#gene_orthogroups = GENE_SETS_DIR+"/{my_version}/STRICT/{clade}/conserved/{clade}_conserved_orthogroups-ALL_genes.txt",
+		gene_orthogroups = GENE_SETS_DIR+"/{my_version}/STRICT/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.txt",
+		tissues_expression = expand("{path}/taus/{{my_version}}/{species}-all_taus.tab", path=TS_CALL_DIR, species=ALL_SPECIES)
+	output:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-BH_genes-TS_labels.txt"
+		#TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-ALL_genes-TS_labels.txt"
+	params:
+		input_tau_dir = TS_CALL_DIR+"/taus/{my_version}",
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade]
+	run:
+		import pandas as pd
+
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		all_genes_tau_dict = {}
+		for species in params.clade_species:
+		  tau_file = str(params.input_tau_dir)+"/"+species+"-all_taus.tab"
+		  tau_df = pd.read_table(tau_file, sep="\t", index_col=False, header=None, names=["GeneID", "Tau"])
+		  gene_tau_dict = pd.Series(tau_df.Tau.values, index=tau_df.GeneID).to_dict()
+		  all_genes_tau_dict = {**all_genes_tau_dict, **gene_tau_dict} #This is the command to merge two dictionaries
+		orthologs_expr_df["Tau"] = orthologs_expr_df["GeneID"].map(all_genes_tau_dict) #Add Tau
+		#Generate TS labels
+		TS_labels = ["TS" if element >= 0.75 else "no_TS" for element in list(orthologs_expr_df["Tau"])]
+		orthologs_expr_df["TS_label"] = TS_labels
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+#Here I am randomizing the TS labels across all possible orthogroups
+rule get_randomizations_no_cutoff:
+	input:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-BH_genes-TS_labels.txt"
+	output:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/rand_all/{clade}_conserved_orthogroups-BH_genes-randomization_{number}.txt"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+		orthogroups_df = orthogroups_df.drop(columns=["Tau"])
+		final_df = pd.DataFrame()
+		#select species one by one
+		for species in list(set(list(orthogroups_df["Species"]))):
+		  species_df = orthogroups_df.loc[orthogroups_df["Species"]==species]
+		  TS_labels = list(species_df["TS_labels"])
+		  np.random.shuffle(TS_labels) #This shuffles the order in place
+		  species_df["TS_labels"] = TS_labels
+		  final_df = pd.concat([final_df, species_df])
+		#write to file
+		final_df = final_df.sort_values(by=["OG_ID", "Species"])
+		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+#Here I am randomizing the TS labels only across 60% of the orthogroups.
+rule get_randomizations_cutoff:
+	input:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-BH_genes-TS_labels.txt"
+	output:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/rand_cutoff/{clade}_conserved_orthogroups-BH_genes-randomization_{number}.txt"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+		orthogroups_df = orthogroups_df.drop(columns=["Tau"])
+		#isolate 40% of the gene orthogroups, among which the TS labels will not be randomized.
+		all_orthogroups = list(set(list(orthogroups_df["OG_ID"])))
+		total_orthogroups = len(all_orthogroups)
+		excluded_orthogroups = all_orthogroups[0:round(total_orthogroups*0.40)]
+		#Initialize final df and set TS_label to "no_TS" for all
+		final_df = orthogroups_df.loc[orthogroups_df["OG_ID"].isin(excluded_orthogroups)]
+		final_df["TS_labels"] = ["no_TS" for element in list(final_df["TS_labels"])]
+		#select species one by one
+		for species in list(set(list(orthogroups_df["Species"]))):
+		  species_df = orthogroups_df.loc[orthogroups_df["Species"]==species]
+		  #Count how many TS genes there are
+		  total_TS_genes = len([element for element in list(species_df["TS_labels"]) if element=="TS"]) 
+		  #remove excluded orthogroups
+		  species_subset_df = species_df.loc[~species_df["OG_ID"].isin(excluded_orthogroups)]
+		  total_no_TS_genes = species_subset_df.shape[0] - total_TS_genes #compute the number of genes without TS to consider
+		  #generate labels
+		  TS_labels = ["TS" for element in list(range(0, total_TS_genes))] + ["no_TS" for element in list(range(0, total_no_TS_genes))]
+		  np.random.shuffle(TS_labels) #This shuffles the order in place
+		  species_subset_df["TS_labels"] = TS_labels #assign the shuffled lab
+		  final_df = pd.concat([final_df, species_subset_df])
+		#write to file
+		final_df = final_df.sort_values(by=["OG_ID", "Species"])
+		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+
+##################################################
+####### GET HIGHEST TAU SET ######################
+##################################################
+
+#For each species, select the gene in each orthogroups with the highest Tau
+rule get_highest_tau:
+	input:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-ALL_genes-TS_labels.txt"
+	output:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-BestTau_genes-TS_labels.txt"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+		input_grouped_df = input_df.groupby(["OG_ID", "Species"])
+		max_tau_df = input_grouped_df.max() #Select only maximum value per group. NB: this is done separately for each column. I.e, you lose the connection gen-Tau
+		max_tau_df = max_tau_df.reset_index() #ungroup df
+		max_tau_long_df = max_tau_df.pivot(index="OG_ID", columns="Species", values="Tau")
+		max_tau_long_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")	
