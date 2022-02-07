@@ -1,0 +1,193 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+CORRECTED_GTFS_DIR = config["paths"]["corrected_gtfs"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+METASAMPLES_DIR = config["paths"]["metasamples_dir"]
+AVERAGE_EXPR_DIR = config["paths"]["average_expr_dir"]
+PCA_ANALYSIS_DIR = config["paths"]["pca_analysis"]
+SPLSDA_ANALYSIS_DIR = config["paths"]["splsda_analysis"]
+TS_CALL_DIR = config["paths"]["ts_call_dir"]
+TS_GAINS_LOSSES_DIR = config["paths"]["ts_gains_losses_dir"]
+
+
+######## tools ############
+INFER_TS_GAINS = config["tools"]["infer_ts_gains"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+TAU_CUTOFF = config["variables"]["tau_cutoff"]
+TAU_UP_CUTOFF = config["variables"]["tau_up_cutoff"]
+TAU_LOW_CUTOFF = config["variables"]["tau_low_cutoff"]
+
+###### targets ##########
+COMPLETE_OG_TAU = expand("{path}/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-best_tau.txt", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, clade="Bilateria")
+INFERRED_GAINS = expand("{path}/{my_version}/{clade}/inferred_gains/{clade}_conserved-COMPLETE-{tau_type}_tau-inferred_gains.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, clade="Bilateria", tau_type=["best", "BH"])
+SPECIES_SPECIFIC_GAINS = expand("{path}/{my_version}/{clade}/inferred_gains/{clade}_conserved-COMPLETE-{tau_type}_tau-species_specific_gains.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, clade="Bilateria", tau_type=["best", "BH"]) 
+
+####### rules ############
+rule all:	
+	input:
+		COMPLETE_OG_TAU,
+		INFERRED_GAINS, 
+		SPECIES_SPECIFIC_GAINS
+
+##################################################
+####### FILTER TAU ORTHOGROUPS ###################
+##################################################
+#Select genes with the highest Tau only in orthogroups with at least one ortholog per species.
+
+#rule generate_OG_bestTau_input:
+#	input:
+#		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-ALL_genes-TS_labels.txt"
+#	output:
+#		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-best_tau.txt"
+#	run:
+#		import pandas as pd
+#
+#		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+#		input_grouped_df = input_df.groupby(["OG_ID", "Species"])
+#		max_tau_df = input_grouped_df.max() #Select only maximum value per group. NB: this is done separately for each column. I.e, you lose the connection gen-Tau
+#		max_tau_df = max_tau_df.reset_index() #ungroup df
+#		max_tau_filtered_df = max_tau_df.groupby("OG_ID")
+#		max_tau_filtered_df = max_tau_filtered_df.filter(lambda x: len(x) == 20) #select only OGs with one entry per species (20 rows)
+#		max_tau_filtered_df = max_tau_filtered_df.reset_index() #ungroup df
+#		max_tau_filtered_df = max_tau_filtered_df.drop(columns=["GeneID", "index", "TS_labels"])
+#		max_tau_filtered_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+
+rule generate_OG_bestTau_input:
+	input:
+		TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-ALL_genes-TS_labels.txt"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-best_tau.txt"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+		input_df = input_df.fillna(-0.1) #Replace NA with -0.1 so that they are considered by the max as numbers
+		input_grouped_df = input_df.groupby(["OG_ID", "Species"])
+		max_tau_indexes = input_grouped_df["Tau"].transform(max) == input_df["Tau"] #Select only maximum value per group.
+		max_tau_df = input_df[max_tau_indexes]
+		max_tau_df = max_tau_df.drop_duplicates(subset=["OG_ID", "Species", "Tau"]) #Select only one gene per species in all cases where the Tau is identical. 
+		max_tau_filtered_df = max_tau_df.groupby("OG_ID")
+		max_tau_filtered_df = max_tau_filtered_df.filter(lambda x: len(x) == 20) #select only OGs with one entry per species (20 rows).
+		max_tau_filtered_df = max_tau_filtered_df.reset_index() #ungroup df
+		max_tau_filtered_df = max_tau_filtered_df.drop(columns=["index", "TS_labels"])
+		#change the -0.1 back to NA
+		max_tau_filtered_df["Tau"] = [tau if tau >= 0 else np.nan for tau in list(max_tau_filtered_df["Tau"])]
+		max_tau_filtered_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+
+#I am filtering the Tau table only fo
+rule generate_OG_BH_input:
+	input:
+		all_taus = TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-ALL_genes-TS_labels.txt",
+		best_hits = GENE_SETS_DIR+"/{my_version}/STRICT/{clade}/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.txt"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-BH_tau.txt"
+	run:
+		import pandas as pd
+
+		taus_df = pd.read_table(str(input.all_taus), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+		best_hit_df = pd.read_table(str(input.best_hits), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		taus_df["FilterID"] = [element[0]+";"+element[1] for element in zip(list(taus_df["OG_ID"]), list(taus_df["GeneID"]))] #Add ID to tau dataframe
+		best_hit_filterIDs = [element[0]+";"+element[1] for element in zip(list(best_hit_df["OG_ID"]), list(best_hit_df["GeneID"]))]
+		#filter dataframe only for best hits
+		taus_df = taus_df.loc[taus_df["FilterID"].isin(best_hit_filterIDs)]
+		#select only orthogroups with 20 genes
+		taus_grouped_df = taus_df.groupby("OG_ID")
+		taus_grouped_df = taus_grouped_df.filter(lambda x: len(x) == 20)
+		taus_grouped_df = taus_grouped_df.reset_index() #ungroup df
+		taus_grouped_df = taus_grouped_df.drop(columns=["TS_labels", "index", "FilterID"])		
+		taus_grouped_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+	
+#Just check how single copy orthologs look like
+rule generate_OG_SCO_input:
+	input:
+		all_taus = TS_CALL_DIR+"/randomizations/{my_version}/{clade}/{clade}_conserved_orthogroups-ALL_genes-TS_labels.txt",
+		SCO = GENE_SETS_DIR+"/{my_version}/STRICT/{clade}/conserved/Bilateria_conserved-reclustered_orthogroups-SCO_genes.txt"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-SCO_tau.txt"
+	run:
+		import pandas as pd
+
+		taus_df = pd.read_table(str(input.all_taus), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "TS_labels"])
+		best_hit_df = pd.read_table(str(input.SCO), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		taus_df["FilterID"] = [element[0]+";"+element[1] for element in zip(list(taus_df["OG_ID"]), list(taus_df["GeneID"]))] #Add ID to tau dataframe
+		best_hit_filterIDs = [element[0]+";"+element[1] for element in zip(list(best_hit_df["OG_ID"]), list(best_hit_df["GeneID"]))]
+		#filter dataframe only for best hits
+		taus_df = taus_df.loc[taus_df["FilterID"].isin(best_hit_filterIDs)]
+		#select only orthogroups with 20 genes
+		taus_grouped_df = taus_df.groupby("OG_ID")
+		taus_grouped_df = taus_grouped_df.filter(lambda x: len(x) == 20)
+		taus_grouped_df = taus_grouped_df.reset_index() #ungroup df
+		taus_grouped_df = taus_grouped_df.drop(columns=["TS_labels", "index", "FilterID"])		
+		taus_grouped_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+
+
+##################################################
+####### INFER TS GAINS ###########################
+##################################################
+#I infer gains and losses exclusively based on Tau (here I do not look at the tissue where the genes are more highly expressed)
+
+rule infers_TS_gains:
+	input:
+		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-{tau_type}_tau.txt"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/inferred_gains/{clade}_conserved-COMPLETE-{tau_type}_tau-inferred_gains.tab"
+	shell:
+		"""
+		python {INFER_TS_GAINS}		--input {input} \
+						--up_tau_cutoff {TAU_UP_CUTOFF} \
+						--low_tau_cutoff {TAU_LOW_CUTOFF} \
+						--output {output}
+		"""
+
+#Associate tissue to species-specific tissue-specific genes
+rule associate_tissue_species_specific_gains:
+	input:
+		orthogroups = TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/{clade}_conserved_orthogroups-COMPLETE-{tau_type}_tau.txt",
+		ts_gains = TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/inferred_gains/{clade}_conserved-COMPLETE-{tau_type}_tau-inferred_gains.tab",
+		ts_tissues = expand("{path}/taus/{{my_version}}/{species}-tau0.45-associated_tissue.tab", path=TS_CALL_DIR, species=BILATERIA)
+	output:
+		TS_GAINS_LOSSES_DIR+"/{my_version}/{clade}/inferred_gains/{clade}_conserved-COMPLETE-{tau_type}_tau-species_specific_gains.tab"	
+	shell:
+		"""
+		cat {input.orthogroups} | filter_1col 1 <(cat {input.ts_gains} | grep STRICT | awk -v OFS="\t" 'length($2)==3' | cut -f1) \
+		| awk -v OFS="\t" 'length($2)==3' | translate -a -v -e "NO_ts" <(cat {input.ts_tissues}) 3 > {output}
+		"""
+
+##################################################
+####### INFER TS LOSSES ##########################
+##################################################
+
+rule infer_TS_losses:
+	input:
+		""
+	output:
+		""
+	shell:
+		"""
+		"""
