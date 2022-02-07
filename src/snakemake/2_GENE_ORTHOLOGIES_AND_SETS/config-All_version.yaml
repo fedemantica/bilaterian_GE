@@ -1,0 +1,35 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  downloaded: "/users/mirimia/fmantica/projects/bilaterian_GE/downloaded"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  broccoli: "/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli"
+  database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  expr_tables_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/average_expr_by_tissue"
+
+tools:
+  recluster_orthogroups: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/recluster_gene_orthogroups.py"
+  compute_seq_similarity: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/compute_seq_similarity-v1.py"
+  mafft: "/users/mirimia/fmantica/software/src/MAFFT_V2.0/mafft.bat"
+  filter_orthogroups: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/filter_orthogroups.py"
+  compute_expr_cor: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/compute_expr_cor.py"
+  get_avg_expr_cor: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/get_avg_expr_cor.py"
+  select_best_hits: "/users/mirimia/fmantica/projects/bilaterian_GE/src/py/select_best_hits-v1.py"
+
+variables:
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  vertebrata: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  insecta: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi"]
+  deuterostoma: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2"]
+  protostoma: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  my_version: "All_version"
+  categories: ["LASSO", "STRICT"]
+  clades: ["Vertebrata", "Insecta", "Bilateria"]
+  evo_types: ["conserved", "specific"]
+  sub_clades_dict: {"Vertebrata" : ["Bilateria", "Deuterostoma", "Vertebrata"], "Insecta" : ["Bilateria", "Protostoma", "Insecta"], "Bilateria" : ["Bilateria"]}
+  max_genes: 80
+  max_proportion: 0.2
+  all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"]
