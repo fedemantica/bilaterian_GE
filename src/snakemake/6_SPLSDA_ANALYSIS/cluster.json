@@ -1,0 +1,34 @@
+{
+  "__default__" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "3G",
+    "time" : "00:30:00",
+    "disk" : "1G",
+    "queue" : "short-sl7"
+  },
+  "fine_tune_sPLSDA" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\" -pe smp 3",
+    "ram" : "5G",
+    "time" : "07:00:00",
+    "disk" : "2G",
+    "queue" : "long-sl7"
+  },
+  "fine_tune_sPLSDA_clade_tissue" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\" -pe smp 3",
+    "ram" : "8G",
+    "time" : "15:00:00",
+    "disk" : "2G",
+    "queue" : "long-sl7"
+  },
+  "fine_tune_sPLSDA_clade_tissue_1by1" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\" -pe smp 3",
+    "ram" : "8G",
+    "time" : "03:00:00",
+    "disk" : "2G",
+    "queue" : "long-sl7"
+  }
+}
