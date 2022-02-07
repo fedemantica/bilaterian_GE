@@ -1,0 +1,230 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+METASAMPLES_DIR = config["paths"]["metasamples_dir"]
+AVERAGE_EXPR_DIR = config["paths"]["average_expr_dir"]
+PCA_ANALYSIS_DIR = config["paths"]["pca_analysis"]
+SPLSDA_ANALYSIS_DIR = config["paths"]["splsda_analysis"]
+DIFF_EXPR_DIR = config["paths"]["diff_expr_dir"]
+
+######## tools ############
+RUN_DESEQ2 = config["tools"]["run_deseq2"]
+GET_GTM_FILES = config["tools"]["get_gtm_files"]
+RUN_GPROFILER2 = config["tools"]["run_gprofiler2"]
+FILTER_DE_GENES = config["tools"]["filter_DE_genes"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+OUTGROUPS = config["variables"]["outgroups"]
+CLADES = config["variables"]["clades"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+HIGHER_GO_CUTOFF = config["variables"]["higher_GO_cutoff"]
+LOWER_GO_CUTOFF =  config["variables"]["lower_GO_cutoff"]
+
+LOG2FC_CUTOFF = config["variables"]["log2fc_cutoff"]
+PVALUE_CUTOFF = config["variables"]["pvalue_cutoff"]
+
+DE_TYPES = config["variables"]["DE_types"]
+
+###### targets ##########
+DESEQ2_RES = expand("{path}/{my_version}/STRICT/Bilateria/conserved/{tissue}/{tissue}-All_shrunk_LFC.tab", path=DIFF_EXPR_DIR, my_version=MY_VERSION, tissue=ALL_TISSUES)
+FILTERED_DESEQ2_RES = expand("{path}/{my_version}/STRICT/Bilateria/conserved/{tissue}/{tissue}-{direction}regulated_shrunk_LFC-filtered.tab", path=DIFF_EXPR_DIR, my_version=MY_VERSION, tissue=ALL_TISSUES, direction="UP")
+GO_RES = expand("{path}/{my_version}/STRICT/Bilateria/conserved/{tissue}/{tissue}-{direction}regulated-{DE_type}-GO_res.tab", path=DIFF_EXPR_DIR, my_version=MY_VERSION, tissue=ALL_TISSUES, direction="UP", DE_type=DE_TYPES)
+
+rule all:
+	input:
+		DESEQ2_RES,
+		FILTERED_DESEQ2_RES,
+		GO_RES
+	
+#######################################
+###### RUN DIFF EXPRESSION ############
+#######################################
+
+rule run_DESeq2:
+	input:
+		counts = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/conserved/{clade}_conserved-metasamples_counts-BH_genes.tab"
+	output:
+		All = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-All_shrunk_LFC.tab",
+		UP = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-UPregulated_shrunk_LFC-All.tab", 
+		DOWN = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-DOWNregulated_shrunk_LFC-All.tab"
+	params:
+		metadata_dir = METADATA+"/",
+		species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade]),
+		output_dir = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}"
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {RUN_DESEQ2} {input.counts} {params.metadata_dir} {wildcards.tissue} {params.species} {params.output_dir}
+		"""
+
+#Here I am considering only the genes that have median zscore higher than 1 in both Vertebrates and Insects in the chosen tissue
+rule get_input_filtered:
+	input:
+		expr = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/conserved/{clade}_conserved-tissues_expression-BH_genes-NORM.tab",
+		diff_expr = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-{direction}regulated_shrunk_LFC-All.tab"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-{direction}regulated_shrunk_LFC-filtered.tab"
+	params:
+		vertebrata = ",".join(VERTEBRATA),
+		insecta = ",".join(INSECTA),
+		outgroups = ",".join(OUTGROUPS)
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {FILTER_DE_GENES}	{input.expr} \
+						{input.diff_expr} \
+						{wildcards.tissue} \
+						{params.vertebrata} \
+						{params.insecta} \
+						{params.outgroups} \
+						{LOG2FC_CUTOFF} \
+						{PVALUE_CUTOFF} \
+						{output}
+		"""
+
+#######################################
+###### GO enrichments #################
+#######################################
+#Here I can use the files that I generated from the other Snakefile
+#These are files necessary to use the custom annotation in gprofiler2 in R
+#For now it is just to try, but things will have to be homogenize
+rule get_GO_annotations:
+	input:
+		"/users/mirimia/fmantica/projects/ludo_analysis/data/GO_enrichments/hg38_GO_annotations-Ensembl102_clueGOLevel5.tab"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annotations-Ensembl102_clueGOLevel5.tab"
+	shell:
+		"""
+		cat {input} | sed "s/ /_/g; s/'//g; s///" | cut -f1-3 > {output}
+		"""
+
+rule count_genes_in_GOs:
+	input:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annotations-Ensembl102_clueGOLevel5.tab"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/genes_in_GO_counts.txt"
+	run:
+		import pandas as pd
+		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["geneID", "GOterm", "GOdef"])
+		grouped_df = input_df.groupby("GOterm")
+		final_df = pd.DataFrame()
+		for term, group in grouped_df:
+		  count = group.shape[0]
+		  final_df = pd.concat([final_df, pd.DataFrame({"GO" : [term], "count" : [count]})])
+		final_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+
+rule reduce_GO_annotations:
+	input:
+		annot = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annotations-Ensembl102_clueGOLevel5.tab",
+		GO_counts = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/genes_in_GO_counts.txt"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annotations-Ensembl102_clueGOLevel5-reduced.tab"
+	shell:
+		"""
+		cat {input.annot} | filter_1col 2 <(cat {input.GO_counts} | awk '$2<={HIGHER_GO_CUTOFF} && $2>={LOWER_GO_CUTOFF} {{print $1}}') > {output}
+		"""
+
+rule generate_gmt_files:
+	input:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annotations-Ensembl102_clueGOLevel5-reduced.tab"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annot-reduced.gmt"
+	shell:
+		"""
+		python {GET_GTM_FILES} -GO {input} -o {output}
+		"""
+
+
+rule get_background:
+	input:
+		orthogroups = GENE_SETS_DIR+"/{my_version}/{category}/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.txt",
+		complete_genes = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/Neural/Neural-All_shrunk_LFC.tab"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/{clade}_conserved-GO_background.txt"
+	shell:
+		"""
+		cat {input.orthogroups} | grep Hs2 | filter_1col 1 <(cut -f1 {input.complete_genes} | tail -n+2) \
+		| cut -f3 > {output}
+		"""
+
+
+##### This is valid both for All and filtered
+#The awk selection works in the same rule because UP and DOWN regulated genes are already separated. But for now I am going to focus on the upregulated.
+rule get_gene_sets:
+	input:
+		raw_set = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-{direction}regulated_shrunk_LFC-{DE_type}.tab",
+		orthogroups = GENE_SETS_DIR+"/{my_version}/{category}/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.txt"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-{direction}regulated-{DE_type}-Hs2_geneIDs.txt"
+	shell:
+		"""
+		cat {input.raw_set} | awk '$3>=1.5 || $3<=-1.5' | tail -n+2 | cut -f1 \
+		| translate <(cat {input.orthogroups} | grep Hs2 | cut -f1,3) 1 > {output}
+		"""
+
+#I need gprofiler2 installed for this. I am creating a conda env
+rule GO_enrichment_gprofiler2:
+	input:
+		gene_set = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-{direction}regulated-{DE_type}-Hs2_geneIDs.txt",
+		background = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/{clade}_conserved-GO_background.txt",
+		annot = DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/GO_files/hg38_GO_annot-reduced.gmt"
+	output:
+		DIFF_EXPR_DIR+"/{my_version}/{category}/{clade}/conserved/{tissue}/{tissue}-{direction}regulated-{DE_type}-GO_res.tab"	
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {RUN_GPROFILER2} {input.gene_set} {input.background} {input.annot} {output}
+		"""
+
+
+#HEADER of gprofiler output
+# 1	query
+# 2	significant
+# 3	p_value
+# 4	term_size
+# 5	query_size
+# 6	intersection_size
+# 7	precision
+# 8	recall
+# 9	term_id
+# 10	source
+# 11	term_name
+# 12	effective_domain_size
+
+
+#rule gprofiler2_plot_input_by_species:
+#	input:
+#		GO_ENRICHMENTS+"/gprofiler2_output/{category}/{species}-enriched_categories-{bg_type}.tab"
+#	output:
+#		GO_ENRICHMENTS+"/gprofiler2_output/{category}/{species}-GO_enrichment_plot_input-{bg_type}.tab"
+#	shell:
+#		"""
+#		echo -e "Species\tGO_category\tSignificance\tPvalue\tPrecision\tObserved\tExpected\tObservedVsExpected" > {output}; \
+#		cat {input} | grep -v "term_id" | awk -v OFS="\t" '{{print $10,$11,$2,$3,$7,$6, $5*($4/$12), $6/($5*($4/$12))}}' \
+#		| sed 's/-transferred_GO-reduced//' >> {output}
+#		"""
