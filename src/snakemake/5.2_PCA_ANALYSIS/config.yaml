@@ -1,0 +1,48 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+  database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
+
+paths:
+  metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
+  preprocessing_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  pca_analysis: "/users/mirimia/fmantica/projects/bilaterian_GE/data/pca_analysis_all_norms"
+  norm_counts_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant"
+  sva_correction_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant/sva_correction"
+  metasamples_quant_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant/metasamples_quantification"
+  tissues_quant_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant/tissues_average_quantification"
+  correlations_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/correlations_analysis"
+  branches_length_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/branches_length_analysis"
+
+tools:
+  quantile_normalize: "bin/quantile_normalize.R"
+  generate_metasamples: "bin/generate_metasamples_VastDB.R"
+  get_quant_from_norm_counts: "bin/get_quant_from_norm_counts.R" 
+  apply_sva_correction: "/users/mirimia/fmantica/projects/bilaterian_GE/src/R/transcriptome_curation2-backup.r"
+  average_expr_by_tissue: "bin/average_expr_by_tissue.py"
+  plot_pca: "bin/plot_PCA.R"
+  plot_correlations: "bin/plot_correlations.R"
+  plot_branches_length: "bin/plot_branches_length.R"
+
+variables:
+  my_version: "All_version"
+  #all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  #all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  all_species: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi"]
+  vertebrata: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  insecta: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi"]
+  deuterostoma: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2"]
+  protostoma: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  human_id: "Hs2"
+  query_species_dict: {"Vertebrata" : "Hs2", "Insecta" : "Dme", "Bilateria" : "Hs2"}
+  clades: ["Insecta"]
+  #clades: ["Vertebrata", "Insecta", "Bilateria"]
+  evo_types: ["conserved"]
+  categories: ["STRICT"]
+  expr_types: ["metasamples", "tissues"]
+  gene_types: ["BH"]
+  all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"]
+  sva_log_quant_values: ["SVA-log2-TPMs", "NOSVA-log2-TPMs", "SVA-NOlog2-TPMs", "NOSVA-NOlog2-TPMs", "SVA-log2-RPKMs", "NOSVA-log2-RPKMs", "SVA-NOlog2-RPKMs", "NOSVA-NOlog2-RPKMs", "SVA-log2-scaledTPMs", "NOSVA-log2-scaledTPMs", "SVA-NOlog2-scaledTPMs", "NOSVA-NOlog2-scaledTPMs"] 
+  sva_log_quant_norm_values: ["SVA-log2-scaledTPMs-NORM", "NOSVA-NOlog2-scaledTPMs-NORM", "NOSVA-NOlog2-scaledTPMs-noNORM", "NOSVA-log2-RPKMs-NORM"]
