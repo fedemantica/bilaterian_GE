@@ -1,0 +1,635 @@
+---
+title: "Fig3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#set Knitr option
+knitr::opts_chunk$set(echo = TRUE)
+knitr::knit_engines$set(python = reticulate::eng_python)
+
+#upload libraries
+library(ggplot2)
+library(mixOmics)
+library(hashmap)
+library(reshape2)
+library(pheatmap)
+library(RColorBrewer)
+library(cowplot)
+library(tidyverse)
+library(viridis)
+library(gridExtra)
+library(egg)
+
+#set directories
+home="/Users/federica/mnt/"
+gene_sets_dir=paste0(home, "projects/bilaterian_GE/data/gene_sets/")
+#tissue_expr_dir=paste0(home, "projects/bilaterian_GE/data/preprocessing/average_expr_by_tissue/")
+pca_dir=paste0(home, "projects/bilaterian_GE/data/pca_analysis_all_norms/")
+metadata_dir=paste0(home, "projects/bilaterian_GE/data/samples_metadata/")
+splsda_dir= paste0(home, "projects/bilaterian_GE/data/splsda_analysis/")
+diff_expr_dir = paste0(home, "projects/bilaterian_GE/data/differential_expression/")
+general_patterns_dir = paste0(home, "projects/bilaterian_GE/data/vertebrates_vs_insects_general_patterns/")
+branches_length_dir = paste0(home, "projects/bilaterian_GE/data/branches_length_analysis/")
+
+#set variables
+my_version = "All_version2"
+my_category = "STRICT"
+my_evo_type = "conserved"
+clades = c("Vertebrata", "Insecta", "Bilateria")
+clades_PCA = c("Vertebrata", "Insecta", "Bilateria")
+options("scipen"=100, "digits"=4)
+
+all_species = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+ordered_species = all_species
+Bilateria = all_species
+Vertebrata = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi")
+Insecta = c("Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi")
+Outgroups = c("Bla", "Sp2", "Sma", "Obi")
+all_tissues=c("Adipose", "DigestiveTract", "Kidney", "Epithelial", "Muscle", "Neural", "Ovary", "Testis")
+ordered_tissues = c("Neural", "Testis", "Ovary", "Muscle", "Kidney", "Epithelial", "DigestiveTract", "Adipose")
+
+#set aestetics vectors
+my_color_vector = c("Neural"="mediumblue", "Testis"="violet", "Ovary"="darkorchid", "Muscle"="springgreen3", 
+                    "Kidney"="gold", "Epithelial"="steelblue1", "DigestiveTract"="chocolate1", "Adipose"="firebrick1")
+my_shapes_vector = c("Hs2"=0, "Mm2"=1, "Bt2"=2, "Mdo"=3, "Gga"=4, "Xtr"=5, "Dre"=6, "Cmi"=7, "Bla"=9, "Sp2"=8, 
+                     "Dme"=15, "Eba"=18, "Aae"= 23, "BmA"=25, "Tca"=17, "Bge"=10, "Ame"=16, "Cdi"=13, "Sma"=14, "Obi"=11)
+my_alpha_vector=c("Hs2"=1, "Mm2"=1, "Bt2"=1, "Mdo"=1, "Gga"=1, "Xtr"=1, "Dre"=1, "Cmi"=1, "Bla"=0.5, "Sp2"=0.5, "Sma"=0.5, "Ame"=0.5, "Dme"=0.5, "Cdi"=0.5, "Obi"=0.5, "Bge"=0.5, "BmA"=0.5, "Tca"=0.5)
+my_sets_color = c("Vertebrata"= "mediumorchid", "Deuterostoma"="olivedrab3", "Insecta"="tan3", "Protostoma"="yellow", "Bilateria"="firebrick1", "Outgroups"="dimgray")
+my_species_colors=c("Hs2"="#00BFFF", "Mm2"="#159DFF", "Bt2"="#1873CD", "Mdo"="#174B8B", "Gga"="#3F3F8B", "Xtr"="#64398B", "Dre"="#82359D", "Cmi"="#9932CC", "Bla"="#2E8B57", "Sp2"="#96B12B", "Obi"="#FFFF00", "Sma"="#FFCC33", "Cdi"="goldenrod", "Bge"="burlywood2", "Ame"="#FF9966", "Tca"="#FF6600", "BmA"="#CC6600", "Aae"="#993300", "Eba"="firebrick3", "Dme"="red")
+my_copy_status_colors = c("single_copy_ortholog"="gray18", "duplicated"="gray76")
+
+
+#Create named vector with PC and corresponding tissue
+PC_tissue_named_vector = c("1"="Neural", "2"="Testis", "3"="Ovary", 
+                          "4"="Muscle", "5"="Kidney", "6"="Epithelial", 
+                          "7"="DigestiveTract", "8"="Adipose")
+paletteLength = 75
+palette_brewer = colorRampPalette(rev(brewer.pal(11, "RdBu")))(paletteLength)
+```
+
+```{r functions, warning=FALSE, message=FALSE, echo=FALSE, dependson="setup"}
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+####################################
+####################################
+
+get_cor_table = function(input_table, query_species, my_tissue)  {
+  #select the Neural columns belonging to the set species
+  tissue_samples = colnames(input_table)[grep(my_tissue, colnames(input_table))]
+  #subset the table: only tissue samples
+  tissue_expr_table = input_table[,tissue_samples]
+  colnames(tissue_expr_table) = sub("_.*", "", colnames(tissue_expr_table))
+  set_species = colnames(tissue_expr_table)
+  #get target species depending on the species set
+  all_target_species = set_species
+  final_matrix =  vector()
+  if (!(query_species %in% colnames(tissue_expr_table))) {
+    final_table = c(query_species, NA, my_tissue, NA)
+      return(final_table)} else {
+  for (target_species in all_target_species) {
+    subsetted_table = tissue_expr_table[,c(query_species, target_species)]
+    subsetted_table = subsetted_table[complete.cases(subsetted_table),] #remove all rows containing one or two NAs
+    query_vector  = as.vector(subsetted_table[,query_species]) #isolate query vector
+    target_vector = as.vector(subsetted_table[,target_species]) #isolate target vector
+    rho = cor.test(query_vector, target_vector, method="spearman")$estimate #isolate rho
+    final_matrix = rbind(final_matrix, c(query_species, target_species, my_tissue, rho)) #append to final matrix
+  }
+  final_table = as.data.frame(final_matrix)
+  colnames(final_table) = c("species_query", "species_target", "tissue", "cor")
+  final_table$cor = as.numeric(as.vector(final_table$cor))
+  return(final_table)
+  }
+}
+
+####################################
+####################################
+
+plot_gene_expr = function(original_OG_ID, loadings_expr_df_long, OGID_humanID_dict, Vertebrata, Insecta, Outgroups) {
+  all_plots = list()
+  i = 1
+  for (clade in c("Vertebrata", "Insecta", "Outgroups")) {
+    my_OG_ID = paste0(OGID_humanID_dict$find(original_OG_ID), " ~ ", original_OG_ID)
+    OG_expr_df = subset(loadings_expr_df_long, OG_ID == original_OG_ID)
+    my_max = max(OG_expr_df$Expr, na.rm=TRUE)
+    my_min = min(OG_expr_df$Expr, na.rm=TRUE)
+    if (clade == "Vertebrata") {OG_expr_df = subset(OG_expr_df, Species %in% Vertebrata)}
+    if (clade == "Insecta") {OG_expr_df = subset(OG_expr_df, Species %in% Insecta)}
+    if (clade == "Outgroups") {OG_expr_df = subset(OG_expr_df, Species %in% Outgroups)}
+    
+    expr_plot = ggplot(data=OG_expr_df, aes(x=Tissue, y=Expr, fill=Tissue), color="black") +
+      geom_boxplot(alpha=0.7, outlier.shape = NA) +
+      geom_jitter(aes(shape=Species), width=0.2, fill="black") +
+      scale_fill_manual(values=my_color_vector) +
+      scale_shape_manual(values=my_shapes_vector) +
+      theme_bw() +
+      theme(axis.title = element_text(color="black"),
+            axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1)
+            ) +
+      guides(fill=FALSE) +
+      ggtitle(paste0(my_OG_ID, " ~ ", clade)) +
+      ylim(c(my_min, my_max))
+    
+    all_plots[[i]] = expr_plot
+    i = i+1
+  }
+  final_plot = plot_grid(all_plots[[1]], all_plots[[2]], all_plots[[3]], ncol=3, rel_widths = c(1,1,1))
+  return(final_plot)
+}
+
+
+####################################
+####################################
+
+get_density <- function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
+```
+
+```{r generate_metadata_table, echo=FALSE, warning=FALSE, message=FALSE, dependson="setup"}
+all_metadata_df = vector()
+for (species in all_species) {
+  file_species = species
+  if (species == "BmA") {file_species= "Bmo"}
+  metadata_df = unique(read.delim(paste0(metadata_dir, file_species, "_samples_info.tab"), header=TRUE)[,1:3])
+  colnames(metadata_df) = c("species", "tissues", "metasample")
+  metadata_df$species = rep(species, nrow(metadata_df)) #This is necessary only to translate Bmo to BmA
+  rownames(metadata_df) = paste0(rep(species, nrow(metadata_df)), "_", as.vector(metadata_df$metasample))
+  metadata_df$metasample = NULL
+  all_metadata_df = rbind(all_metadata_df, metadata_df)
+}
+colnames(all_metadata_df) = c("species", "tissues")
+
+sample_tissue_dict = hashmap(rownames(all_metadata_df), as.vector(all_metadata_df$tissues))
+sample_species_dict = hashmap(rownames(all_metadata_df), as.vector(all_metadata_df$species))
+```
+
+<!-- Panel A,B: tissue branches length -->
+```{r tissue_branches_lengths_v2, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup","functions"), fig.width=5, fig.height=5}
+all_branches_plots = list()
+i = 1
+for (clade in c("Vertebrata", "Insecta")) {
+  clade_values_df = read.delim(paste0(branches_length_dir, my_version, "/STRICT/Bilateria/conserved/Bilateria_conserved-tissue_average_expr-NOSVA-log2-TPMs-total_tree_lengths_bytissue-", clade, ".txt"), header=TRUE)
+  
+  #Remove adipose
+  clade_values_df = subset(clade_values_df, tissue!="Adipose")
+  #Reformat input df (just to be sure) 
+  clade_values_df$tissue = factor(clade_values_df$tissue, levels=ordered_tissues)
+  clade_values_df$values = as.numeric(as.vector(clade_values_df$values))
+  
+  ##### Plot
+  branches_length_plot = ggplot() +
+    #geom_boxplot(data=clade_values_df, aes(x=tissue, y=values, fill=tissue, color=tissue), alpha=0.5, outlier.shape = NA) +
+    geom_boxplot(data=clade_values_df, aes(x=tissue, y=values, fill=tissue), alpha=0.7, color="black", stroke=0.5, outlier.shape = NA) +
+    theme_bw() +
+    scale_fill_manual(values=my_color_vector) +
+    scale_color_manual(values=my_color_vector) +
+    ggtitle(clade) +
+    theme(axis.text.x = element_text(color="black", size=8, angle=30, hjust=1, vjust=1),
+          axis.text.y = element_text(color="black", size=8),
+          #axis.title.x = element_text(color="black", size=14),
+          axis.title.x = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+          #axis.ticks.x = element_blank(),
+          axis.title.y = element_text(color="black", size=12),
+          plot.title = element_text(color="black", size=14, hjust=0.5,)
+          ) +
+    ylab("Tot branch length") +
+    xlab("") +
+    #xlab(clade) +
+    guides(fill=FALSE,  color=FALSE) +
+    scale_y_continuous(breaks=number_ticks(8), limits=c(450, 620))
+    
+    all_branches_plots[[i]] = branches_length_plot
+    i = i+1
+}
+
+panel_A = plot_grid(all_branches_plots[[1]], all_branches_plots[[2]], align="v", ncol=2)
+print(panel_A)
+```
+
+<!-- Panel C,D -->
+<!-- Sequence similarities and expression correlations distribs -->
+```{r expr_cor_vs_seq_sim, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.height=5, fig.width=5}
+input_expr_cor_df = read.delim(paste0(general_patterns_dir, my_version, "/expression_correlations_spearman_by_clade-BH_genes-NORM.tab"), header=TRUE)
+
+expr_cor_joint_plot = ggplot(data=input_expr_cor_df) +
+  geom_density(aes(x=expression_correlations_spearman_insecta), color="tan3", alpha=0.5, fill="tan3") +
+  geom_density(aes(x=expression_correlations_spearman_vertebrata), color="darkorchid", alpha=0.5, fill="darkorchid") +
+  theme_bw() +
+  theme(axis.text = element_text(color="black"),
+        axis.title.x = element_text(color="black"),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(-0.5, 5.5, 5.5, 5.5), "pt")) +
+  scale_x_continuous(breaks = number_ticks(5)) +
+  scale_y_continuous(breaks = number_ticks(4), limits=c(0,3)) +
+  xlab("Average\nexpression correlation")
+
+print(expr_cor_joint_plot)
+
+input_seq_sim_df = read.delim(paste0(general_patterns_dir, my_version, "/sequence_similarities_by_clade-BH_genes.tab"), header=TRUE)
+seq_sim_joint_plot = ggplot(data=input_seq_sim_df) +
+  geom_density(aes(x=sequence_similarities_insecta), color="tan3", alpha=0.5, fill="tan3") +
+  geom_density(aes(x=sequence_similarities_vertebrata), color="darkorchid", alpha=0.5, fill="darkorchid") +
+  theme_bw() +
+  theme(axis.text = element_text(color="black"),
+        axis.title.x = element_text(color="black"),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(5.5, 5.5, -0.5, 5.5), "pt")) +
+  scale_x_continuous(breaks = number_ticks(6)) +
+  scale_y_continuous(breaks = number_ticks(4), limits=c(0,3)) +
+  xlab("Average\nsequence similarity")
+
+print(seq_sim_joint_plot)
+
+#Wilcoxon test to see if the two distributions are significantly different
+wilcoxon_res = wilcox.test(input_seq_sim_df$sequence_similarities_vertebrata, input_seq_sim_df$sequence_similarities_insecta)
+
+panel_CD = egg::ggarrange(seq_sim_joint_plot, expr_cor_joint_plot, ncol=1, labels=c("B", "C"), draw=FALSE)
+#panel_CD = plot_grid(seq_sim_joint_plot, expr_cor_joint_plot, ncol=1, labels=c("B", "C"), align="hv")
+#panel_CD = ggpubr::ggarrange(seq_sim_joint_plot, expr_cor_joint_plot, ncol=1, labels=c("B", "C"), align="hv")
+print(panel_CD)
+
+panel_CD_horizontal = egg::ggarrange(seq_sim_joint_plot, expr_cor_joint_plot, ncol=2, labels=c("B", "C"), draw=FALSE)
+print(panel_CD_horizontal)
+```
+
+<!--Panel E -->
+<!-- all dots density with the linear regreassion and the delta distributions on the side -->
+```{r seq_sim_vs_expr_cor_delta_BH_spearman_postNORM, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.height=5, fig.width=5}
+input_seq_sim_df = read.delim(paste0(general_patterns_dir, my_version, "/sequence_similarities_by_clade-BH_genes.tab"), header=TRUE)
+input_expr_cor_df = read.delim(paste0(general_patterns_dir, my_version, "/expression_correlations_spearman_by_clade-BH_genes-NORM.tab"), header=TRUE)
+combined_df = merge(input_seq_sim_df, input_expr_cor_df, by="OG_ID")
+combined_df = combined_df[,c("OG_ID", colnames(combined_df)[grep("delta", colnames(combined_df))])]
+
+#####################
+spearman_test = cor.test(combined_df$sequence_similarities_delta, combined_df$expression_correlations_spearman_delta, method="spearman")
+my_rho = unname(round(spearman_test$estimate, 3))
+my_pvalue = format(spearman_test$p.value, scientific = TRUE)
+
+#Delta distributions plots
+seq_sim_delta_plot = ggplot(data=combined_df) +
+  geom_density(aes(x=sequence_similarities_delta), color="firebrick1", alpha=0.5, fill="firebrick1") +
+  theme_void() +
+  theme(#axis.text.y = element_text(color="black", size=5),
+        #axis.text.x = element_blank(),
+        #axis.ticks.x = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank()) +
+  #scale_x_continuous(breaks = number_ticks(8)) +
+  scale_y_continuous(breaks = number_ticks(4), limits=c(0,3.5))
+
+#####################
+expr_cor_delta_plot = ggplot(data=combined_df) +
+  geom_density(aes(x=expression_correlations_spearman_delta), color="firebrick1", alpha=0.5, fill="firebrick1") +
+  theme_void() +
+  theme(#axis.text.x = element_text(color="black", size=5),
+        #axis.text.y = element_blank(),
+        #axis.ticks.y = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank()) +
+  #scale_x_continuous(breaks = number_ticks(8)) +
+  scale_y_continuous(breaks = number_ticks(4), limits=c(0,3.5)) +
+  #coord_cartesian(ylim=c(0,3.2)) +
+  coord_flip()
+
+#####################
+empty_plot = ggplot() + theme_void()
+
+#####################
+combined_df$density <- get_density(combined_df$sequence_similarities_delta, combined_df$expression_correlations_spearman_delta, n = 100)
+seq_sim_vs_expr_cor_delta_plot = ggplot(data=combined_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta, color=density)) +
+  geom_point(alpha=0.7) +
+  ggtitle("Some title TBD") +
+  #annotate("text", x=0.5, y=1.2, label=paste0("rho=", my_rho, "\np=", my_pvalue), size=3) +
+  geom_smooth(method='lm', formula= y~x, color="black", se=TRUE) +
+  scale_color_viridis(option = "plasma") +
+  theme_bw() +
+  theme(axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", hjust=0.5),
+        legend.position = "right") +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 0) +
+  xlab("Delta seq sim (V-I)") +
+  ylab("Delta expr cor (V-I)")
+
+Pearson_cor = cor.test(x=combined_df$sequence_similarities_delta, y=combined_df$expression_correlations_spearman_delta, method="pearson")
+Linear_model = lm(sequence_similarities_delta~expression_correlations_spearman_delta, data = combined_df)
+
+# panel_E = egg::ggarrange(seq_sim_delta_plot, seq_sim_vs_expr_cor_delta_plot, empty_plot, expr_cor_delta_plot, 
+#                        ncol=2, byrow = FALSE, 
+#                        heights = c(0.25,1), 
+#                        widths = c(1,0.25),
+#                        labels=c("E","","",""),
+#                        draw=FALSE)
+
+panel_E = seq_sim_vs_expr_cor_delta_plot 
+print(panel_E)
+```
+
+<!--Panel F -->
+<!-- all grey dots where I highlight the genes at each pole -->
+```{r seq_sim_vs_expr_cor_delta, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.height=5, fig.width=5}
+input_seq_sim_df = read.delim(paste0(general_patterns_dir, my_version, "/sequence_similarities_by_clade-BH_genes.tab"), header=TRUE)
+input_expr_cor_df = read.delim(paste0(general_patterns_dir, my_version, "/expression_correlations_spearman_by_clade-BH_genes-NORM.tab"), header=TRUE)
+combined_df = merge(input_seq_sim_df, input_expr_cor_df, by="OG_ID")
+combined_df = combined_df[,c("OG_ID", colnames(combined_df)[grep("delta", colnames(combined_df))])]
+
+##################################
+#Select top 500 most relatively slowly evolving genes per clade.
+vertebrata_expr_slow_evolving_df = combined_df[order(combined_df$expression_correlations_spearman_delta, decreasing=TRUE),][1:500,]
+insecta_expr_slow_evolving_df = combined_df[order(combined_df$expression_correlations_spearman_delta),][1:500,]
+vertebrata_seq_slow_evolving_df = combined_df[order(combined_df$sequence_similarities_delta, decreasing=TRUE),][1:500,]
+insecta_seq_slow_evolving_df = combined_df[order(combined_df$sequence_similarities_delta),][1:500,]
+
+combined_df$density <- get_density(combined_df$sequence_similarities_delta, combined_df$expression_correlations_spearman_delta, n = 100)
+
+ExprCons_plot = ggplot(data=combined_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta)) +
+  geom_point(color="dimgray", alpha=0.1) +
+  geom_point(data=insecta_expr_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta), color="goldenrod", alpha=0.4) +
+  geom_point(data=vertebrata_expr_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta), color="mediumorchid1", alpha=0.4) +
+  theme_bw() +
+  theme(axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", hjust=0.5)) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 0) +
+  xlab("Delta seq sim (V-I)") +
+  ylab("Delta expr cor (V-I)") +
+  ggtitle("ExprCons genes")
+
+##################################
+
+SeqCons_plot = ggplot(data=combined_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta)) +
+  geom_point(color="dimgray", alpha=0.1) +
+  geom_point(data=insecta_seq_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta), color="chocolate1", alpha=0.4) +
+  geom_point(data=vertebrata_seq_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta), color="darkorchid1", alpha=0.4) +
+  theme_bw() +
+  theme(axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", hjust=0.5)) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 0) +
+  xlab("Delta seq sim (V-I)") +
+  ylab("Delta expr cor (V-I)") +
+  ggtitle("SeqCons genes")
+
+##################################
+#panel_E = egg::ggarrange(SeqCons_plot, ExprCons_plot, ncol=1, labels=c("E","F"))
+
+insecta_exprcons_colors = "tan1"
+insecta_seqcons_colors = "tan4"
+vertebrata_exprcons_colors = "darkorchid1"
+vertebrata_seqcons_colors = "darkorchid4"
+
+joint_plot = ggplot(data=combined_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta)) +
+  geom_point(color="dimgray", alpha=0.1, stroke=0.5) +
+  geom_point(data=insecta_expr_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta),
+             color=insecta_exprcons_colors, fill=insecta_exprcons_colors, alpha=0.3, stroke=0.5) +
+  geom_point(data=vertebrata_expr_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta),
+             color=vertebrata_exprcons_colors, fill=vertebrata_exprcons_colors, alpha=0.3, stroke=0.5) +
+  geom_point(data=insecta_seq_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta),
+             color=insecta_seqcons_colors, fill=insecta_seqcons_colors, shape=21, alpha=0.3, stroke=0.5) +
+  geom_point(data=vertebrata_seq_slow_evolving_df, aes(x=sequence_similarities_delta, y=expression_correlations_spearman_delta),
+             color=vertebrata_seqcons_colors, fill=vertebrata_seqcons_colors, alpha=0.3, stroke=0.5) +
+  theme_bw() +
+  theme(axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", hjust=0.5)) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = 0) +
+  xlab("Delta seq sim (V-I)") +
+  ylab("Delta expr cor (V-I)") +
+  ggtitle("SeqCons and ExprCons genes")
+
+panel_F = joint_plot
+print(joint_plot)
+```
+
+<!--Panel G -->
+<!--Phenotype association -->
+```{r phenotype_association, echo=FALSE, message=FALSE, warning=FALSE, dependson="setup", fig.height=2, fig.width=3}
+quadrants_categories = c("Insecta_seq_slow_evolving", "Insecta_expr_slow_evolving", "Vertebrata_seq_slow_evolving", "Vertebrata_expr_slow_evolving")
+phenotype_categories = c("Mammals_and_fly", "Mammals_only", "Fly_only", "Neither_mammals_nor_fly")
+phenotype_categories_colors = c("Mammals_only"="darkorchid", "Fly_only"="tan3")
+
+insecta_exprcons_colors = "tan1"
+insecta_seqcons_colors = "tan4"
+vertebrata_exprcons_colors = "darkorchid1"
+vertebrata_seqcons_colors = "darkorchid4"
+
+gene_groups_colors = c("darkorchid4", "tan4",  "gray42", "darkorchid1", "tan1")
+
+phenotype_overlap_input_df = vector()
+for (category in quadrants_categories) {
+  input_df = read.delim(paste0(general_patterns_dir, my_version, "/phenotype_overlap/all_species-", category, "-phenotype_conservation_stats.txt"), header=TRUE)
+  input_df$Gene_group = rep(category, nrow(input_df))
+  phenotype_overlap_input_df = rbind(phenotype_overlap_input_df, input_df) 
+}
+
+###### Change gene groups to new labels (for consistency with the following plot)
+phenotype_overlap_input_df$Gene_group[phenotype_overlap_input_df$Gene_group=="Vertebrata_seq_slow_evolving"] = "Vertebrata_SeqCons"
+phenotype_overlap_input_df$Gene_group[phenotype_overlap_input_df$Gene_group=="Vertebrata_expr_slow_evolving"] = "Vertebrata_ExprCons"
+phenotype_overlap_input_df$Gene_group[phenotype_overlap_input_df$Gene_group=="Insecta_seq_slow_evolving"] = "Insecta_SeqCons"
+phenotype_overlap_input_df$Gene_group[phenotype_overlap_input_df$Gene_group=="Insecta_expr_slow_evolving"] = "Insecta_ExprCons"
+
+###### Add background info
+background_input_df = read.delim(paste0(splsda_dir, my_version, "/STRICT/Bilateria/conserved/phenotype_overlap/all_species-Bilateria_conserved-conservation_labels.txt"), header=TRUE)
+total_background = nrow(background_input_df)
+background_df = as.data.frame(table(background_input_df$Label))
+colnames(background_df) = c("Category", "Counts")
+background_df$Percentage = background_df$Counts/total_background 
+background_df$Gene_group = rep("Background", nrow(background_df))
+background_df$Category = firstup(as.vector(background_df$Category))
+
+phenotype_overlap_input_df = rbind(phenotype_overlap_input_df, background_df)
+
+###### Order factors
+category_levels = rev(c("Vertebrata_SeqCons", "Insecta_SeqCons", "Background", "Vertebrata_ExprCons", "Insecta_ExprCons"))
+
+#Gene Grop
+phenotype_overlap_input_df$Gene_group = gsub("_", "\n", phenotype_overlap_input_df$Gene_group)
+phenotype_overlap_input_df$Gene_group = factor(phenotype_overlap_input_df$Gene_group, levels=gsub("_", "\n", category_levels))
+
+###### Order factors
+phenotype_overlap_input_df = subset(phenotype_overlap_input_df, Category %in% c("Mammals_only", "Fly_only"))
+#phenotype_overlap_input_df$Category = factor(phenotype_overlap_input_df$Category, levels=c("Mammals_only", "Fly_only")) 
+
+phenotype_overlap_input_df$Category = factor(phenotype_overlap_input_df$Category, levels=rev(c("Mammals_only", "Fly_only"))) 
+
+phenotypes_barplot = ggplot(data=phenotype_overlap_input_df) +
+  geom_bar(aes(x=Counts, y=Gene_group, color=Category, fill=Category), stat = "identity", position=position_fill(), alpha=0.5, width = 0.4) +
+  geom_text(aes(x=Counts, y=Gene_group, label=Counts), position = position_fill(vjust=0.5)) +
+  theme_void() +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_fill_manual(values=phenotype_categories_colors) +
+  scale_color_manual(values=phenotype_categories_colors) +
+  theme(#axis.text.x = element_text(color="black", angle=60, hjust=1, vjust=1),
+        axis.text.x = element_text(color="black", angle=90, hjust=1, vjust=1, size=10),
+        axis.text.y = element_text(color=rev(gene_groups_colors)),
+        axis.ticks.x = element_line(),
+        plot.title = element_blank(),
+        axis.ticks.length.x = unit(0.5, "mm"),
+        axis.title = element_blank()) +
+        #legend.position = "bottom") +
+  guides(size=FALSE, fill=FALSE, color=FALSE)
+
+print(phenotypes_barplot)
+panel_G = phenotypes_barplot
+```
+
+<!-- panel H -->
+<!-- Dulpications across the SeqCons and ExprCons genes -->
+```{r duplications_plots, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.height=4, fig.width=6}
+#####################################
+#Duplications
+quadrants_categories = c("Insecta_seq_slow_evolving", "Insecta_expr_slow_evolving", "Vertebrata_seq_slow_evolving", "Vertebrata_expr_slow_evolving", "Background")
+
+all_categories_df = vector()
+for (category in quadrants_categories) {
+  input_df = read.delim(paste0(general_patterns_dir, my_version, "/duplications_analysis/", category, "-species_with_duplications_counts.tab"), header=TRUE)
+  all_categories_df = rbind(all_categories_df, input_df)
+}
+all_categories_df$Species_number = factor(all_categories_df$Species_number, levels=seq(0,8))
+
+#scale_fill_brewer(palette = "Blues") +
+my_clade = "Vertebrata"
+input_df = subset(all_categories_df, Clade==my_clade)
+input_df$Category = as.character(input_df$Category)
+if (my_clade=="Vertebrata") {my_palette="Purples"}
+if (my_clade=="Insecta") {my_palette="YlOrBr"}
+#Change the factor levels to make the interpretation easier
+if (my_clade=="Vertebrata") {
+  input_df$Category[input_df$Category=="Vertebrata_seq_slow_evolving"] = "Vertebrata_SeqCons"
+  input_df$Category[input_df$Category=="Vertebrata_expr_slow_evolving"] = "Vertebrata_ExprCons"
+  input_df$Category[input_df$Category=="Insecta_seq_slow_evolving"] = "Insecta_SeqCons"
+  input_df$Category[input_df$Category=="Insecta_expr_slow_evolving"] = "Insecta_ExprCons"
+}
+category_levels = rev(c("Vertebrata_SeqCons", "Insecta_SeqCons", "Background", "Vertebrata_ExprCons", "Insecta_ExprCons"))
+#input_df$Category = factor(input_df$Category, levels = category_levels)
+input_df$Category = gsub("_", "\n", input_df$Category)
+input_df$Category = factor(input_df$Category, levels=gsub("_", "\n", category_levels))
+
+duplications_barplot = ggplot(data=input_df, aes(x=Category, y=Genes_duplicated_in_species, fill=Species_number)) +
+  geom_bar(stat="identity", position = "fill", color="black", width=0.4, alpha=0.7) +
+  #geom_bar(stat="identity", color="black") +
+  #scale_fill_brewer(palette = my_palette) +
+  scale_fill_grey(start=1, end=0) +
+  scale_x_discrete(expand = c(0, 0)) +
+  theme_void() +
+  theme(axis.text.x = element_text(color="black", angle=90, hjust=1, vjust=1, size=10),
+        axis.text.y = element_blank(),
+        plot.title = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_line(),
+        axis.ticks.length.x = unit(0.5, "mm")) +
+  coord_flip() +
+  guides(fill=FALSE)
+  #ggtitle(paste0("Duplications in ", my_clade))
+print(duplications_barplot)
+
+#panel_GH = egg::ggarrange(phenotypes_barplot, duplications_barplot, ncol=2, widths = c(0.35,1), draw=FALSE, labels=c("G","H"))
+#panel_GH = egg::ggarrange(phenotypes_barplot, duplications_barplot, ncol=2, widths = c(1,1), draw=FALSE, labels=c("G","H"))
+panel_GH = plot_grid(phenotypes_barplot, duplications_barplot, ncol=2, rel_widths = c(1,0.6), align="h")
+print(panel_GH)
+```
+
+```{r duplications_plots_legend, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.height=4, fig.width=6}
+#####################################
+#Duplications
+quadrants_categories = c("Insecta_seq_slow_evolving", "Insecta_expr_slow_evolving", "Vertebrata_seq_slow_evolving", "Vertebrata_expr_slow_evolving", "Background")
+
+all_categories_df = vector()
+for (category in quadrants_categories) {
+  input_df = read.delim(paste0(general_patterns_dir, my_version, "/duplications_analysis/", category, "-species_with_duplications_counts.tab"), header=TRUE)
+  all_categories_df = rbind(all_categories_df, input_df)
+}
+all_categories_df$Species_number = factor(all_categories_df$Species_number, levels=seq(0,8))
+
+#scale_fill_brewer(palette = "Blues") +
+my_clade = "Vertebrata"
+input_df = subset(all_categories_df, Clade==my_clade)
+input_df$Category = as.character(input_df$Category)
+if (my_clade=="Vertebrata") {my_palette="Purples"}
+if (my_clade=="Insecta") {my_palette="YlOrBr"}
+#Change the factor levels to make the interpretation easier
+if (my_clade=="Vertebrata") {
+  input_df$Category[input_df$Category=="Vertebrata_seq_slow_evolving"] = "Vertebrata_SeqCons"
+  input_df$Category[input_df$Category=="Vertebrata_expr_slow_evolving"] = "Vertebrata_ExprCons"
+  input_df$Category[input_df$Category=="Insecta_seq_slow_evolving"] = "Insecta_SeqCons"
+  input_df$Category[input_df$Category=="Insecta_expr_slow_evolving"] = "Insecta_ExprCons"
+}
+category_levels = rev(c("Vertebrata_SeqCons", "Insecta_SeqCons", "Background", "Vertebrata_ExprCons", "Insecta_ExprCons"))
+#input_df$Category = factor(input_df$Category, levels = category_levels)
+input_df$Category = gsub("_", "\n", input_df$Category)
+input_df$Category = factor(input_df$Category, levels=gsub("_", "\n", category_levels))
+
+duplications_barplot = ggplot(data=input_df, aes(x=Category, y=Genes_duplicated_in_species, fill=Species_number)) +
+  geom_bar(stat="identity", position = "fill", color="black", width=0.4, alpha=0.7) +
+  #geom_bar(stat="identity", color="black") +
+  #scale_fill_brewer(palette = my_palette) +
+  scale_fill_grey(start=1, end=0) +
+  scale_x_discrete(expand = c(0, 0)) +
+  theme_void() +
+  theme(axis.text.x = element_text(color="black", angle=90, hjust=1, vjust=1, size=10),
+        axis.text.y = element_blank(),
+        plot.title = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_line(),
+        axis.ticks.length.x = unit(0.5, "mm")) +
+  coord_flip()
+  #ggtitle(paste0("Duplications in ", my_clade))
+print(duplications_barplot)
+
+ggsave("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/Fig3-duplication_barplot-legend.pdf", duplications_barplot, device="pdf")
+
+#panel_GH = egg::ggarrange(phenotypes_barplot, duplications_barplot, ncol=2, widths = c(0.35,1), draw=FALSE, labels=c("G","H"))
+#panel_GH = egg::ggarrange(phenotypes_barplot, duplications_barplot, ncol=2, widths = c(1,1), draw=FALSE, labels=c("G","H"))
+panel_GH = plot_grid(phenotypes_barplot, duplications_barplot, ncol=2, rel_widths = c(1,0.6), align="h")
+print(panel_GH)
+```
+
+<!-- panel I: GO networks from Revigo -->
+
+<!-- Extra GO enrichments for ExprCons and SeqCons genes -->
+```{r extra_GO_enrichments_SeqCons_and_ExprCons, warning=FALSE, message=FALSE, echo=FALSE, dependson=c("setup", "functions")}
+output_dir = paste0(home, "projects/bilaterian_GE/data/vertebrates_vs_insects_general_patterns/All_version2/GO_enrichments/expanded_and_collapsed_sets/")
+
+input_seq_sim_df = read.delim(paste0(general_patterns_dir, my_version, "/sequence_similarities_by_clade-BH_genes.tab"), header=TRUE)
+input_expr_cor_df = read.delim(paste0(general_patterns_dir, my_version, "/expression_correlations_spearman_by_clade-BH_genes-NORM.tab"), header=TRUE)
+combined_df = merge(input_seq_sim_df, input_expr_cor_df, by="OG_ID")
+combined_df = combined_df[,c("OG_ID", colnames(combined_df)[grep("delta", colnames(combined_df))])]
+
+##################################
+##### Select top 250 most relatively slowly evolving genes per clade.
+vertebrata_expr_slow_evolving_df = combined_df[order(combined_df$expression_correlations_spearman_delta, decreasing=TRUE),][1:250,]
+insecta_expr_slow_evolving_df = combined_df[order(combined_df$expression_correlations_spearman_delta),][1:250,]
+vertebrata_seq_slow_evolving_df = combined_df[order(combined_df$sequence_similarities_delta, decreasing=TRUE),][1:250,]
+insecta_seq_slow_evolving_df = combined_df[order(combined_df$sequence_similarities_delta),][1:250,]
+
+#Save to file
+write.table(as.vector(vertebrata_expr_slow_evolving_df$OG_ID), paste0(output_dir, "Vertebrata_expr_slow_evolving-250_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(as.vector(insecta_expr_slow_evolving_df$OG_ID), paste0(output_dir,"Insecta_expr_slow_evolving-250_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(as.vector(vertebrata_seq_slow_evolving_df$OG_ID), paste0(output_dir,"Vertebrata_seq_slow_evolving-250_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(as.vector(insecta_seq_slow_evolving_df$OG_ID), paste0(output_dir,"Insecta_seq_slow_evolving-250_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+
+###### Select top 750 most relatively slowly evolving genes per clade.
+vertebrata_expr_slow_evolving_df = combined_df[order(combined_df$expression_correlations_spearman_delta, decreasing=TRUE),][1:750,]
+insecta_expr_slow_evolving_df = combined_df[order(combined_df$expression_correlations_spearman_delta),][1:750,]
+vertebrata_seq_slow_evolving_df = combined_df[order(combined_df$sequence_similarities_delta, decreasing=TRUE),][1:750,]
+insecta_seq_slow_evolving_df = combined_df[order(combined_df$sequence_similarities_delta),][1:750,]
+
+#Save to file
+write.table(as.vector(vertebrata_expr_slow_evolving_df$OG_ID), paste0(output_dir,"Vertebrata_expr_slow_evolving-750_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(as.vector(insecta_expr_slow_evolving_df$OG_ID), paste0(output_dir,"Insecta_expr_slow_evolving-750_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(as.vector(vertebrata_seq_slow_evolving_df$OG_ID), paste0(output_dir,"Vertebrata_seq_slow_evolving-750_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+write.table(as.vector(insecta_seq_slow_evolving_df$OG_ID), paste0(output_dir,"Insecta_seq_slow_evolving-750_OGs-GO_input.txt"), quote=FALSE, col.names=FALSE, row.names=FALSE)
+```
