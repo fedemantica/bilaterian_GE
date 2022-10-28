@@ -1,0 +1,2399 @@
+---
+title: "Fig5 v3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#set Knitr option
+knitr::opts_chunk$set(echo = TRUE)
+knitr::knit_engines$set(python = reticulate::eng_python)
+
+#upload libraries
+library(ggplot2)
+library(mixOmics)
+library(hashmap)
+library(reshape2)
+library(pheatmap)
+library(RColorBrewer)
+library(cowplot)
+library(tidyverse)
+library(viridis)
+library(gridExtra)
+library(egg)
+library(plotly)
+library(ggrepel)
+library(pathview)
+library(gage)
+library(ggtree)
+library(ape)
+library(purrr)
+library(ggh4x)
+library(ggpubr)
+library(forcats)
+library(ggridges)
+library(ggalluvial)
+library(data.table)
+
+#set directories
+home="/Users/federica/mnt/"
+ts_call_dir=paste0(home, "projects/bilaterian_GE/data/ts_call/")
+splsda_dir = paste0(home, "projects/bilaterian_GE/data/splsda_analysis/")
+tau_dir = paste0(home, "projects/bilaterian_GE/data/ts_call/species_QN_5_TPM_taus/")
+original_tau_dir = paste0(home, "projects/bilaterian_GE/data/ts_call/taus/")
+gene_sets_dir=paste0(home, "projects/bilaterian_GE/data/gene_sets/")
+randomization_dir=paste0(home, "projects/bilaterian_GE/data/ts_call/QN_randomizations/")
+evo_distances_dir = paste0(home, "projects/bilaterian_GE/data/evo_distances/")
+ts_gains_losses_dir = paste0(home, "projects/bilaterian_GE/data/ts_gains_losses/species_QN_5_TPM_v6/")
+GO_transfers_dir = paste0(home, "projects/bilaterian_GE/data/GO_transfers/")
+intergenic_dist_dir = paste0(home, "projects/bilaterian_GE/data/ts_intergenic_regions/")
+# #tissue_expr_dir=paste0(home, "projects/bilaterian_GE/data/preprocessing/average_expr_by_tissue/")
+# pca_dir=paste0(home, "projects/bilaterian_GE/data/pca_analysis_all_norms/")
+# metadata_dir=paste0(home, "projects/bilaterian_GE/data/samples_metadata/")
+# splsda_dir= paste0(home, "projects/bilaterian_GE/data/splsda_analysis/")
+# diff_expr_dir = paste0(home, "projects/bilaterian_GE/data/differential_expression/")
+# general_patterns_dir = paste0(home, "projects/bilaterian_GE/data/vertebrates_vs_insects_general_patterns/")
+# branches_length_dir = paste0(home, "projects/bilaterian_GE/data/branches_length_analysis/")
+
+#set variables
+my_version = "All_version2"
+my_category = "STRICT"
+my_evo_type = "conserved"
+clades = c("Vertebrata", "Insecta", "Bilateria")
+clades_PCA = c("Vertebrata", "Insecta", "Bilateria")
+options("scipen"=100, "digits"=4)
+
+all_species = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+ordered_species_tree = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", rev(c("Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")))
+ordered_species = all_species
+Bilateria = all_species
+Vertebrata = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi")
+Insecta = c("Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi")
+Outgroups = c("Bla", "Sp2", "Sma", "Obi")
+all_tissues=c("Adipose", "DigestiveTract", "Kidney", "Epithelial", "Muscle", "Neural", "Ovary", "Testis")
+ordered_tissues = c("Neural", "Testis", "Ovary", "Muscle", "Kidney", "Epithelial", "DigestiveTract", "Adipose")
+
+#set aestetics vectors
+my_color_vector = c("Neural"="mediumblue", "Testis"="violet", "Ovary"="darkorchid", "Muscle"="springgreen3", 
+                    "Kidney"="gold", "Epithelial"="steelblue1", "DigestiveTract"="chocolate1", "Adipose"="firebrick1")
+my_shapes_vector = c("Hs2"=0, "Mm2"=1, "Bt2"=2, "Mdo"=3, "Gga"=4, "Xtr"=5, "Dre"=6, "Cmi"=7, "Bla"=9, "Sp2"=8, 
+                     "Dme"=15, "Eba"=18, "Aae"= 23, "BmA"=25, "Tca"=17, "Bge"=10, "Ame"=16, "Cdi"=13, "Sma"=14, "Obi"=11)
+my_alpha_vector=c("Hs2"=1, "Mm2"=1, "Bt2"=1, "Mdo"=1, "Gga"=1, "Xtr"=1, "Dre"=1, "Cmi"=1, "Bla"=0.5, "Sp2"=0.5, "Sma"=0.5, "Ame"=0.5, "Dme"=0.5, "Cdi"=0.5, "Obi"=0.5, "Bge"=0.5, "BmA"=0.5, "Tca"=0.5)
+my_sets_color = c("Vertebrata"= "mediumorchid", "Deuterostoma"="olivedrab3", "Insecta"="tan3", "Protostoma"="yellow", "Bilateria"="firebrick1", "Outgroups"="dimgray")
+my_species_colors=c("Hs2"="#00BFFF", "Mm2"="#159DFF", "Bt2"="#1873CD", "Mdo"="#174B8B", "Gga"="#3F3F8B", "Xtr"="#64398B", "Dre"="#82359D", "Cmi"="#9932CC", "Bla"="#2E8B57", "Sp2"="#96B12B", "Obi"="#FFFF00", "Sma"="#FFCC33", "Cdi"="goldenrod", "Bge"="burlywood2", "Ame"="#FF9966", "Tca"="#FF6600", "Bmo"="#CC6600", "Aae"="#993300", "Eba"="firebrick3", "Dme"="red")
+my_copy_status_colors = c("single_copy_ortholog"="gray18", "duplicated"="gray76")
+my_branch_colors = c("Deuterostoma"="olivedrab3", "Protostoma"="tan3", "Bilateria"="firebrick1")
+my_ancestral_colors = c("Ancestral"="dimgray", "Species_specific"="coral3")
+
+#Create named vector with PC and corresponding tissue
+PC_tissue_named_vector = c("1"="Neural", "2"="Testis", "3"="Ovary", 
+                          "4"="Muscle", "5"="Kidney", "6"="Epithelial", 
+                          "7"="DigestiveTract", "8"="Adipose")
+paletteLength = 75
+palette_brewer = colorRampPalette(rev(brewer.pal(11, "RdBu")))(paletteLength)
+
+multi_tissues_vector = c(ordered_tissues, "MultiTS")
+multi_tissues_color_vector = c(my_color_vector, "MultiTS"="black")
+
+
+####### Variables neeeded to plot the tree
+Bilateria = all_species
+Euarchontoglires = c("Hs2", "Mm2")
+Eutheria = c(Euarchontoglires, "Bt2")
+Mammalia = c(Eutheria, "Mdo")
+Amniota = c(Mammalia, "Gga")
+Tetrapoda = c(Amniota, "Xtr")
+Euteleostomi = c(Tetrapoda, "Dre")
+Vertebrata = c(Euteleostomi, "Cmi")
+Chordata = c(Vertebrata, "Bla")
+Deuterostoma = c(Chordata, "Sp2")
+Cyclorrapha = c("Dme", "Eba")
+Diptera = c(Cyclorrapha, "Aae")
+Panorpidae = c(Diptera, "Bmo")
+Oligoneoptera = c(Panorpidae, "Tca")
+Holometabola = c(Oligoneoptera, "Ame")
+Neoptera = c(Holometabola, "Bge")
+Insecta = c(Neoptera, "Cdi")
+Arthropoda = c(Insecta, "Sma")
+Protostoma = c(Arthropoda, "Obi")
+
+all_ancestors = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma",
+              "Bilateria", "Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma")
+
+all_ancestors_colors = c("Euarchontoglires"="#159DFF",
+                         "Eutheria" = "#1873CD",
+                         "Mammalia" = "#174B8B",
+                         "Amniota" = "#3F3F8B",  
+                         "Tetrapoda" =  "#64398B",
+                         "Euteleostomi" = "#82359D",
+                         "Vertebrata" = "#9932CC",
+                         "Chordata" = "#2E8B57",
+                         "Deuterostoma" = "#96B12B",
+                         "Cyclorrapha" = "firebrick3",
+                         "Diptera" = "#993300",
+                         "Panorpidae" = "#CC6600",
+                         "Oligoneoptera" = "#FF6600", 
+                         "Holometabola" = "#FF9966",
+                         "Neoptera" = "burlywood2",
+                         "Insecta" = "goldenrod",
+                         "Arthropoda" = "#FFCC33",
+                         "Protostoma" = "#FFFF00",
+                         "species\nspecific" = "gray71")
+
+clade_species = c("Euarchontoglires" = list(Euarchontoglires),
+                  "Eutheria" = list(Eutheria),
+                  "Mammalia" = list(Mammalia),
+                  "Amniota" = list(Amniota),
+                  "Tetrapoda" = list(Tetrapoda),
+                  "Euteleostomi" = list(Euteleostomi),
+                  "Vertebrata" = list(Vertebrata),
+                  "Chordata" = list(Chordata),
+                  "Deuterostoma" = list(Deuterostoma),
+                  "Cyclorrapha" = list(Cyclorrapha),
+                  "Diptera" = list(Diptera),
+                  "Panorpidae" = list(Panorpidae),
+                  "Oligoneoptera" = list(Oligoneoptera),
+                  "Holometabola" = list(Holometabola),
+                  "Neoptera" = list(Neoptera),
+                  "Insecta" = list(Insecta),
+                  "Arthropoda" = list(Arthropoda),
+                  "Protostoma" = list(Protostoma),
+                  "Bilateria" = list(Bilateria),
+                  "Hs2" = "Hs2", "Mm2" = "Mm2", "Bt2" = "Bt2", "Mdo" = "Mdo", "Gga" = "Gga", "Xtr" = "Xtr", "Dre" = "Dre", "Cmi" = "Cmi",
+                  "Bla" = "Bla", "Sp2" = "Sp2", "Sma" = "Sma", "Obi" = "Obi",
+                  "Dme" = "Dme", "Eba" = "Eba", "Aae" = "Aae", "Bmo" = "Bmo", "Tca" = "Tca", "Ame" = "Ame", "Bge" = "Bge", "Cdi" = "Cdi")
+
+
+node_x_position = c("Hs2"=1, "Euarchontoglires"=1.5, "Mm2"=2, "Eutheria"=2, "Bt2"=3, "Mammalia"=2.5,
+                    "Mdo"=4, "Amniota"=3, "Gga"=5, "Tetrapoda"=3.5, "Xtr"=6, "Euteleostomi"=4,
+                    "Dre"=7, "Vertebrata"=4.5, "Cmi"=8, "Chordata"=5, "Bla"=9, "Deuterostoma"=5.5, "Sp2"=10,
+                    "Bilateria" = 11,
+                    "Dme"=21, "Cyclorrapha"=20.5, "Eba"=20, "Diptera"=20, "Aae"=19, "Panorpidae"=19.5,
+                    "Bmo"=18, "Oligoneoptera"=19, "Tca"=17, "Holometabola"=18.5, "Ame"=16, "Neoptera"=18,
+                    "Bge"=15, "Insecta"=17.5, "Cdi"=14, "Arthropoda"=17, "Sma"=13, "Protostoma"=16.5, "Obi"=12)
+
+node_y_position = c("Hs2"=1, "Euarchontoglires"=2, "Mm2"=1, "Eutheria"=3, "Bt2"=1, "Mammalia"=4,
+                    "Mdo"=1, "Amniota"=5, "Gga"=1, "Tetrapoda"=6, "Xtr"=1, "Euteleostomi"=7,
+                    "Dre"=1, "Vertebrata"=8, "Cmi"=1, "Chordata"=9, "Bla"=1, "Deuterostoma"=10, "Sp2"=1,
+                    "Bilateria" = 11,
+                    "Dme"=1, "Cyclorrapha"=2, "Eba"=1, "Diptera"=3, "Aae"=1, "Panorpidae"=4,
+                    "Bmo"=1, "Oligoneoptera"=5, "Tca"=1, "Holometabola"=6, "Ame"=1, "Neoptera"=7,
+                    "Bge"=1, "Insecta"=8, "Cdi"=1, "Arthropoda"=9, "Sma"=1, "Protostoma"=10, "Obi"=1)
+
+node_x_labels = c("1.0"="Hs2", "1.5"="", "2.0"="Mm2", "2.5"="", "3.0"="Bt2", "3.5"="", "4.0"="Mdo", "4.5"="", "5.0"="Gga", "5.5"="",
+                  "6.0"="Xtr", "7.0"="Dre", "8.0"="Cmi", "9.0"="Bla", "10.0"="Sp2",
+                   "11.0"="",
+                   "12.0"="Obi", "13.0"="Sma", "14.0"="Cdi", "15.0"="Bge", "16.0"="Ame", "16.5"="", "17.0"="Tca", "17.5"="", "18.0"="Bmo",
+                  "18.5"="", "19.0"="Aae", "19.5"="", "20.0"="Eba", "20.5"="", "21.0"="Dme")
+
+multi_tissues_vector = c(ordered_tissues, "MultiTS")
+multi_tissues_color_vector = c(my_color_vector, "MultiTS"="black")
+
+deuterostoma_y_labels = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma", "Bilateria")
+protostoma_y_labels = c("Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma", "Bilateria")
+
+
+####### Get sub-ancestors
+sub_Euarchontoglires = c("Hs2","Mm2")
+sub_Eutheria = c("Euarchontoglires")
+sub_Mammalia = c(sub_Eutheria, "Eutheria")
+sub_Amniota = c(sub_Mammalia, "Mammalia")
+sub_Tetrapoda = c(sub_Amniota, "Amniota")
+sub_Euteleostomi = c(sub_Tetrapoda, "Tetrapoda")
+sub_Vertebrata = c(sub_Euteleostomi, "Euteleostomi")
+sub_Chordata = c(sub_Vertebrata, "Vertebrata")
+sub_Deuterostoma = c(sub_Chordata, "Chordata")
+sub_Cyclorrapha = c("Dme","Eba")
+#sub_Diptera = c(sub_Cyclorrapha, "Cyclorrapha")
+sub_Diptera = c("Cyclorrapha")
+sub_Panorpidae = c(sub_Diptera, "Diptera")
+sub_Oligoneoptera = c(sub_Panorpidae, "Panorpidae")
+sub_Holometabola = c(sub_Oligoneoptera, "Oligoneoptera")
+sub_Neoptera = c(sub_Holometabola, "Holometabola")
+sub_Insecta = c(sub_Neoptera, "Neoptera")
+sub_Arthropoda = c(sub_Insecta, "Insecta")
+sub_Protostoma = c(sub_Arthropoda, "Arthropoda")
+sub_Bilateria = c(sub_Deuterostoma, sub_Protostoma)
+```
+
+```{r functions, warning=FALSE, message=FALSE, echo=FALSE, dependson="setup"}
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+
+####################################
+####################################
+
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+####################################
+####################################
+
+get_density <- function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
+####################################
+####################################
+
+plot_ts_genes_stats = function(annotation_row_df, ordered_tissues) {
+  my_extra_color_vector = c("Adipose"="firebrick1", "Neural"="mediumblue", "Muscle"="springgreen3", "Ovary"="darkorchid", "Kidney"="gold", "Testis"="violet", "DigestiveTract"="chocolate1", "Epithelial"="steelblue1", "no_tissue"="white")
+  ordered_tissue_combs = rev(names(table(annotation_row_df$Tissue)[order(table(annotation_row_df$Tissue))]))
+  #Modify input
+  annotation_row_df$Tissue = factor(annotation_row_df$Tissue, levels=ordered_tissue_combs)
+  TS_genes_number_plot = ggplot(data=annotation_row_df) +
+    geom_bar(aes(x=Tissue), stat="count", fill="darkgray", color="darkgray", alpha=0.8) +
+    theme_bw() +
+    geom_text(stat="count", aes(x=Tissue, label=..count..), vjust=-1, size=3) + #add count on top of barplot
+    ylab("Number of TS genes") +
+    ggtitle("Number of TS genes by tissue") +
+    theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks = element_blank(),
+        title = element_text(size=12, color="black"),
+        panel.background = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank()) +
+    scale_y_continuous(breaks=number_ticks(15), 
+                       limits = c(0, max(unname(table(annotation_row_df$Tissue)))+60))
+  
+  #Build input for UpSet-like kind of plot
+  shared_tissues_df = data.frame(tissue_comb=unique(as.vector(annotation_row_df$Tissue)))
+  for (i in seq(length(ordered_tissues))) {
+    shared_tissues_df$tissue = as.vector(shared_tissues_df$tissue_comb)
+    shared_tissues_df$tissue[grep(ordered_tissues[i], shared_tissues_df$tissue_comb)] = ordered_tissues[i]
+    shared_tissues_df$tissue[grep(ordered_tissues[i], shared_tissues_df$tissue_comb, invert=TRUE)] = "no_tissue"
+    colnames(shared_tissues_df)[ncol(shared_tissues_df)] = ordered_tissues[i]
+  }
+  
+  shared_tissues_long_df = melt(shared_tissues_df, id.vars = "tissue_comb")
+  shared_tissues_long_df$tissue_comb = factor(shared_tissues_long_df$tissue_comb, levels=ordered_tissue_combs)
+  colnames(shared_tissues_long_df) = c("tissue_comb", "tissue", "status")
+  shared_tissues_long_df$tissue = factor(shared_tissues_long_df$tissue, levels=rev(ordered_tissues))
+  shared_tissues_long_df = subset(shared_tissues_long_df, status != "no_tissue")
+  
+  shared_tissues_plot = ggplot(data=shared_tissues_long_df, aes(x=tissue_comb, y=tissue, group=tissue_comb)) +
+    geom_line() +
+    geom_point(aes(x=tissue_comb, y=tissue, fill=status), color="black", shape=21, size=3) +
+    scale_fill_manual(values=my_extra_color_vector) +
+    theme_bw() +
+    theme(axis.title.x = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(color="black", size=10),
+        axis.text.x=element_blank(),
+        panel.background = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.border = element_blank()) +
+    ylab("Tissues") +
+    guides(fill=FALSE)
+  
+  final_plot = plot_grid(TS_genes_number_plot, shared_tissues_plot, align="v", rel_heights = c(1,0.6), ncol=1)
+  return(final_plot)
+}
+
+####################################
+get_density <- function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
+
+####################################
+see_pathview <- function(..., save_image = FALSE)
+{
+  msg <- capture.output(pathview::pathview(...), type = "message")
+  msg <- grep("image file", msg, value = T)
+  filename <- sapply(strsplit(msg, " "), function(x) x[length(x)])
+  img <- png::readPNG(filename)
+  grid::grid.raster(img)
+  if(!save_image) invisible(file.remove(filename))
+}
+
+#######################################
+########## Tree function ##############
+#######################################
+tree_y <-  function(ggtree, data){
+  if(!inherits(ggtree, "ggtree"))
+    stop("not a ggtree object")
+  left_join(dplyr::select(data, label), dplyr::select(ggtree$data, label, y)) %>%
+    pull(y)
+}
+
+#This is just to see if I can actually paier a ggtree with a ggplot decently.
+# overwrite the default expand for continuous scales
+scale_y_tree <- function(expand=expand_scale(0, 0.6), ...){
+    scale_y_continuous(expand=expand, ...)
+}
+
+# get the range of the ggtree y-axis data
+tree_ylim <- function(ggtree){
+  if(!inherits(ggtree, "ggtree"))
+    stop("not a ggtree object")
+  range(ggtree$data$y)
+}
+
+# plot data next to a ggtree aligned by shared labels
+ggtreeplot <- function(ggtree, data = NULL, mapping = aes(), flip=FALSE,
+     expand_limits=expand_scale(0,.6), ...){
+  
+  if(!inherits(ggtree, "ggtree"))
+    stop("not a ggtree object")
+
+  # match the tree limits
+  limits <- tree_ylim(ggtree)
+  limits[1] <- limits[1] + (limits[1] * expand_limits[1]) - expand_limits[2]
+  limits[2] <- limits[2] + (limits[2] * expand_limits[3]) + expand_limits[4]
+  
+  if(flip){
+    mapping <- modifyList(aes_(x=~x), mapping)
+    data <- mutate(data, x=tree_y(ggtree, data))
+    gg <- ggplot(data=data, mapping = mapping, ...) +
+      scale_x_continuous(limits=limits, expand=c(0,0))
+  }else{
+    mapping <- modifyList(aes_(y=~y), mapping)
+    data <- mutate(data, y=tree_y(ggtree, data))
+    gg <- ggplot(data=data, mapping = mapping, ...) +
+      scale_y_continuous(limits=limits, expand=c(0,0))
+  }
+  gg
+}
+
+#######################################
+########## Randomizations #############
+#######################################
+
+get_random_labels_stats = function(ts_long_df) {
+  final_mat = vector()
+  current_species = vector()
+  for (index in seq(1, length(ordered_species))) {
+    new_species = ordered_species[index]
+    current_species = c(current_species, new_species)
+    current_OGs_df = subset(ts_long_df, Species %in% current_species) #Select the orthogroups containing at least one of the species
+    current_OGs_num = length(unique(as.vector(current_OGs_df$OG_ID)))
+    TS_OGs_df = subset(current_OGs_df, TS_labels == "TS")
+    TS_OGs_num = length(unique(as.vector(TS_OGs_df$OG_ID)))
+    TS_OGs_proportion = TS_OGs_num/current_OGs_num
+    final_mat = rbind(final_mat, c(length(current_species), TS_OGs_num, TS_OGs_proportion, new_species))
+  }
+  colnames(final_mat) = c("Species_number", "TS_OG_number", "TS_OG_proportion", "new_species")
+  final_df = as.data.frame(final_mat)
+  final_df$TS_OG_number = as.numeric(as.vector(final_df$TS_OG_number))
+  final_df$TS_OG_proportion = as.numeric(as.vector(final_df$TS_OG_proportion))
+  final_df$Species_number = as.numeric(as.vector(final_df$Species_number))
+  final_df$new_species = as.character(final_df$new_species)
+  return(final_df)
+}
+
+#######################################
+######## TS gains and losses ##########
+#######################################
+
+plot_tree_structure = function(node_x_position, node_y_position, node_x_labels) {
+  ancestors = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma",
+                "Bilateria", "Hs2", "Dme",
+                "Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma")
+  deuterostoma_side = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma")
+  protostoma_side = c("Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma")
+  
+  node_y_values = unique(as.numeric(unname(node_y_position))[as.numeric(unname(node_y_position)) != 1])
+  deuterostoma_y_labels = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma", "")
+  protostoma_y_labels = c("Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma", "")
+  
+  node_x_position_dict = hashmap(names(node_x_position), unname(node_x_position))
+  node_y_position_dict = hashmap(names(node_y_position), unname(node_y_position))
+  
+  tree_input_df = data.frame(Node=c(all_species, all_ancestors))
+  #Add coordinates for each node
+  tree_input_df$Node_x_position = node_x_position_dict$find(tree_input_df$Node)
+  tree_input_df$Node_y_position = node_y_position_dict$find(tree_input_df$Node)
+  #Add groups so that lines between all ancestors and all pairs will be drawn.
+  tree_input_df$ancestor_state = rep("none", nrow(tree_input_df))
+  tree_input_df$ancestor_state[tree_input_df$Node %in% ancestors] = "ancestor"
+  #Add side of the tree (Deuterostoma or Protostoma)
+  
+  #This is long and manual
+  tree_input_df$node_state = rep("none", nrow(tree_input_df))
+  tree_input_df$node_state[tree_input_df$Node %in% c("Mm2", "Euarchontoglires")] = "Euarchontoglires"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bt2", "Eutheria")] = "Eutheria"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Mdo", "Mammalia")] = "Mammalia"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Gga", "Amniota")] = "Amniota"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Xtr", "Tetrapoda")] = "Tetrapoda"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Dre", "Euteleostomi")] = "Euteleostomi"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Cmi", "Vertebrata")] = "Vertebrata"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bla", "Chordata")] = "Chordata"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Sp2", "Deuterostoma")] = "Deuterostoma"
+  
+  tree_input_df$node_state[tree_input_df$Node %in% c("Eba", "Cyclorrapha")] = "Cyclorrapha"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Aae", "Diptera")] = "Diptera"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bmo", "Panorpidae")] = "Panorpidae"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Tca", "Oligoneoptera")] = "Oligoneoptera"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Ame", "Holometabola")] = "Holometabola"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bge", "Neoptera")] = "Neoptera"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Cdi", "Insecta")] = "Insecta"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Sma", "Arthropoda")] = "Arthropoda"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Obi", "Protostoma")] = "Protostoma"
+  
+  ts_gains_plot = ggplot(data=tree_input_df, aes(x=Node_x_position, y=Node_y_position)) +
+    geom_line(data=subset(tree_input_df, ancestor_state=="ancestor"), 
+              aes(group=ancestor_state),
+              color="dimgray") +
+    geom_line(data=subset(tree_input_df, node_state!="none"), 
+              aes(group=node_state),
+              color="dimgray") +
+    geom_segment(data=subset(tree_input_df, ancestor_state=="ancestor" & Node %in% deuterostoma_side), 
+                 aes(x=0, y=Node_y_position, xend=Node_x_position, yend=Node_y_position), 
+                 linetype="dashed", stroke=0.2, color="dimgray") +
+    geom_segment(data=subset(tree_input_df, ancestor_state=="ancestor" & Node %in% protostoma_side),
+                 aes(x=Node_x_position, y=Node_y_position, xend=21.5, yend=Node_y_position), 
+                 linetype="dashed", stroke=0.2, color="dimgray") +
+    theme_void() +
+    #add different labels on the two sides
+    scale_x_continuous(breaks=as.numeric(names(node_x_labels)), labels=unname(node_x_labels)) +
+    scale_y_continuous(breaks=node_y_values, labels=deuterostoma_y_labels,
+                       sec.axis = dup_axis(labels=protostoma_y_labels)) +
+    theme(axis.title=element_blank(),
+          axis.text.x = element_text(angle=30, color="black"),
+          axis.text.y = element_text(color="black"),
+          plot.title=element_text(hjust=0.5))
+
+  return(ts_gains_plot)
+}
+
+##########################
+##########################
+
+plot_taus_ts_gains = function(clade_tau_df, my_clade_species, nodelist) {
+  category_tau_plot = ggplot(data=clade_tau_df, aes(x=Species, y=Tau, fill=Species)) +
+      geom_boxplot(alpha=0) + #very ugly line of code to set the axis.
+      
+      geom_rect(data=subset(clade_tau_df, Species %in% c(my_clade_species[1], my_clade_species[length(my_clade_species)]))[1,],
+          aes(ymin=0, ymax=1,
+              xmin=which(nodelist==my_clade_species[1])-0.5,
+              xmax=which(nodelist==my_clade_species[length(my_clade_species)])+0.5),
+          color="white", fill="dimgray", alpha=0.3) +
+      
+      geom_boxplot(color="black", alpha=0.8) +
+      geom_hline(yintercept = 0.75, color="red") +
+      scale_fill_manual(values=my_species_colors) +
+      theme_bw() +
+      theme(axis.title = element_text(color="black"),
+            axis.text.y = element_text(color="black"),
+            axis.text.x = element_text(color="black", angle=30)) +
+      scale_y_continuous(breaks=number_ticks(10), limits=c(0,1)) +
+      guides(fill=FALSE)
+    
+    return(category_tau_plot)
+}
+```
+
+```{r extra_functions, warning=FALSE, message=FALSE, echo=FALSE, dependson=c("setup", "functions")}
+plot_tree_structure_v1 = function(node_x_position, node_y_position, node_x_labels) {
+  ancestors = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma",
+                "Bilateria", "Hs2", "Dme",
+                "Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma")
+  deuterostoma_side = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma")
+  protostoma_side = c("Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma")
+  
+  node_y_values = unique(as.numeric(unname(node_y_position))[as.numeric(unname(node_y_position)) != 1])
+  deuterostoma_y_labels = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma", "")
+  protostoma_y_labels = c("Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma", "")
+  
+  node_x_position_dict = hashmap(names(node_x_position), unname(node_x_position))
+  node_y_position_dict = hashmap(names(node_y_position), unname(node_y_position))
+  
+  tree_input_df = data.frame(Node=c(all_species, all_ancestors))
+  #Add coordinates for each node
+  tree_input_df$Node_x_position = node_x_position_dict$find(tree_input_df$Node)
+  tree_input_df$Node_y_position = node_y_position_dict$find(tree_input_df$Node)
+  #Add groups so that lines between all ancestors and all pairs will be drawn.
+  tree_input_df$ancestor_state = rep("none", nrow(tree_input_df))
+  tree_input_df$ancestor_state[tree_input_df$Node %in% ancestors] = "ancestor"
+  #Add side of the tree (Deuterostoma or Protostoma)
+  
+  #This is long and manual
+  tree_input_df$node_state = rep("none", nrow(tree_input_df))
+  tree_input_df$node_state[tree_input_df$Node %in% c("Mm2", "Euarchontoglires")] = "Euarchontoglires"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bt2", "Eutheria")] = "Eutheria"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Mdo", "Mammalia")] = "Mammalia"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Gga", "Amniota")] = "Amniota"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Xtr", "Tetrapoda")] = "Tetrapoda"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Dre", "Euteleostomi")] = "Euteleostomi"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Cmi", "Vertebrata")] = "Vertebrata"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bla", "Chordata")] = "Chordata"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Sp2", "Deuterostoma")] = "Deuterostoma"
+  
+  tree_input_df$node_state[tree_input_df$Node %in% c("Eba", "Cyclorrapha")] = "Cyclorrapha"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Aae", "Diptera")] = "Diptera"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bmo", "Panorpidae")] = "Panorpidae"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Tca", "Oligoneoptera")] = "Oligoneoptera"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Ame", "Holometabola")] = "Holometabola"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Bge", "Neoptera")] = "Neoptera"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Cdi", "Insecta")] = "Insecta"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Sma", "Arthropoda")] = "Arthropoda"
+  tree_input_df$node_state[tree_input_df$Node %in% c("Obi", "Protostoma")] = "Protostoma"
+  
+  ts_gains_plot = ggplot(data=tree_input_df, aes(x=Node_x_position, y=Node_y_position)) +
+    geom_line(data=subset(tree_input_df, ancestor_state=="ancestor"), 
+              aes(group=ancestor_state),
+              color="dimgray") +
+    geom_line(data=subset(tree_input_df, node_state!="none"), 
+              aes(group=node_state),
+              color="dimgray") +
+    #geom_segment(data=subset(tree_input_df, ancestor_state=="ancestor" & Node %in% deuterostoma_side), 
+    #             aes(x=0, y=Node_y_position, xend=Node_x_position, yend=Node_y_position), 
+    #             linetype="dashed", stroke=0.2, color="dimgray") +
+    #geom_segment(data=subset(tree_input_df, ancestor_state=="ancestor" & Node %in% protostoma_side),
+    #             aes(x=Node_x_position, y=Node_y_position, xend=21.5, yend=Node_y_position), 
+    #             linetype="dashed", stroke=0.2, color="dimgray") +
+    theme_void() +
+    #add different labels on the two sides
+    scale_x_continuous(breaks=as.numeric(names(node_x_labels)), labels=unname(node_x_labels)) +
+    scale_y_continuous(breaks=node_y_values, labels=deuterostoma_y_labels,
+                       sec.axis = dup_axis(labels=protostoma_y_labels)) +
+    theme(axis.title=element_blank(),
+          axis.text.x = element_text(angle=30, color="black", vjust=2, hjust=1),
+          axis.text.y.right = element_text(color="black", hjust=1),
+          axis.text.y.left = element_text(color="black", hjust=-0.1),
+          plot.title=element_text(hjust=0.5),
+          plot.margin = unit(c(1,1,2,1), "cm")
+          )
+
+  return(ts_gains_plot)
+}
+```
+
+<!-- FIRST ROW -->
+<!-- Panel A: super tree with gains and losses proportions -->
+```{r super_ggplot_tree, warning=FALSE, echo=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=11, fig.height=6, eval=FALSE}
+#### Generate dictionaries with nodes position
+node_y_position_super = node_y_position
+node_x_position_super = node_x_position
+
+node_x_position_super[names(node_x_position_super) %in% deuterostoma_y_labels] = node_x_position_super[names(node_x_position_super) %in% deuterostoma_y_labels]-1
+node_x_position_super[names(node_x_position_super) %in% protostoma_y_labels] = node_x_position_super[names(node_x_position_super) %in% protostoma_y_labels]+1
+
+node_y_position_super[names(node_y_position_super) %in% ordered_species[seq(2,length(ordered_species),2)]] = node_y_position_super[names(node_y_position_super) %in% ordered_species[seq(2,length(ordered_species),2)]] -2.25
+node_y_position_super[names(node_y_position_super) %in% ordered_species[seq(1,length(ordered_species)-1,2)]] = node_y_position_super[names(node_y_position_super) %in% ordered_species[seq(1,length(ordered_species)-1,2)]] -1.25
+
+node_x_position_dict = hashmap(names(node_x_position_super), unname(node_x_position_super))
+node_y_position_dict = hashmap(names(node_y_position_super), unname(node_y_position_super))
+
+#### Generate the input dataframe
+all_scaled_percent_df = vector()
+for (tissue in ordered_tissues) {
+  for (category in c("gains", "losses")) {
+    input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", category, ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+    tot_TS_genes = length(unique(as.vector(input_df$OG_ID)))
+    
+    #Count TS gains
+    ts_gains_counts_df = as.data.frame(table(input_df$TS_gain))
+    colnames(ts_gains_counts_df) = c("Node", "TS_gains")
+    ts_gains_counts_df$Node = as.vector(ts_gains_counts_df$Node)
+    ts_gains_counts_df$Node[ts_gains_counts_df$Node == "BmA"] = "Bmo"
+    #ts_gains_counts_df$TS_gains_log = log2(ts_gains_counts_df$TS_gains+1)
+    #ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains_log/sum(ts_gains_counts_df$TS_gains_log),3)*100
+    ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains/sum(ts_gains_counts_df$TS_gains),3)*100
+    ts_gains_counts_df$TS_gains_percent = log2(ts_gains_counts_df$TS_gains_percent+1)
+    ts_gains_counts_df$TS_gains_scaled_percent = ts_gains_counts_df$TS_gains_percent/max(ts_gains_counts_df$TS_gains_percent)
+    
+    ### Add Labels
+    ts_gains_counts_df$Tissue = rep(tissue, nrow(ts_gains_counts_df))
+    ts_gains_counts_df$Inference_type = rep(category, nrow(ts_gains_counts_df))
+    ts_gains_counts_df$Tissue_inference = paste0(ts_gains_counts_df$Tissue, "_", ts_gains_counts_df$Inference_type)
+    
+    all_scaled_percent_df = rbind(all_scaled_percent_df, ts_gains_counts_df)
+  }
+}
+
+all_nodes_gains_losses_heatmaps_list = list()
+i = 1
+ordered_nodes = unique(as.vector(all_scaled_percent_df$Node))
+for (my_node in ordered_nodes) {
+  subsetted_scaled_percent_df = subset(all_scaled_percent_df, Node==my_node)
+  coordinates_df = data.frame(x=rep(c(0,0,1,0,1,1,1,1,2,1,2,2,2,2,3,2,3,3,
+                                  3,3,4,3,4,4), 2), 
+                              y=c(rep(c(1,2,2,1,1,2,1,2,2,1,1,2),2),
+                                  rep(c(0,1,1,0,0,1,0,1,1,0,0,1),2)), 
+                              group=c(rep("A", 3), rep("B", 3), rep("C", 3), rep("D",3),
+                                      rep("E", 3), rep("F", 3), rep("G", 3), rep("H",3),
+                                      rep("I", 3), rep("J", 3), rep("K", 3), rep("L",3),
+                                      rep("M", 3), rep("N", 3), rep("O", 3), rep("P",3)
+                                      ))
+  
+  ### Generate a dictionary with the group/Tissue correspondence
+  Tissue_inference_type_levels = rep(ordered_tissues, each=2)
+  Tissue_inference_type_levels[seq(1,length(Tissue_inference_type_levels)-1,2)] = paste0(ordered_tissues, "_gains")
+  Tissue_inference_type_levels[seq(2,length(Tissue_inference_type_levels),2)] = paste0(ordered_tissues, "_losses")
+  
+  group_tissue_dict = hashmap(c("A","B","C","D","E","F","G","H",
+                                "I","J","K","L","M","N","O","P"),
+                              Tissue_inference_type_levels)
+  
+  
+  ### Generate a dictionary with the tissue - value correspondence. This has to be done for each node:
+  Tissue_percentage_dict = hashmap(as.vector(subsetted_scaled_percent_df$Tissue_inference),
+                                   as.vector(subsetted_scaled_percent_df$TS_gains_scaled_percent))
+  
+  ### Add information to the dataframe
+  coordinates_df$Tissue_inference = group_tissue_dict$find(coordinates_df$group)
+  coordinates_df$Scaled_percent = Tissue_percentage_dict$find(coordinates_df$Tissue_inference)
+  #Replace NA with 0
+  coordinates_df$Scaled_percent[is.na(coordinates_df$Scaled_percent)] = 0
+  
+  #Add tissue info for color
+  coordinates_df$Tissue = sub("_.*", "", coordinates_df$Tissue_inference)
+  
+  ####Generate the triangular structure
+  node_gains_losses_heatmap = ggplotGrob(ggplot(data=coordinates_df) +
+    geom_polygon(aes(x=x, y=y, group=group, fill=Scaled_percent), alpha=0.7, color="black", size=0.2) +
+    scale_fill_viridis(direction=-1, limits=c(0,1)) +
+    #scale_alpha_identity() +
+    theme_void() +
+    theme(panel.background = element_rect(fill = "white", color="white")) +
+    guides(fill=FALSE))
+  
+  #print(node_gains_losses_heatmap)
+  all_nodes_gains_losses_heatmaps_list[[i]] = node_gains_losses_heatmap
+  i = i+1
+}
+
+#### 
+node_gains_losses_heatmap_grob = tibble(xmin=node_x_position_dict$find(ordered_nodes)-0.75,
+                                        xmax=node_x_position_dict$find(ordered_nodes)+0.75,
+                                        ymin=node_y_position_dict$find(ordered_nodes)-0.5,
+                                        ymax=node_y_position_dict$find(ordered_nodes)+0.5,
+                                        grob=all_nodes_gains_losses_heatmaps_list)
+
+super_tree_test = plot_tree_structure_v1(node_x_position, node_y_position, node_x_labels) + #plot the tree structure
+  purrr::pmap(node_gains_losses_heatmap_grob, function(grob, xmin, xmax, ymin, ymax) annotation_custom(grob = grob, xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax))
+
+print(super_tree_test)
+panel_A = super_tree_test
+
+#pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5/Fig5_panelA.pdf", width=11, height=6)
+#print(panel_A)
+#dev.off()
+```
+
+<!-- Panel B: gains and losses proportions across tissue and ancestors -->
+```{r gains_and_losses_proportion_plots, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=5, fig.height=6, eval=FALSE}
+all_counts_df = vector()
+for (tissue in ordered_tissues) {
+  for (category in c("gains", "losses")) {
+    input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", category, ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+    tot_TS_genes = length(unique(as.vector(input_df$OG_ID)))
+    
+    #Count TS gains
+    ts_gains_counts_df = as.data.frame(table(input_df$TS_gain))
+    colnames(ts_gains_counts_df) = c("Node", "TS_gains")
+    ts_gains_counts_df$Node = as.vector(ts_gains_counts_df$Node)
+    ts_gains_counts_df$Node[ts_gains_counts_df$Node == "BmA"] = "Bmo"
+    #ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains/sum(ts_gains_counts_df$TS_gains),3)*100
+    #ts_gains_counts_df$TS_gains_scaled_percent = ts_gains_counts_df$TS_gains_percent/max(ts_gains_counts_df$TS_gains_percent)
+    
+    ### Add Labels
+    ts_gains_counts_df$Tissue = rep(tissue, nrow(ts_gains_counts_df))
+    ts_gains_counts_df$Inference_type = rep(category, nrow(ts_gains_counts_df))
+    ts_gains_counts_df$Tissue_inference = paste0(ts_gains_counts_df$Tissue, "_", ts_gains_counts_df$Inference_type)
+    
+    all_counts_df = rbind(all_counts_df, ts_gains_counts_df)
+  }
+}
+
+all_counts_df$Node = factor(all_counts_df$Node, levels=c(all_ancestors, ordered_species))
+all_counts_df$Inference_type = factor(all_counts_df$Inference_type, levels=rev(c("gains", "losses")))
+all_counts_df$Tissue = factor(all_counts_df$Tissue, levels=rev(ordered_tissues))
+
+#Derive tissue_inference levels
+tissue_inference_levels_df = expand.grid(ordered_tissues, c("gains", "losses"))
+tissue_inference_levels = paste0(tissue_inference_levels_df$Var1, "_", tissue_inference_levels_df$Var2)
+all_counts_df$Tissue_inference = factor(all_counts_df$Tissue_inference, levels=rev(tissue_inference_levels))
+#Derive tissue_inferences_colors
+tissue_inferences_colors = rep(unname(my_color_vector),2)
+names(tissue_inferences_colors) = tissue_inference_levels
+
+deut_counts_df = subset(all_counts_df, Node %in% c(deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"], Deuterostoma))
+deut_counts_df$Node = factor(deut_counts_df$Node, c(Deuterostoma, deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"]))
+
+gains_losses_proportions_deut_plot = ggplot(deut_counts_df, aes(x=Node, y=TS_gains, fill=Tissue_inference, color=Inference_type, alpha=Inference_type)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_manual(values=tissue_inferences_colors) +
+  scale_color_manual(values=c("gains"="black", "losses"="white")) +
+  scale_alpha_manual(values=c("gains"=0.8, "losses"=0.4)) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title = element_blank(),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1)) +
+  coord_flip() +
+  guides(fill="none", color="none", alpha="none")
+
+print(gains_losses_proportions_deut_plot)
+
+
+prot_counts_df = subset(all_counts_df, Node %in% c(protostoma_y_labels[protostoma_y_labels!="Bilateria"], Protostoma))
+prot_counts_df$Node = factor(prot_counts_df$Node, c(Protostoma, protostoma_y_labels[protostoma_y_labels!="Bilateria"]))
+
+gains_losses_proportions_prot_plot = ggplot(prot_counts_df, aes(x=Node, y=TS_gains, fill=Tissue_inference, color=Inference_type, alpha=Inference_type)) +
+  geom_bar(stat="identity", position="fill") +
+  scale_fill_manual(values=tissue_inferences_colors) +
+  scale_color_manual(values=c("gains"="black", "losses"="white")) +
+  scale_alpha_manual(values=c("gains"=0.8, "losses"=0.4)) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.title = element_blank(),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1)) +
+  scale_x_discrete(position = "top") +
+  coord_flip() +
+  guides(fill="none", color="none", alpha="none")
+
+print(gains_losses_proportions_prot_plot)
+
+#Combine the two plots
+combined_proportion_plots = plot_grid(gains_losses_proportions_deut_plot, gains_losses_proportions_prot_plot, nrow=1, align="h")
+print(combined_proportion_plots)
+panel_B = combined_proportion_plots
+
+#pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5/Fig5_panelB.pdf", width=5, height=6)
+#print(panel_B)
+#dev.off()
+
+#### Compute proportion of losses on the total of inferences for all nodes
+joint_df = rbind(deut_counts_df, prot_counts_df)
+stats_df = joint_df %>%
+  group_by(Node, Inference_type) %>%
+  summarize(total_gains = sum(TS_gains)) %>%
+  ungroup() %>%
+  group_by(Node) %>%
+  mutate(total_inferences = sum(total_gains)) %>%
+  mutate(proportion = total_gains / total_inferences) %>%
+  filter(Inference_type == "losses")
+
+ancestral_stats_df = stats_df %>%
+  filter(Node %in% c("Deuterostoma", "Chordata", "Vertebrata", "Euteleostomi", "Tetrapoda", "Protostoma", "Arthropoda", "Insecta", "Neoptera", "Holometabola"))
+
+recent_stats_df = stats_df %>%
+  filter(!(Node %in% c("Deuterostoma", "Chordata", "Vertebrata", "Euteleostomi", "Tetrapoda", "Protostoma", "Arthropoda", "Insecta", "Neoptera", "Holometabola")))
+```
+
+<!-- Panel C: number of gains across corresponding ancestors -->
+```{r number_of_gains_across_corresponding_ancestors, warning=FALSE, message=FALSE, echo=FALSE, dependson=c("setup", "functions"), fig.width=6, fig.height=6, eval=FALSE}
+all_counts_df = vector()
+for (tissue in ordered_tissues) {
+  for (category in c("gains", "losses")) {
+    input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", category, ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+    tot_TS_genes = length(unique(as.vector(input_df$OG_ID)))
+    
+    #Count TS gains
+    ts_gains_counts_df = as.data.frame(table(input_df$TS_gain))
+    colnames(ts_gains_counts_df) = c("Node", "TS_gains")
+    ts_gains_counts_df$Node = as.vector(ts_gains_counts_df$Node)
+    ts_gains_counts_df$Node[ts_gains_counts_df$Node == "BmA"] = "Bmo"
+    #ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains/sum(ts_gains_counts_df$TS_gains),3)*100
+    #ts_gains_counts_df$TS_gains_scaled_percent = ts_gains_counts_df$TS_gains_percent/max(ts_gains_counts_df$TS_gains_percent)
+    
+    ### Add Labels
+    ts_gains_counts_df$Tissue = rep(tissue, nrow(ts_gains_counts_df))
+    ts_gains_counts_df$Inference_type = rep(category, nrow(ts_gains_counts_df))
+    ts_gains_counts_df$Tissue_inference = paste0(ts_gains_counts_df$Tissue, "_", ts_gains_counts_df$Inference_type)
+    
+    all_counts_df = rbind(all_counts_df, ts_gains_counts_df)
+  }
+}
+
+#Sum gains across nodes
+all_summed_gains_losses_df = all_counts_df %>%
+  group_by(Node, Inference_type) %>%
+  summarize(inferences_sum=sum(TS_gains))
+
+#Remove single species
+all_summed_gains_losses_df = subset(all_summed_gains_losses_df, !(Node %in% ordered_species))
+#Build node level dict
+ancestor_node_level_dict = hashmap(c(deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"], 
+                                     protostoma_y_labels[protostoma_y_labels!="Bilateria"]), 
+                                   c(rep(rev(seq(1,9)),2)))
+#Add node level for plotting
+all_summed_gains_losses_df$Node_level = ancestor_node_level_dict$find(all_summed_gains_losses_df$Node)
+all_summed_gains_losses_df$Node_level[all_summed_gains_losses_df$Node=="Bilateria"] = 0
+
+#Remove losses
+all_summed_gains_losses_df = subset(all_summed_gains_losses_df, Inference_type!="losses")
+#Add branch
+all_summed_gains_losses_df$Branch = rep("Deuterostoma", nrow(all_summed_gains_losses_df))
+all_summed_gains_losses_df$Branch[all_summed_gains_losses_df$Node %in% protostoma_y_labels] = "Protostoma"
+all_summed_gains_losses_df$Branch[all_summed_gains_losses_df$Node=="Bilateria"] = "Bilateria"
+#Transform to factor
+all_summed_gains_losses_df$Node_level = as.factor(all_summed_gains_losses_df$Node_level)
+
+#######################################
+#Add information regarding proportion of Onholog 
+
+## Build color vector
+deuterostome_colors = rep("olivedrab3", length(deuterostoma_y_labels)-1)
+names(deuterostome_colors) = deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"]
+protostome_colors = rep("tan3", length(protostoma_y_labels)-1)
+names(protostome_colors) = protostoma_y_labels[protostoma_y_labels!="Bilateria"]
+all_nodes_species_colors = c(deuterostome_colors, protostome_colors, my_species_colors)
+
+######## Get table with intergenic regions for all bilaterian genes in all species
+#Correct each measurement for the median intergenic distance of the species
+orthogroups_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"),
+                            header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_tissue", "Expr_cutoff"), stringsAsFactors = FALSE)
+orthogroups_df$Species[orthogroups_df$Species == "BmA"] = "Bmo"
+#Get dictionary with key=human_geneID and value=OG_ID
+geneID_OGID_dict = hashmap(as.vector(orthogroups_df$GeneID), as.vector(orthogroups_df$OG_ID))
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+### Upload onholog info
+onholog_info_df = read.delim(paste0(home, "projects/bilaterian_GE/data/DB/onholog_info/Ohnologs-Hs2-V6-formatted.tab"), header=FALSE, col.names=c("OhnologID", "Human_geneID", "Human_genename"))
+### Add orthogroup ID
+onholog_info_df$OG_ID = geneID_OGID_dict$find(as.vector(onholog_info_df$Human_geneID))
+### remove NAs and get list of onholog OG_IDs (there is only one)
+ohnolog_OGIDs = unique(as.vector(onholog_info_df$OG_ID))
+ohnolog_OGIDs =  ohnolog_OGIDs[!(is.na(ohnolog_OGIDs))]
+
+### Assign onholog status to orthogroups
+tissue_gains_df$Onholog_status = rep("NO_Ohn", nrow(tissue_gains_df))
+tissue_gains_df$Onholog_status[tissue_gains_df$OG_ID %in% ohnolog_OGIDs] = "Ohn"
+
+#Add branch info
+tissue_gains_df$Branch = rep("Deuterostoma", nrow(tissue_gains_df))
+tissue_gains_df$Branch[tissue_gains_df$TS_gains %in% c(protostoma_y_labels, Protostoma)] = "Protostoma"
+tissue_gains_df$Branch[tissue_gains_df$TS_gains=="Bilateria"] = "Bilateria"
+tissue_gains_df$Branch_Ohn_status = paste0(tissue_gains_df$Branch, "_", tissue_gains_df$Onholog_status) 
+#Add the Vertebrate status
+tissue_gains_df$Vertebrate_status = rep("NO_Vert", nrow(tissue_gains_df))
+tissue_gains_df$Vertebrate_status[tissue_gains_df$TS_gains %in% c(Vertebrata, sub_Chordata) & tissue_gains_df$Onholog_status=="Ohn"] = "Vert"
+
+#Order factors
+my_levels = c(rev(c("Deuterostoma", rev(sub_Deuterostoma), rev(Deuterostoma))), "Bilateria", "Protostoma", rev(sub_Protostoma), rev(Protostoma))
+my_intercept = length(ohnolog_OGIDs[ohnolog_OGIDs %in% unique(as.vector(tissue_gains_df$OG_ID))]) / length(unique(as.vector(tissue_gains_df$OG_ID)))
+tissue_gains_df$TS_gains = factor(tissue_gains_df$TS_gains, levels=my_levels)
+
+final_tissue_gains_df = tissue_gains_df %>%
+  dplyr::select(OG_ID, TS_gains, Onholog_status) %>%
+  group_by(TS_gains, Onholog_status) %>%
+  summarise(total = n()) %>%
+  mutate(propotion = total/sum(total)) %>%
+  filter(Onholog_status=="Ohn")
+
+onholog_proportion_dict = hashmap(as.vector(final_tissue_gains_df$TS_gains), as.vector(final_tissue_gains_df$propotion))
+#######################################
+
+#Add onholog proportion info
+all_summed_gains_losses_df$Onholog_proportion = onholog_proportion_dict$find(all_summed_gains_losses_df$Node)
+all_summed_gains_losses_df$Branch = factor(all_summed_gains_losses_df$Branch, levels=c("Protostoma", "Deuterostoma","Bilateria"))
+
+gains_losses_nodes_plot = ggplot(all_summed_gains_losses_df, 
+                                 aes(x=Node_level, y=inferences_sum, 
+                                     group=Branch, 
+                                     shape=Inference_type,
+                                     color=Branch)) +
+  geom_point(aes(size=Onholog_proportion)) +
+  geom_line(size=0.5) +
+  geom_text_repel(aes(label=Node), box.padding = 0.5) +
+  #ggtitle("Total number of gains") +
+  scale_color_manual(values=c("Bilateria"="firebrick1", "Deuterostoma"="olivedrab4", "Protostoma"="goldenrod3")) +
+  theme_bw() +
+  scale_size(range=c(1,11)) +
+  theme(axis.text = element_text(color="black"),
+        plot.title=element_text(color="black", face="bold", hjust=0.5),
+        legend.position = "bottom",
+        #legend.position = c(0.9, 0.9),
+        #legend.justification = c("right", "top")
+        ) +
+  ylab("Total number of gains") +
+  scale_y_continuous(breaks = number_ticks(6)) +
+  xlab("Node level") +
+  guides(shape=FALSE, color=FALSE)
+
+print(gains_losses_nodes_plot)
+
+#panel_C = gains_losses_nodes_plot
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelC.pdf", width=6, height=6)
+print(gains_losses_nodes_plot)
+dev.off()
+```
+
+<!-- Related supplementary panel: proportion of onholog orthogroups among the tissue-specific gains in all nodes -->
+```{r onholog_proportion_plot_v1, warning=FALSE, message=FALSE, echo=FALSE, dependson=c("setup", "functions"), fig.width=9, fig.height=4}
+####### Build color vector
+deuterostome_colors = rep("olivedrab3", length(deuterostoma_y_labels)-1)
+names(deuterostome_colors) = deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"]
+protostome_colors = rep("tan3", length(protostoma_y_labels)-1)
+names(protostome_colors) = protostoma_y_labels[protostoma_y_labels!="Bilateria"]
+all_nodes_species_colors = c(deuterostome_colors, protostome_colors, my_species_colors)
+
+######## Get table with intergenic regions for all bilaterian genes in all species
+#Correct each measurement for the median intergenic distance of the species
+orthogroups_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"),
+                            header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_tissue", "Expr_cutoff"), stringsAsFactors = FALSE)
+orthogroups_df$Species[orthogroups_df$Species == "BmA"] = "Bmo"
+#Get dictionary with key=human_geneID and value=OG_ID
+geneID_OGID_dict = hashmap(as.vector(orthogroups_df$GeneID), as.vector(orthogroups_df$OG_ID))
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+### Upload onholog info
+onholog_info_df = read.delim(paste0(home, "projects/bilaterian_GE/data/DB/onholog_info/Ohnologs-Hs2-V6-formatted.tab"), header=FALSE, col.names=c("OhnologID", "Human_geneID", "Human_genename"))
+### Add orthogroup ID
+onholog_info_df$OG_ID = geneID_OGID_dict$find(as.vector(onholog_info_df$Human_geneID))
+### remove NAs and get list of onholog OG_IDs
+ohnolog_OGIDs = unique(as.vector(onholog_info_df$OG_ID))
+ohnolog_OGIDs =  ohnolog_OGIDs[!(is.na(ohnolog_OGIDs))]
+
+### Assign onholog status to orthogroups
+tissue_gains_df$Onholog_status = rep("NO_Ohn", nrow(tissue_gains_df))
+tissue_gains_df$Onholog_status[tissue_gains_df$OG_ID %in% ohnolog_OGIDs] = "Ohn"
+#Remove single species
+#tissue_gains_df = subset(tissue_gains_df, !(TS_gains %in% ordered_species))
+
+#Build node level dict
+# ancestor_node_level_dict = hashmap(c(deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"], 
+#                                      protostoma_y_labels[protostoma_y_labels!="Bilateria"]), 
+#                                    c(rep(rev(seq(1,9)),2)))
+# #Add node level for plotting
+# tissue_gains_df$Node_level = ancestor_node_level_dict$find(tissue_gains_df$TS_gains)
+# tissue_gains_df$Node_level[tissue_gains_df$TS_gains=="Bilateria"] = 0
+
+#tissue_gains_df$TS_gains = factor(tissue_gains_df$TS_gains, levels=all_ancestors)
+# proportion_df = tissue_gains_df %>%
+#   #filter(Tissue!="Testis") %>%
+#   group_by(TS_gains, Onholog_status) %>%
+#   summarise(n = n()) %>%
+#   mutate(freq = n / sum(n)) %>%
+#   mutate(freq1 = n / length(ohnolog_OGIDs)) %>%
+#   filter(Onholog_status=="Ohn")
+
+tissue_gains_df$Branch = rep("Deuterostoma", nrow(tissue_gains_df))
+tissue_gains_df$Branch[tissue_gains_df$TS_gains %in% c(protostoma_y_labels, Protostoma)] = "Protostoma"
+tissue_gains_df$Branch[tissue_gains_df$TS_gains=="Bilateria"] = "Bilateria"
+tissue_gains_df$Branch_Ohn_status = paste0(tissue_gains_df$Branch, "_", tissue_gains_df$Onholog_status) 
+#Add the Vertebrate status
+tissue_gains_df$Vertebrate_status = rep("NO_Vert", nrow(tissue_gains_df))
+tissue_gains_df$Vertebrate_status[tissue_gains_df$TS_gains %in% c(Vertebrata, sub_Chordata) & tissue_gains_df$Onholog_status=="Ohn"] = "Vert"
+
+
+#proportion_df$Node_level = factor(proportion_df$Node_level, seq(0,9))
+# test = ggplot(proportion_df, 
+#                                  aes(x=Node_level, y=freq, 
+#                                      group=Branch, color=Branch)) +
+#   geom_point(size=4) +
+#   geom_line(size=0.5) +
+#   geom_text_repel(aes(label=TS_gains), box.padding = 0.5) +
+#   #ggtitle("Total number of gains") +
+#   scale_color_manual(values=c("Bilateria"="firebrick1", "Deuterostoma"="olivedrab4", "Protostoma"="goldenrod3")) +
+#   theme_bw() +
+#   theme(axis.text = element_text(color="black"),
+#         plot.title=element_text(color="black", face="bold", hjust=0.5)#,
+#         #legend.position = c(0.9, 0.9),
+#         #legend.justification = c("right", "top")
+#         ) +
+#   ylab("Propotion of Ohnolog orthogroups") +
+#   scale_y_continuous(breaks = number_ticks(6)) +
+#   xlab("Node level") +
+#   guides(shape=FALSE)
+# 
+# print(test)
+
+my_levels = c(rev(c("Deuterostoma", rev(sub_Deuterostoma), rev(Deuterostoma))), "Bilateria", "Protostoma", rev(sub_Protostoma), rev(Protostoma))
+my_intercept = length(ohnolog_OGIDs[ohnolog_OGIDs %in% unique(as.vector(tissue_gains_df$OG_ID))]) / length(unique(as.vector(tissue_gains_df$OG_ID)))
+tissue_gains_df$TS_gains = factor(tissue_gains_df$TS_gains, levels=my_levels)
+
+#Plot
+test = ggplot(data=tissue_gains_df, aes(x=TS_gains, fill=Branch_Ohn_status, color=Vertebrate_status, alpha=Vertebrate_status)) +
+  geom_bar(stat="count", position="fill") +
+  geom_hline(yintercept=my_intercept) +
+  scale_fill_manual(values=c("Deuterostoma_Ohn"="darkolivegreen4", "Protostoma_Ohn"="tan3", "Bilateria_Ohn"="firebrick1", "Deuterostoma_NO_Ohn"="white", "Protostoma_NO_Ohn"="white", "Bilateria_NO_Ohn"="white")) +
+  scale_color_manual(values=c("Vert"="black", "NO_Vert"="white")) +
+  scale_alpha_manual(values=c("Vert"=0.9, "NO_Vert"=0.75)) +
+  theme_bw() +
+  ggtitle("Proportion of TS gains in Ohnolog orthogroups") +
+  theme(axis.text.x = element_text(color="black", angle=45, hjust=1, vjust=1),
+        axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        plot.title = element_text(hjust=0.5, face="bold")) +
+  xlab("TS gains") +
+  ylab("Proportion")
+
+print(test)
+```
+
+<!-- Panel D: Ratio between duplication status of TS species and non-TS species -->
+```{r duplication_barplot_with_background_nodes, warning=FALSE, message=FALSE, echo=FALSE, dependson=c("setup", "functions"), fig.width=8, fig.height=4, eval=FALSE}
+#Upload orthogroups and get duplication info about each gene
+orthogroups_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"),
+                            header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_tissue", "Expr_cutoff"), stringsAsFactors = FALSE)
+orthogroups_df$Species[orthogroups_df$Species == "BmA"] = "Bmo"
+#### Remove entries that do not pass the cutoff
+#orthogroups_df = subset(orthogroups_df, Tau!="-Inf")[,c("OG_ID", "Species", "GeneID")]
+orthogroups_df$OG_ID_Species = paste0(orthogroups_df$OG_ID, "_", orthogroups_df$Species)
+species_paralogs_count_df = as.data.frame(table(orthogroups_df$OG_ID_Species))
+OG_ID_Species_paralogs_counts_dict = hashmap(as.vector(species_paralogs_count_df$Var1), as.vector(species_paralogs_count_df$Freq))
+orthogroups_df$Paralogs_count = OG_ID_Species_paralogs_counts_dict$find(orthogroups_df$OG_ID_Species)
+
+#Generate background: for each node (group of species) compute the proportion in each orthogroup that is duplicated. Get the difference for non-duplicated.
+#Sum all and get proportions.
+background_df = vector()
+for (ancestor in all_ancestors) {
+  my_species = get(ancestor)
+  #Subset all orthogroups to only these species
+  my_species_orthogroups_df = subset(orthogroups_df, Species %in% my_species)
+  #Compute for each orthogroup the proportion of duplicated species (among the ones with conserved genes)
+   final_ancestor_df = my_species_orthogroups_df %>%
+      dplyr::select(OG_ID, Species, Paralogs_count) %>%
+      distinct() %>%
+      mutate(Dup_status=case_when(Paralogs_count > 1 ~ "Dup",
+                                  Paralogs_count <= 1 ~ "NO_Dup")) %>%
+      group_by(OG_ID, Dup_status) %>%
+      summarise(total = n()) %>%
+      ungroup() %>%
+      pivot_wider(id_cols="OG_ID", names_from="Dup_status", values_from="total", values_fill=0) %>%
+      pivot_longer(cols=c("Dup", "NO_Dup"), names_to = "Dup_status") %>%
+      group_by(OG_ID) %>%
+      mutate(freq=value/sum(value)) %>%
+      mutate(freq = replace_na(freq, 0))
+  
+  collapsed_final_df = final_ancestor_df %>%
+    group_by(Dup_status) %>%
+    summarise(freq_proportion = mean(freq)) %>%
+    #summarise(freq_sum = sum(freq)) %>%
+    #mutate(freq_proportion = freq_sum/sum(freq_sum)) %>%
+    mutate(Node = ancestor) %>%
+    dplyr::select(Node, Dup_status, freq_proportion)
+    #dplyr::select(Node, Dup_status, freq_sum, freq_proportion)
+  
+  background_df = rbind(background_df, collapsed_final_df)
+}
+
+#Upload tissue specific gains
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#Select the relative orthogroups
+foreground_df = vector()
+for (ancestor in all_ancestors) {
+  #Select orthogroups with gains
+  ancestor_gains_OGs = unique(as.vector(subset(tissue_gains_df, TS_gains==ancestor)$OG_ID))
+  #Select ancestor species
+  my_species = get(ancestor)
+  #Subset all orthogroups to only these species in the orthogroups with gains
+  my_species_orthogroups_df = subset(orthogroups_df, Species %in% my_species & OG_ID %in% ancestor_gains_OGs)
+  #For each orthogroup, remove the species with losses
+  #Leave this pending for one second
+  #Compute the same statistics as above
+    final_ancestor_df = my_species_orthogroups_df %>%
+      dplyr::select(OG_ID, Species, Paralogs_count) %>%
+      distinct() %>%
+      mutate(Dup_status=case_when(Paralogs_count > 1 ~ "Dup",
+                                  Paralogs_count <= 1 ~ "NO_Dup")) %>%
+      group_by(OG_ID, Dup_status) %>%
+      summarise(total = n()) %>%
+      ungroup() %>%
+      pivot_wider(id_cols="OG_ID", names_from="Dup_status", values_from="total", values_fill=0) %>%
+      pivot_longer(cols=c("Dup", "NO_Dup"), names_to = "Dup_status") %>%
+      group_by(OG_ID) %>%
+      mutate(freq=value/sum(value)) %>%
+      mutate(freq = replace_na(freq, 0))
+  
+  collapsed_final_df = final_ancestor_df %>%
+    group_by(Dup_status) %>%
+    summarise(freq_proportion = mean(freq)) %>%
+    #summarise(freq_sum = sum(freq)) %>%
+    #mutate(freq_proportion = freq_sum/sum(freq_sum)) %>%
+    mutate(Node = ancestor) %>%
+    dplyr::select(Node, Dup_status, freq_proportion)
+    #dplyr::select(Node, Dup_status, freq_sum, freq_proportion)
+  
+  foreground_df = rbind(foreground_df, collapsed_final_df)
+}
+#Select only the TS species (species without losses) and compute the proportion of those species that are duplicated.
+#Compute the difference as not-duplicated (it has to sum to 1).
+
+#Order:
+#foreground_df$Node = factor(foreground_df$Node, levels=all_ancestors)
+foreground_df$Node = factor(foreground_df$Node, levels=c(deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"], "Bilateria",
+                                                             rev(protostoma_y_labels[protostoma_y_labels!="Bilateria"])))
+foreground_df$Dup_status = factor(foreground_df$Dup_status, levels=rev(c("Dup", "NO_Dup")))
+#background_df$Node = factor(background_df$Node, levels=all_ancestors)
+background_df$Node = factor(background_df$Node, levels=c(deuterostoma_y_labels[deuterostoma_y_labels!="Bilateria"], "Bilateria",
+                                                             rev(protostoma_y_labels[protostoma_y_labels!="Bilateria"])))
+background_df$Dup_status = factor(background_df$Dup_status, levels=rev(c("Dup", "NO_Dup")))
+
+#Add branch info
+foreground_df$Branch = rep("Deuterostoma", nrow(foreground_df))
+foreground_df$Branch[foreground_df$Node %in% protostoma_y_labels] = "Protostoma"
+foreground_df$Branch[foreground_df$Node=="Bilateria"] = "Bilateria"
+foreground_df = foreground_df %>%
+  unite("Branch_Dup_status", c(Branch,Dup_status), remove=FALSE)
+
+foreground_df$Branch_Dup_status = factor(foreground_df$Branch_Dup_status, levels=rev(c("Deuterostoma_Dup", "Deuterostoma_NO_Dup", "Protostoma_Dup", "Protostoma_NO_Dup", "Bilateria_Dup", "Bilateria_NO_Dup")))
+
+#Plot:
+dup_background_df = subset(background_df, Dup_status=="Dup")
+
+ancestral_gains_duplication_status = ggplot() +
+  geom_bar(data=foreground_df, aes(x=Node, y=freq_proportion, fill=Branch_Dup_status), stat="identity", position="fill", color="black", alpha=0.75) +
+  geom_errorbar(data=dup_background_df, aes(x=Node, ymin=freq_proportion, ymax=freq_proportion), color="black", linetype="dashed") +
+  #scale_fill_manual(values=c("Dup"="firebrick1", "Non_Dup"="dimgray")) +
+  scale_fill_manual(values=c("Deuterostoma_Dup"="darkolivegreen4", "Protostoma_Dup"="tan3", "Bilateria_Dup"="firebrick1", "Deuterostoma_NO_Dup"="white", "Protostoma_NO_Dup"="white", "Bilateria_NO_Dup"="white")) +
+  ggtitle("Proportion of TS gains orthogroups with duplications") +
+  theme_bw() +
+  theme(axis.text.y = element_text(color="black"),
+        axis.title = element_blank(),
+        axis.text.x = element_text(color="black", angle=45, hjust=1, vjust=1),
+        axis.ticks.y = element_line(),
+        plot.title = element_text(color="black", hjust=0.5, face="bold")) #+
+  #guides(fill="none")
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelD.pdf", width=7, height=4)
+print(ancestral_gains_duplication_status)
+dev.off()
+```
+
+
+<!-- SECOND ROW -->
+<!-- Panel E: Tissue specific gains for one Eutheria and one Holometabola category to show the expression differences between TS and non-TS genes -->
+```{r eutheria_expression_patterns, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("seutp", "functions"), fig.width=12, fig.height=7, eval=FALSE}
+all_orthogroups_df = read.delim(paste0(gene_sets_dir, my_version, "/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt"),
+                                header=FALSE, col.names = c("OG_ID", "Species", "GeneID"))
+
+#### Build expression table: all genes from all species across all tissues
+all_species_expr_df = vector()
+for (species in ordered_species) {
+  input_file = paste0(tau_dir, my_version, "/", species, "-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab")
+  input_df = read.delim(input_file, header=TRUE, row=1)
+  scaled_input_df = input_df
+  ######
+  long_scaled_input_df = melt(as.matrix(scaled_input_df))
+  colnames(long_scaled_input_df) = c("GeneID", "Tissue", "Scaled_expr")
+  long_scaled_input_df$Species = rep(species, nrow(long_scaled_input_df))
+  all_species_expr_df = rbind(all_species_expr_df, long_scaled_input_df)
+}
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#### Upload losses info
+tissue_losses_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_losses_df = rbind(tissue_losses_df, input_df)
+}
+
+###### Filter only for gains that happened in the node of interest
+all_OGs_tissue_gains = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_OG_IDs = all_OGs_tissue_gains[!duplicated(all_OGs_tissue_gains)]
+tissue_gains_df$OG_ID_tissue = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_df = subset(tissue_gains_df, OG_ID_tissue %in% single_tissue_gains_OG_IDs)
+
+###### Upload OG_ID, gene correspondence from which the inference was performed
+all_tissue_tau_df = vector()
+for (tissue in ordered_tissues) {
+  tissue_tau_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-", tissue, "_specific_OGs.tab"),
+                           header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Expr_cutoff"))
+  tissue_tau_df$Query_tissue = rep(tissue, nrow(tissue_tau_df))
+  all_tissue_tau_df = rbind(all_tissue_tau_df, tissue_tau_df)
+}
+
+#Build GeneID - OG_ID dictionary
+unique_tissue_tau_df = unique(all_tissue_tau_df[,c("OG_ID", "Species", "GeneID")])
+GeneID_OG_ID_dict = hashmap(as.vector(unique_tissue_tau_df$GeneID), as.vector(unique_tissue_tau_df$OG_ID))
+
+#### Filter on ancestors and tissue gains, then combine in a unique dataframe
+for (ancestor in c("Eutheria")) {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species %in% get(ancestor)] = "TS" #Distinguish between genes belonging to the node or not
+    
+    #### Cycle on each OG_ID and remove species with losses
+    for (my_OG_ID in unique(as.vector(selected_expr_df$OG_ID))) {
+      species_with_losses = as.vector(subset(tissue_losses_df, (Tissue==tissue) & (OG_ID==my_OG_ID) & 
+                                               (TS_losses %in% get(ancestor) | TS_losses %in% get(paste0("sub_", ancestor))))$TS_losses)
+      ancestral_losses = species_with_losses[!(species_with_losses %in% ordered_species)]
+      if (length(ancestral_losses>0)) {
+        ancestral_losses_species = unique(unlist(lapply(list(ancestral_losses), get)))
+        species_with_losses = c(species_with_losses[!(species_with_losses != ancestral_losses)], ancestral_losses_species)
+      }
+      #### For each OG, remove species with losses
+      selected_expr_df$Category[(selected_expr_df$OG_ID==my_OG_ID & selected_expr_df$Species %in% species_with_losses)] = "NO_TS"
+      #### Remove the species whose tau is NA (so the gene is not expressed enough to pass the cutoffs
+      selected_expr_df = subset(selected_expr_df, !(OG_ID==my_OG_ID & 
+                                                      Species %in% as.vector(subset(all_tissue_tau_df, 
+                                                                                    Query_tissue==tissue & 
+                                                                                      OG_ID==my_OG_ID & 
+                                                                                      is.na(Tau)))))
+      #
+    }
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+  all_selected_expr_df$Category = factor(all_selected_expr_df$Category, levels=c("TS", "NO_TS"))
+  
+  final_all_selected_expr_df = all_selected_expr_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue) %>%
+    summarise(Median=median(Scaled_expr))
+  
+  Query_tissue_number_raw = table(as.vector(unique(final_all_selected_expr_df[,c("OG_ID", "Query_tissue")]))$Query_tissue)
+  Query_tissue_number = paste0(names(Query_tissue_number_raw), " ~ ", unname(Query_tissue_number_raw), " OGs")
+  names(Query_tissue_number) = names(Query_tissue_number_raw)
+  
+  #### Plot
+  clade_expr_plot = ggplot(data=final_all_selected_expr_df, aes(x=Tissue, y=Median, fill=Tissue)) +
+  geom_boxplot(alpha=0.8, color="black", outlier.size = 0.5, stroke=0.8) +
+  theme_bw() +
+  theme(axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1),
+        plot.title = element_text(color="black", face="bold")) +
+  scale_fill_manual(values=my_color_vector) +
+  ggtitle(paste0(ancestor)) +
+  coord_cartesian(ylim = c(0,8)) +
+  guides(fill=FALSE)
+
+  final_clade_expr_plot = clade_expr_plot + facet_nested_wrap(~Query_tissue+Category, labeller = labeller(Query_tissue=Query_tissue_number), drop=FALSE, nrow=2, scales = "free")
+  print(final_clade_expr_plot)
+}
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelE.pdf", width=12, height=7)
+print(final_clade_expr_plot)
+dev.off()
+```
+
+
+<!-- Panel F: Number of tissues with reduced expression in non TS vs TS, plus results from 100 randomizations -->
+<!-- NB: this also generates the plots for the relative EDF. But I will repeat the code there -->
+```{r test_specialization_expression_nodes, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setutp", "functions"), fig.width=6, fig.height=8, eval=FALSE}
+all_orthogroups_df = read.delim(paste0(gene_sets_dir, my_version, "/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt"),
+                                header=FALSE, col.names = c("OG_ID", "Species", "GeneID"))
+
+all_species_expr_df = vector()
+for (species in ordered_species) {
+  input_file = paste0(tau_dir, my_version, "/", species, "-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab")
+  input_df = read.delim(input_file, header=TRUE, row=1)
+  scaled_input_df = input_df
+  
+  ######
+  long_scaled_input_df = melt(as.matrix(scaled_input_df))
+  colnames(long_scaled_input_df) = c("GeneID", "Tissue", "Scaled_expr")
+  long_scaled_input_df$Species = rep(species, nrow(long_scaled_input_df))
+  all_species_expr_df = rbind(all_species_expr_df, long_scaled_input_df)
+}
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#### Upload losses info
+tissue_losses_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_losses_df = rbind(tissue_losses_df, input_df)
+}
+
+###### Filter only for gains that happened in the node of interest
+all_OGs_tissue_gains = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_OG_IDs = all_OGs_tissue_gains[!duplicated(all_OGs_tissue_gains)]
+tissue_gains_df$OG_ID_tissue = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_df = subset(tissue_gains_df, OG_ID_tissue %in% single_tissue_gains_OG_IDs)
+
+###### Upload OG_ID, gene correspondence from which the inference was performed
+all_tissue_tau_df = vector()
+for (tissue in ordered_tissues) {
+  tissue_tau_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-", tissue, "_specific_OGs.tab"),
+                           header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Expr_cutoff"))
+  tissue_tau_df$Query_tissue = rep(tissue, nrow(tissue_tau_df))
+  all_tissue_tau_df = rbind(all_tissue_tau_df, tissue_tau_df)
+}
+
+#Build GeneID - OG_ID dictionary
+unique_tissue_tau_df = unique(all_tissue_tau_df[,c("OG_ID", "Species", "GeneID")])
+GeneID_OG_ID_dict = hashmap(as.vector(unique_tissue_tau_df$GeneID), as.vector(unique_tissue_tau_df$OG_ID))
+
+
+all_stacked_plots_df = vector()
+for (ancestor in all_ancestors[all_ancestors!="Bilateria"]) {
+#for (ancestor in "Eutheria") {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species %in% get(ancestor)] = "TS" #Distinguish between genes belonging to the node or not
+    
+    #### Cycle on each OG_ID and remove species with losses
+    for (my_OG_ID in unique(as.vector(selected_expr_df$OG_ID))) {
+      species_with_losses = as.vector(subset(tissue_losses_df, (Tissue==tissue) & (OG_ID==my_OG_ID) & 
+                                               (TS_losses %in% get(ancestor) | TS_losses %in% get(paste0("sub_", ancestor))))$TS_losses)
+      ancestral_losses = species_with_losses[!(species_with_losses %in% ordered_species)]
+      if (length(ancestral_losses>0)) {
+        ancestral_losses_species = unique(unlist(lapply(list(ancestral_losses), get)))
+        species_with_losses = c(species_with_losses[!(species_with_losses != ancestral_losses)], ancestral_losses_species)
+      }
+      #### For each OG, remove species with losses
+      selected_expr_df$Category[(selected_expr_df$OG_ID==my_OG_ID & selected_expr_df$Species %in% species_with_losses)] = "NO_TS"
+      #### Remove the species whose tau is NA (so the gene is not expressed enough to pass the cutoffs
+      selected_expr_df = subset(selected_expr_df, !(OG_ID==my_OG_ID & 
+                                                      Species %in% as.vector(subset(all_tissue_tau_df, 
+                                                                                    Query_tissue==tissue & 
+                                                                                      OG_ID==my_OG_ID & 
+                                                                                      is.na(Tau)))))
+      #
+    }
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+  all_selected_expr_df$Category = factor(all_selected_expr_df$Category, levels=c("TS", "NO_TS"))
+  
+  final_all_selected_expr_df = all_selected_expr_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue) %>%
+    summarise(Median=median(Scaled_expr))
+  
+  #### Get info about TS and no_TS species on the same row
+  #TS
+  final_TS_selected_expr_df = subset(final_all_selected_expr_df, Category=="TS")
+  colnames(final_TS_selected_expr_df)[colnames(final_TS_selected_expr_df)=="Median"] = "TS_Median"
+  final_TS_selected_expr_df$Category = NULL
+  #NO_TS
+  final_NOTS_selected_expr_df = subset(final_all_selected_expr_df, Category=="NO_TS")
+  colnames(final_NOTS_selected_expr_df)[colnames(final_NOTS_selected_expr_df)=="Median"] = "NO_TS_Median"
+  final_NOTS_selected_expr_df$Category = NULL
+  #Combine
+  combined_final_all_selected_expr_df = inner_join(final_TS_selected_expr_df, final_NOTS_selected_expr_df, by=c("OG_ID"="OG_ID", "Query_tissue"="Query_tissue", "Tissue"="Tissue"))
+  ###Subset only for tissues that are not the query tissue
+  combined_final_all_selected_expr_df = subset(combined_final_all_selected_expr_df, Query_tissue!=Tissue)
+  ###Add a label depending on the tissue medians
+  plot_input_df = combined_final_all_selected_expr_df %>% 
+    mutate(Spec_candidate = case_when(
+      TS_Median < NO_TS_Median ~ TRUE,
+      TS_Median >= NO_TS_Median ~ FALSE
+      #TRUE ~ "Similar" #This is the standard form for the else statement
+    ))
+  
+  final_plot_input_df = plot_input_df %>%
+    group_by(OG_ID, Query_tissue) %>%
+    summarise(Spec_candidate=sum(Spec_candidate))
+  
+  #Order factor
+  final_plot_input_df$Query_tissue = factor(final_plot_input_df$Query_tissue, levels = rev(ordered_tissues))
+  final_plot_input_df$Spec_candidate = as.character(final_plot_input_df$Spec_candidate)
+  
+  final_plot_input_df$Node = rep(ancestor, nrow(final_plot_input_df))
+  all_stacked_plots_df = rbind(all_stacked_plots_df, as.data.frame(final_plot_input_df))
+  #all_stacked_plots[[i]] = specialization_hyp_plot
+  #i = i+1
+}
+all_stacked_plots_df$Node = factor(all_stacked_plots_df$Node, levels=rev(c(all_ancestors[1:9], rev(all_ancestors[11:19]))))
+
+Query_node_number_raw = table(as.vector(unique(all_stacked_plots_df[,c("OG_ID", "Query_tissue", "Node")]))$Node)
+Query_node_number = paste0(names(Query_node_number_raw), " ~ ", unname(Query_node_number_raw), " gains")
+names(Query_node_number) = names(Query_node_number_raw)
+
+##################################################
+###### Randomization section ####################
+##################################################
+
+#### Filter on ancestors and tissue gains, then combine in a unique dataframe
+#all_stacked_plots = list()
+#i = 1
+all_density_plots_df = vector()
+for (ancestor in all_ancestors[all_ancestors!="Bilateria"]) {
+#for (ancestor in "Eutheria") {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species %in% get(ancestor)] = "TS" #Distinguish between genes belonging to the node or not
+    
+    #### Cycle on each OG_ID and remove species with losses
+    for (my_OG_ID in unique(as.vector(selected_expr_df$OG_ID))) {
+      species_with_losses = as.vector(subset(tissue_losses_df, (Tissue==tissue) & (OG_ID==my_OG_ID) & 
+                                               (TS_losses %in% get(ancestor) | TS_losses %in% get(paste0("sub_", ancestor))))$TS_losses)
+      ancestral_losses = species_with_losses[!(species_with_losses %in% ordered_species)]
+      if (length(ancestral_losses>0)) {
+        ancestral_losses_species = unique(unlist(lapply(list(ancestral_losses), get)))
+        species_with_losses = c(species_with_losses[!(species_with_losses != ancestral_losses)], ancestral_losses_species)
+      }
+      #### For each OG, remove species with losses
+      selected_expr_df$Category[(selected_expr_df$OG_ID==my_OG_ID & selected_expr_df$Species %in% species_with_losses)] = "NO_TS"
+      #### Remove the species whose tau is NA (so the gene is not expressed enough to pass the cutoffs
+      selected_expr_df = subset(selected_expr_df, !(OG_ID==my_OG_ID & 
+                                                      Species %in% as.vector(subset(all_tissue_tau_df, 
+                                                                                    Query_tissue==tissue & 
+                                                                                      OG_ID==my_OG_ID & 
+                                                                                      is.na(Tau)))))
+      #
+    }
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+
+    ##### This is where the randomization should occur
+  ########################################################
+  ########################################################
+  original_randomization_df = vector()
+  randomized_TS_among_genes_df = vector()
+  
+  original_expr = all_selected_expr_df
+    for (num in seq(1,100)) {
+      randomization_df = all_selected_expr_df
+      randomization_df$rand_round = rep(num, nrow(randomization_df))
+      original_randomization_df = rbind(original_randomization_df, randomization_df)
+  
+      randomization_df = randomization_df %>%
+        group_by(OG_ID, Query_tissue) %>%
+        dplyr::select(-c(Tissue, Scaled_expr)) %>%
+        distinct()
+      
+      randomized_TS_among_genes_df = rbind(randomized_TS_among_genes_df, as.data.frame(randomization_df))
+    }
+  
+  randomized_TS_among_genes_df = randomized_TS_among_genes_df %>% group_by(OG_ID, Query_tissue, rand_round) %>%
+      mutate(Category = sample(Category))
+
+  final_randomization_df = left_join(original_randomization_df, randomized_TS_among_genes_df, by=c("OG_ID", "GeneID", "Species", "Query_tissue", "rand_round")) %>%
+    dplyr::select(-Category.x) %>%
+    dplyr::rename(Category=Category.y)
+
+  ########################################################
+  ########################################################
+  final_randomization_df$Category = factor(final_randomization_df$Category, levels=c("TS", "NO_TS"))
+  final_all_selected_expr_df = final_randomization_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue, rand_round) %>%
+    summarise(Median=median(Scaled_expr))
+  
+  #### Get info about TS and no_TS species on the same row
+  #TS
+  final_TS_selected_expr_df = subset(final_all_selected_expr_df, Category=="TS")
+  colnames(final_TS_selected_expr_df)[colnames(final_TS_selected_expr_df)=="Median"] = "TS_Median"
+  final_TS_selected_expr_df$Category = NULL
+  #NO_TS
+  final_NOTS_selected_expr_df = subset(final_all_selected_expr_df, Category=="NO_TS")
+  colnames(final_NOTS_selected_expr_df)[colnames(final_NOTS_selected_expr_df)=="Median"] = "NO_TS_Median"
+  final_NOTS_selected_expr_df$Category = NULL
+  #Combine
+  combined_final_all_selected_expr_df = inner_join(final_TS_selected_expr_df, final_NOTS_selected_expr_df, 
+                                                   by=c("OG_ID"="OG_ID", "Query_tissue"="Query_tissue", "Tissue"="Tissue", "rand_round"="rand_round"))
+  
+  ###Subset only for tissues that are not the query tissue
+  combined_final_all_selected_expr_df = subset(combined_final_all_selected_expr_df, Query_tissue!=Tissue)
+  ###Add a label depending on the tissue medians
+  plot_input_df = combined_final_all_selected_expr_df %>% 
+    mutate(Spec_candidate = case_when(
+      TS_Median < NO_TS_Median ~ TRUE,
+      TS_Median >= NO_TS_Median ~ FALSE
+      #TRUE ~ "Similar" #This is the standard form for the else statement
+    ))
+  
+  final_plot_input_df = plot_input_df %>%
+    group_by(OG_ID, Query_tissue, rand_round) %>%
+    summarise(Spec_candidate=sum(Spec_candidate))
+  
+  #Order factor
+  final_plot_input_df$Query_tissue = factor(final_plot_input_df$Query_tissue, levels = rev(ordered_tissues))
+  final_plot_input_df$Spec_candidate = as.character(final_plot_input_df$Spec_candidate)
+  
+  final_plot_input_df$Node = rep(ancestor, nrow(final_plot_input_df))
+  all_density_plots_df = rbind(all_density_plots_df, as.data.frame(final_plot_input_df))
+  #all_stacked_plots[[i]] = specialization_hyp_plot
+  #i = i+1
+}
+
+#### Compute the proportion in each Node and rand_round for wchih Spec_candidate is >= 5.
+final_density_plots_df = all_density_plots_df %>%
+  mutate(High_values = case_when(
+      Spec_candidate >= 5 ~ TRUE,
+      Spec_candidate < 5 ~ FALSE)
+  ) %>% 
+  mutate(Total = TRUE) %>%
+  group_by(Node, rand_round) %>%
+  summarize(Spec_candidate=sum(High_values)/sum(Total))
+
+
+final_density_plots_df$Node = factor(final_density_plots_df$Node, levels=rev(c(all_ancestors[1:9], rev(all_ancestors[11:19]))))
+
+#### Plot
+specialization_hyp_plot = ggplot(data=all_stacked_plots_df, aes(y=Node, fill=Spec_candidate, color=Spec_candidate)) +
+  geom_bar(stat="count", position=position_fill(), alpha=0.8) +
+  geom_density_ridges(data=final_density_plots_df, aes(x=Spec_candidate, y=Node), 
+                      color="white", fill="firebrick1", alpha=0.8,
+                      scale=1, stroke=2, position=position_nudge(y=-0.4)) +
+  theme_bw() +
+  theme(axis.title = element_text(color="black"),
+        axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", face="bold", hjust=0.5)) +
+  scale_fill_brewer(palette = "BUgn", limits=as.character(seq(0,7)), breaks=as.character(seq(0,7))) +
+  scale_color_manual(values=c("7"="black", "6"="black", "5"="black", 
+                              "4"="white", "3"="white", "2"="white", "1"="white", "0"="white")) +
+  ggtitle("All ancestors") +
+  scale_y_discrete(labels = Query_node_number) +
+  ylab("Query tissue") +
+  labs(fill="Spec\nTis") +
+  guides(color=FALSE)
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelG.pdf", width=6, height=8)
+print(specialization_hyp_plot)
+dev.off()
+
+#### Save the dataframes to different variables AND to file:
+ancestor_stacked_plots_df = all_stacked_plots_df
+ancestor_final_density_plots = final_density_plots_df
+write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/ancestor_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/ancestor_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+```
+
+```{r test_specialization_expression_single_species, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setutp", "functions"), fig.width=6, fig.height=8, eval=FALSE}
+reference_OG = c("GF_013551", "GF_013830")
+all_orthogroups_df = read.delim(paste0(gene_sets_dir, my_version, "/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt"),
+                                header=FALSE, col.names = c("OG_ID", "Species", "GeneID"))
+reference_OGs_df = subset(all_orthogroups_df, OG_ID %in% reference_OG & 
+                            !(GeneID %in% c("FBgn0004403", "FBgn0033555", "ENSBTAG00000048169", "ENSBTAG00000054615", "ENSBTAG00000037600"))) #These are the genes that I need to exclude.
+reference_OGs_df = reference_OGs_df[,c("Species", "GeneID")]
+reference_OGs_df$Species = as.character(as.vector(reference_OGs_df$Species))
+reference_OGs_df$Species[reference_OGs_df$Species=="BmA"] = "Bmo"
+
+all_species_expr_df = vector()
+for (species in ordered_species) {
+  input_file = paste0(tau_dir, my_version, "/", species, "-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab")
+  input_df = read.delim(input_file, header=TRUE, row=1)
+  #Isolate reference gene expr and scale input expr
+  #reference_gene = unname(all_species_reference_genes[species])
+  #reference_gene_expr = as.numeric(as.vector(input_df[reference_gene,]))
+  #scaled_input_df = t(t(input_df)/reference_gene_expr)
+  #reference_gene = as.vector(subset(reference_OGs_df, Species==species)$GeneID)
+  #reference_gene_expr = as.numeric(unname(apply(input_df[reference_gene,], 2, mean))) #Compute the mean between the selected reference genes
+  #scaled_input_df = t(t(input_df)/reference_gene_expr)
+  scaled_input_df = input_df
+  ######
+  long_scaled_input_df = melt(as.matrix(scaled_input_df))
+  colnames(long_scaled_input_df) = c("GeneID", "Tissue", "Scaled_expr")
+  long_scaled_input_df$Species = rep(species, nrow(long_scaled_input_df))
+  all_species_expr_df = rbind(all_species_expr_df, long_scaled_input_df)
+}
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#### Upload losses info
+tissue_losses_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_losses_df = rbind(tissue_losses_df, input_df)
+}
+
+###### Filter only for gains that happened in the node of interest
+all_OGs_tissue_gains = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_OG_IDs = all_OGs_tissue_gains[!duplicated(all_OGs_tissue_gains)]
+tissue_gains_df$OG_ID_tissue = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_df = subset(tissue_gains_df, OG_ID_tissue %in% single_tissue_gains_OG_IDs)
+#single_tissue_gains_df = tissue_gains_df
+
+###### Upload OG_ID, gene correspondence from which the inference was performed
+all_tissue_tau_df = vector()
+for (tissue in ordered_tissues) {
+  tissue_tau_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-", tissue, "_specific_OGs.tab"),
+                           header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Expr_cutoff"))
+  tissue_tau_df$Query_tissue = rep(tissue, nrow(tissue_tau_df))
+  all_tissue_tau_df = rbind(all_tissue_tau_df, tissue_tau_df)
+}
+
+#Build GeneID - OG_ID dictionary
+unique_tissue_tau_df = unique(all_tissue_tau_df[,c("OG_ID", "Species", "GeneID")])
+GeneID_OG_ID_dict = hashmap(as.vector(unique_tissue_tau_df$GeneID), as.vector(unique_tissue_tau_df$OG_ID))
+
+all_stacked_plots_df = vector()
+for (ancestor in ordered_species) {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species==ancestor] = "TS" #Distinguish between genes belonging to the node or not
+    ###Since I am looking at single species, no need to remove species with losses.
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+  all_selected_expr_df$Category = factor(all_selected_expr_df$Category, levels=c("TS", "NO_TS"))
+  
+  final_all_selected_expr_df = all_selected_expr_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue) %>%
+    summarise(Median=median(Scaled_expr))
+  
+  #### Get info about TS and no_TS species on the same row
+  #TS
+  final_TS_selected_expr_df = subset(final_all_selected_expr_df, Category=="TS")
+  colnames(final_TS_selected_expr_df)[colnames(final_TS_selected_expr_df)=="Median"] = "TS_Median"
+  final_TS_selected_expr_df$Category = NULL
+  #NO_TS
+  final_NOTS_selected_expr_df = subset(final_all_selected_expr_df, Category=="NO_TS")
+  colnames(final_NOTS_selected_expr_df)[colnames(final_NOTS_selected_expr_df)=="Median"] = "NO_TS_Median"
+  final_NOTS_selected_expr_df$Category = NULL
+  #Combine
+  combined_final_all_selected_expr_df = inner_join(final_TS_selected_expr_df, final_NOTS_selected_expr_df, by=c("OG_ID"="OG_ID", "Query_tissue"="Query_tissue", "Tissue"="Tissue"))
+  ###Subset only for tissues that are not the query tissue
+  combined_final_all_selected_expr_df = subset(combined_final_all_selected_expr_df, Query_tissue!=Tissue)
+  ###Add a label depending on the tissue medians
+  plot_input_df = combined_final_all_selected_expr_df %>% 
+    mutate(Spec_candidate = case_when(
+      TS_Median < NO_TS_Median ~ TRUE,
+      TS_Median >= NO_TS_Median ~ FALSE
+      #TRUE ~ "Similar" #This is the standard form for the else statement
+    ))
+  
+  final_plot_input_df = plot_input_df %>%
+    group_by(OG_ID, Query_tissue) %>%
+    summarise(Spec_candidate=sum(Spec_candidate))
+  
+  #Order factor
+  final_plot_input_df$Query_tissue = factor(final_plot_input_df$Query_tissue, levels = rev(ordered_tissues))
+  final_plot_input_df$Spec_candidate = as.character(final_plot_input_df$Spec_candidate)
+  
+  final_plot_input_df$Node = rep(ancestor, nrow(final_plot_input_df))
+  all_stacked_plots_df = rbind(all_stacked_plots_df, as.data.frame(final_plot_input_df))
+}
+all_stacked_plots_df$Node = factor(all_stacked_plots_df$Node, levels=rev(ordered_species))
+
+Query_node_number_raw = table(as.vector(unique(all_stacked_plots_df[,c("OG_ID", "Query_tissue", "Node")]))$Node)
+Query_node_number = paste0(names(Query_node_number_raw), " ~ ", unname(Query_node_number_raw), " gains")
+names(Query_node_number) = names(Query_node_number_raw)
+
+##################################################
+###### Randomization section ####################
+##################################################
+
+#### Filter on ancestors and tissue gains, then combine in a unique dataframe
+all_density_plots_df = vector()
+for (ancestor in ordered_species) {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species==ancestor] = "TS" #Distinguish between genes belonging to the node or not
+    ##### I am not removing the species with losses, because I am considering only single species here.
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+
+  ##### This is where the randomization should occur
+  ########################################################
+  ########################################################
+  original_randomization_df = vector()
+  randomized_TS_among_genes_df = vector()
+  
+  original_expr = all_selected_expr_df
+    for (num in seq(1,100)) {
+      randomization_df = all_selected_expr_df
+      randomization_df$rand_round = rep(num, nrow(randomization_df))
+      original_randomization_df = rbind(original_randomization_df, randomization_df)
+  
+      randomization_df = randomization_df %>%
+        group_by(OG_ID, Query_tissue) %>%
+        dplyr::select(-c(Tissue, Scaled_expr)) %>%
+        distinct()
+      
+      randomized_TS_among_genes_df = rbind(randomized_TS_among_genes_df, as.data.frame(randomization_df))
+    }
+  
+  randomized_TS_among_genes_df = randomized_TS_among_genes_df %>% group_by(OG_ID, Query_tissue, rand_round) %>%
+      mutate(Category = sample(Category))
+
+final_randomization_df = left_join(original_randomization_df, randomized_TS_among_genes_df, by=c("OG_ID", "GeneID", "Species", "Query_tissue", "rand_round")) %>%
+  dplyr::select(-Category.x) %>%
+  dplyr::rename(Category=Category.y)
+
+  ########################################################
+  ########################################################
+
+  final_randomization_df$Category = factor(final_randomization_df$Category, levels=c("TS", "NO_TS"))
+  final_all_selected_expr_df = final_randomization_df %>%
+    group_by(OG_ID, Category, Query_tissue, Tissue, rand_round) %>%
+    summarise(Median=median(Scaled_expr))
+
+  #### Get info about TS and no_TS species on the same row
+  #TS
+  final_TS_selected_expr_df = subset(final_all_selected_expr_df, Category=="TS")
+  colnames(final_TS_selected_expr_df)[colnames(final_TS_selected_expr_df)=="Median"] = "TS_Median"
+  final_TS_selected_expr_df$Category = NULL
+  #NO_TS
+  final_NOTS_selected_expr_df = subset(final_all_selected_expr_df, Category=="NO_TS")
+  colnames(final_NOTS_selected_expr_df)[colnames(final_NOTS_selected_expr_df)=="Median"] = "NO_TS_Median"
+  final_NOTS_selected_expr_df$Category = NULL
+  #Combine
+  combined_final_all_selected_expr_df = inner_join(final_TS_selected_expr_df, final_NOTS_selected_expr_df,
+                                                   by=c("OG_ID"="OG_ID", "Query_tissue"="Query_tissue", "Tissue"="Tissue", "rand_round"="rand_round"))
+
+  ###Subset only for tissues that are not the query tissue
+  combined_final_all_selected_expr_df = subset(combined_final_all_selected_expr_df, Query_tissue!=Tissue)
+  ###Add a label depending on the tissue medians
+  plot_input_df = combined_final_all_selected_expr_df %>%
+    mutate(Spec_candidate = case_when(
+      TS_Median < NO_TS_Median ~ TRUE,
+      TS_Median >= NO_TS_Median ~ FALSE
+    ))
+
+  final_plot_input_df = plot_input_df %>%
+    group_by(OG_ID, Query_tissue, rand_round) %>%
+    summarise(Spec_candidate=sum(Spec_candidate))
+
+  #Order factor
+  final_plot_input_df$Query_tissue = factor(final_plot_input_df$Query_tissue, levels = rev(ordered_tissues))
+  final_plot_input_df$Spec_candidate = as.character(final_plot_input_df$Spec_candidate)
+
+  final_plot_input_df$Node = rep(ancestor, nrow(final_plot_input_df))
+  all_density_plots_df = rbind(all_density_plots_df, as.data.frame(final_plot_input_df))
+}
+
+#### Compute the proportion in each Node and rand_round for wchih Spec_candidate is >= 5.
+final_density_plots_df = all_density_plots_df %>%
+  mutate(High_values = case_when(
+      Spec_candidate >= 5 ~ TRUE,
+      Spec_candidate < 5 ~ FALSE)
+  ) %>%
+  mutate(Total = TRUE) %>%
+  group_by(Node, rand_round) %>%
+  summarize(Spec_candidate=sum(High_values)/sum(Total))
+
+
+final_density_plots_df$Node = factor(final_density_plots_df$Node, levels=rev(ordered_species))
+
+#### Plot
+specialization_hyp_plot = ggplot(data=all_stacked_plots_df, aes(y=Node, fill=Spec_candidate, color=Spec_candidate)) +
+  geom_bar(stat="count", position=position_fill(), alpha=0.8) +
+  geom_density_ridges(data=final_density_plots_df, aes(x=Spec_candidate, y=Node), 
+                      color="white", fill="firebrick1", alpha=0.8,
+                      scale=1, stroke=2, position=position_nudge(y=-0.4)) +
+  theme_bw() +
+  theme(axis.title = element_text(color="black"),
+        axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", face="bold", hjust=0.5)) +
+  scale_fill_brewer(palette = "BUgn", limits=as.character(seq(0,7)), breaks=as.character(seq(0,7))) +
+  scale_color_manual(values=c("7"="black", "6"="black", "5"="black", 
+                              "4"="white", "3"="white", "2"="white", "1"="white", "0"="white")) +
+  ggtitle("All species") +
+  scale_y_discrete(labels = Query_node_number) +
+  ylab("Query tissue") +
+  labs(fill="Spec\nTis") +
+  guides(color=FALSE)
+
+
+print(specialization_hyp_plot)
+# panel_B = specialization_hyp_plot
+# 
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_sup/SupFig9-panel_E.pdf", width=6, height=8)
+print(specialization_hyp_plot)
+dev.off()
+
+species_stacked_plots_df = all_stacked_plots_df
+species_final_density_plots = final_density_plots_df
+write.table(species_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/species_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+write.table(species_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/species_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+```
+
+```{r nodes_and_species_collapsed_specialization, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=6, fig.height=4}
+combined_stacked_plots_df = rbind(ancestor_stacked_plots_df, species_stacked_plots_df)
+combined_final_density_plots_df = rbind(ancestor_final_density_plots, species_final_density_plots)
+
+#### Add groups for plotting
+combined_stacked_plots_df$plot_group = rep("Vertebrate_nodes", nrow(combined_stacked_plots_df))
+combined_stacked_plots_df$plot_group[combined_stacked_plots_df$Node %in% sub_Arthropoda] = "Insect_nodes" #select only insect nodes
+combined_stacked_plots_df$plot_group[combined_stacked_plots_df$Node %in% c("Chordata", "Deuterostoma", "Arthropoda", "Protostoma")] = "Outgroup_nodes" #select only outgroup modes
+combined_stacked_plots_df$plot_group[combined_stacked_plots_df$Node %in% Vertebrata] = "Vertebrate_species" #select only verterbate species
+combined_stacked_plots_df$plot_group[combined_stacked_plots_df$Node %in% Insecta] = "Insect_species" #select only insect species
+combined_stacked_plots_df$plot_group[combined_stacked_plots_df$Node %in% Outgroups] = "Outgroup_species" #select only outgroup species
+
+#### Add groups for plotting
+combined_final_density_plots_df$plot_group = rep("Vertebrate_nodes", nrow(combined_final_density_plots_df))
+combined_final_density_plots_df$plot_group[combined_final_density_plots_df$Node %in% sub_Arthropoda] = "Insect_nodes" #select only insect nodes
+combined_final_density_plots_df$plot_group[combined_final_density_plots_df$Node %in% c("Chordata", "Deuterostoma", "Arthropoda", "Protostoma")] = "Outgroup_nodes" #select only outgroup modes
+combined_final_density_plots_df$plot_group[combined_final_density_plots_df$Node %in% Vertebrata] = "Vertebrate_species" #select only verterbate species
+combined_final_density_plots_df$plot_group[combined_final_density_plots_df$Node %in% Insecta] = "Insect_species" #select only insect species
+combined_final_density_plots_df$plot_group[combined_final_density_plots_df$Node %in% Outgroups] = "Outgroup_species" #select only outgroup species
+
+
+#Order factor
+ordered_levels = c("Vertebrate_nodes", "Insect_nodes", "Outgroup_nodes", "Vertebrate_species", "Insect_species", "Outgroup_species")
+combined_stacked_plots_df$plot_group = factor(combined_stacked_plots_df$plot_group, levels=rev(ordered_levels))
+combined_final_density_plots_df$plot_group = factor(combined_final_density_plots_df$plot_group, levels=rev(ordered_levels))
+
+#Get number
+Query_node_number_raw = table(as.vector(unique(combined_stacked_plots_df[,c("OG_ID", "Query_tissue", "plot_group")]))$plot_group)
+Query_node_number = paste0(sub("_", " ", names(Query_node_number_raw)), " ~ ", unname(Query_node_number_raw))
+names(Query_node_number) = names(Query_node_number_raw)
+
+combined_specialization_hyp_plot = ggplot(data=combined_stacked_plots_df, aes(y=plot_group, fill=Spec_candidate, color=Spec_candidate)) +
+  geom_bar(stat="count", position=position_fill(), alpha=0.8) +
+  geom_density_ridges(data=combined_final_density_plots_df, aes(x=Spec_candidate, y=plot_group), 
+                      color="white", fill="firebrick1", alpha=0.8,
+                      scale=1, stroke=2, position=position_nudge(y=-0.4)) +
+  theme_bw() +
+  theme(axis.title = element_text(color="black"),
+        axis.text = element_text(color="black"),
+        plot.title = element_text(color="black", face="bold", hjust=0.5)) +
+  scale_fill_brewer(palette = "BUgn", limits=as.character(seq(0,7)), breaks=as.character(seq(0,7))) +
+  scale_color_manual(values=c("7"="black", "6"="black", "5"="black", 
+                              "4"="white", "3"="white", "2"="white", "1"="white", "0"="white")) +
+  #ggtitle("All species") +
+  scale_y_discrete(labels = Query_node_number) +
+  ylab("Query tissue") +
+  labs(fill="Spec\nTis") +
+  guides(color=FALSE)
+
+print(combined_specialization_hyp_plot)
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/collapsed_specialization_plot.pdf", width=6, height=4)
+print(combined_specialization_hyp_plot)
+dev.off()
+```
+
+
+<!-- Panel G: Specialization scatterplot: duplication vs non-duplication -->
+```{r specialization_scenario_ancestor_by_duplication_scatterplot, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.width=6, fig.height=6, eval=FALSE}
+#### Build table for duplication status
+orthogroups_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"),
+                            header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Tissue_paralog", "Expr_cutoff"), stringsAsFactors = FALSE)
+orthogroups_df$Species[orthogroups_df$Species == "BmA"] = "Bmo"
+#### Remove entries that do not pass the cutoff
+orthogroups_df = subset(orthogroups_df, Tau!="-Inf")[,c("OG_ID", "Species", "GeneID")]
+orthogroups_df$OG_ID_Species = paste0(orthogroups_df$OG_ID, "_", orthogroups_df$Species)
+species_paralogs_count_df = as.data.frame(table(orthogroups_df$OG_ID_Species))
+OG_ID_Species_paralogs_counts_dict = hashmap(as.vector(species_paralogs_count_df$Var1), as.vector(species_paralogs_count_df$Freq))
+orthogroups_df$Paralogs_count = OG_ID_Species_paralogs_counts_dict$find(orthogroups_df$OG_ID_Species)
+### Get the duplicated genes
+duplicated_genes = as.vector(subset(orthogroups_df, Paralogs_count>1)$GeneID)
+
+#### BUild expression table
+reference_OG = c("GF_013551", "GF_013830")
+all_orthogroups_df = read.delim(paste0(gene_sets_dir, my_version, "/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt"),
+                                header=FALSE, col.names = c("OG_ID", "Species", "GeneID"))
+reference_OGs_df = subset(all_orthogroups_df, OG_ID %in% reference_OG & 
+                            !(GeneID %in% c("FBgn0004403", "FBgn0033555", "ENSBTAG00000048169", "ENSBTAG00000054615", "ENSBTAG00000037600"))) #These are the genes that I need to exclude.
+reference_OGs_df = reference_OGs_df[,c("Species", "GeneID")]
+reference_OGs_df$Species = as.character(as.vector(reference_OGs_df$Species))
+reference_OGs_df$Species[reference_OGs_df$Species=="BmA"] = "Bmo"
+
+all_species_expr_df = vector()
+for (species in ordered_species) {
+  input_file = paste0(tau_dir, my_version, "/", species, "-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab")
+  input_df = read.delim(input_file, header=TRUE, row=1)
+  #Isolate reference gene expr and scale input expr
+  #reference_gene = as.vector(subset(reference_OGs_df, Species==species)$GeneID)
+  #reference_gene_expr = as.numeric(unname(apply(input_df[reference_gene,], 2, mean))) #Compute the mean between the selected reference genes
+  #scaled_input_df = t(t(input_df)/reference_gene_expr)
+  scaled_input_df = input_df
+  ######
+  long_scaled_input_df = melt(as.matrix(scaled_input_df))
+  colnames(long_scaled_input_df) = c("GeneID", "Tissue", "Scaled_expr")
+  long_scaled_input_df$Species = rep(species, nrow(long_scaled_input_df))
+  all_species_expr_df = rbind(all_species_expr_df, long_scaled_input_df)
+}
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#### Upload losses info
+tissue_losses_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_losses_df = rbind(tissue_losses_df, input_df)
+}
+
+###### Filter only for gains that happened in the node of interest
+all_OGs_tissue_gains = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_OG_IDs = all_OGs_tissue_gains[!duplicated(all_OGs_tissue_gains)]
+tissue_gains_df$OG_ID_tissue = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_df = subset(tissue_gains_df, OG_ID_tissue %in% single_tissue_gains_OG_IDs)
+
+###### Upload OG_ID, gene correspondence from which the inference was performed
+all_tissue_tau_df = vector()
+for (tissue in ordered_tissues) {
+  tissue_tau_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-", tissue, "_specific_OGs.tab"),
+                           header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Expr_cutoff"))
+  tissue_tau_df$Query_tissue = rep(tissue, nrow(tissue_tau_df))
+  all_tissue_tau_df = rbind(all_tissue_tau_df, tissue_tau_df)
+}
+
+#Build GeneID - OG_ID dictionary
+unique_tissue_tau_df = unique(all_tissue_tau_df[,c("OG_ID", "Species", "GeneID")])
+GeneID_OG_ID_dict = hashmap(as.vector(unique_tissue_tau_df$GeneID), as.vector(unique_tissue_tau_df$OG_ID))
+
+#### Filter on ancestors and tissue gains, then combine in a unique dataframe
+all_ancestors_final_df = vector()
+for (ancestor in all_ancestors[all_ancestors!="Bilateria"]) {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species %in% get(ancestor)] = "TS" #Distinguish between genes belonging to the node or not
+    
+    #### Cycle on each OG_ID and remove species with losses
+    for (my_OG_ID in unique(as.vector(selected_expr_df$OG_ID))) {
+      species_with_losses = as.vector(subset(tissue_losses_df, (Tissue==tissue) & (OG_ID==my_OG_ID) & 
+                                               (TS_losses %in% get(ancestor) | TS_losses %in% get(paste0("sub_", ancestor))))$TS_losses)
+      ancestral_losses = species_with_losses[!(species_with_losses %in% ordered_species)]
+      if (length(ancestral_losses>0)) {
+        ancestral_losses_species = unique(unlist(lapply(list(ancestral_losses), get)))
+        species_with_losses = c(species_with_losses[!(species_with_losses != ancestral_losses)], ancestral_losses_species)
+      }
+      #### For each OG, remove species with losses
+      selected_expr_df$Category[(selected_expr_df$OG_ID==my_OG_ID & selected_expr_df$Species %in% species_with_losses)] = "NO_TS"
+      #### Remove the species whose tau is NA (so the gene is not expressed enough to pass the cutoffs
+      selected_expr_df = subset(selected_expr_df, !(OG_ID==my_OG_ID & 
+                                                      Species %in% as.vector(subset(all_tissue_tau_df, 
+                                                                                    Query_tissue==tissue & 
+                                                                                      OG_ID==my_OG_ID & 
+                                                                                      is.na(Tau)))))
+      #
+    }
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+  all_selected_expr_df$Category = factor(all_selected_expr_df$Category, levels=c("TS", "NO_TS"))
+  
+  ###### Add the duplication status
+  all_selected_expr_df$Dup_status = rep("NO_dup", nrow(all_selected_expr_df))
+  all_selected_expr_df$Dup_status[all_selected_expr_df$GeneID %in% duplicated_genes] = "Dup"
+  all_selected_expr_df$Dup_status[all_selected_expr_df$Category=="NO_TS"] = "NO_TS" #Consider all the non-TS genes together, independently from their dup status
+  all_selected_expr_df$Dup_status = factor(all_selected_expr_df$Dup_status, levels=c("Dup", "NO_dup", "NO_TS"))
+  
+  final_all_selected_expr_df = all_selected_expr_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue, Dup_status) %>%
+    summarise(Median=median(Scaled_expr)) %>%
+    filter(Tissue!=Query_tissue) %>% #remove entries for the query tissue
+    group_by(OG_ID, Category, Query_tissue, Dup_status) %>%
+    summarize(NO_TS_tissues_median=median(Median))
+  
+  ##### Get a unique non-TS reference dataframe
+  noTS_df = final_all_selected_expr_df %>%
+    filter(Dup_status=="NO_TS" & Category=="NO_TS") %>%
+    rename(NO_TS_tissues_median = "NO_TS_median") %>%
+    ungroup %>%
+    dplyr::select(-c(Dup_status, Category))
+  
+  ##### Work on the duplicated TS entries
+  duplicated_entries_TS_df = final_all_selected_expr_df %>%
+    filter(Dup_status=="Dup", Category=="TS") %>%
+    rename(NO_TS_tissues_median = "Dup_TS_median") %>%
+    ungroup %>%
+    dplyr::select(-c(Dup_status, Category))
+  
+  # duplicated_entries_noTS_df = final_all_selected_expr_df %>%
+  #   filter(Dup_status=="Dup" & Category=="NO_TS") %>%
+  #   rename(NO_TS_tissues_median = "Dup_NO_TS_median") %>%
+  #   ungroup %>%
+  #   dplyr::select(-c(Dup_status, Category))
+  
+  duplicated_entries_df = inner_join(duplicated_entries_TS_df, noTS_df, by=c("OG_ID", "Query_tissue")) %>%
+    mutate(Delta_Dup_NO_TS_vs_TS = NO_TS_median - Dup_TS_median)
+  
+  ##### Work on non-duplicated entries
+  non_duplicated_entries_TS_df = final_all_selected_expr_df %>%
+    filter(Dup_status=="NO_dup", Category=="TS") %>%
+    rename(NO_TS_tissues_median = "NO_dup_TS_median") %>%
+    ungroup %>%
+    dplyr::select(-c(Dup_status, Category))
+  
+  # non_duplicated_entries_noTS_df = final_all_selected_expr_df %>%
+  #   filter(Dup_status=="Dup" & Category=="NO_TS") %>%
+  #   rename(NO_TS_tissues_median = "NO_dup_NO_TS_median") %>%
+  #   ungroup %>%
+  #   dplyr::select(-c(Dup_status, Category))
+  
+  non_duplicated_entries_df = inner_join(non_duplicated_entries_TS_df, noTS_df, by=c("OG_ID", "Query_tissue")) %>%
+    mutate(Delta_NO_dup_NO_TS_vs_TS = NO_TS_median - NO_dup_TS_median)
+  
+  ##### Join duplicated entries
+  final_duplicated_df = inner_join(duplicated_entries_df, non_duplicated_entries_df, by=c("OG_ID", "Query_tissue"))
+  final_duplicated_df$Node = rep(ancestor, nrow(final_duplicated_df))
+  all_ancestors_final_df = rbind(all_ancestors_final_df, final_duplicated_df)
+  # Query_tissue_number_raw = table(as.vector(unique(final_all_selected_expr_df[,c("OG_ID", "Query_tissue")]))$Query_tissue)
+  # Query_tissue_number = paste0(names(Query_tissue_number_raw), " ~ ", unname(Query_tissue_number_raw), " OGs")
+  # names(Query_tissue_number) = names(Query_tissue_number_raw)
+}
+
+#### Plot
+all_ancestors_final_df$Node = factor(all_ancestors_final_df$Node, levels=all_ancestors)
+dup_status_plot = ggplot(data=all_ancestors_final_df, aes(x=Delta_Dup_NO_TS_vs_TS, y=Delta_NO_dup_NO_TS_vs_TS, color=Query_tissue)) +
+  geom_point(size=2) +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  geom_vline(xintercept = 0, linetype="dashed") +
+  theme(axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black"),
+        plot.title = element_text(color="black", face="bold", hjust=0.5)) +
+  scale_color_manual(values=my_color_vector) +
+  ggtitle("Duplicated vs Non-duplicated TS genes") +
+  #scale_y_continuous(limits=c(0,1)) +
+  coord_fixed() +
+  ylab("Delta (non-TS - NO dup TS)") +
+  xlab("Delta (non-TS - Dup TS)") +
+  geom_abline(slope = 1, yintercept=0) +
+  guides(color=FALSE) +
+  facet_wrap(~Node)
+
+print(dup_status_plot)
+
+all_dup_status_plot = ggplot(data=all_ancestors_final_df, aes(x=Delta_Dup_NO_TS_vs_TS, y=Delta_NO_dup_NO_TS_vs_TS, color=Query_tissue)) +
+  geom_point() +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  geom_vline(xintercept = 0, linetype="dashed") +
+  theme(axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black"),
+        plot.title = element_text(color="black", face="bold", hjust=0.5),
+        panel.grid.minor = element_blank()) +
+  scale_color_manual(values=my_color_vector) +
+  #ggtitle("Duplicated vs Non-duplicated TS genes - all ancestors") +
+  scale_y_continuous(breaks=number_ticks(6)) +
+  scale_x_continuous(breaks=number_ticks(6)) +
+  coord_fixed() +
+  ylab("Delta (non-TS - NO dup TS)") +
+  xlab("Delta (non-TS - Dup TS)") +
+  geom_abline(slope = 1, yintercept=0) +
+  guides(color=FALSE)
+
+print(all_dup_status_plot)
+
+##### Plot with density
+all_ancestors_final_df$density = get_density(all_ancestors_final_df$Delta_Dup_NO_TS_vs_TS, all_ancestors_final_df$Delta_NO_dup_NO_TS_vs_TS, n = 50)
+all_dup_status_plot = ggplot(data=all_ancestors_final_df, aes(x=Delta_Dup_NO_TS_vs_TS, y=Delta_NO_dup_NO_TS_vs_TS, color=density)) +
+  geom_point() +
+  theme_bw() +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  geom_vline(xintercept = 0, linetype="dashed") +
+  theme(axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black"),
+        plot.title = element_text(color="black", face="bold", hjust=0.5),
+        panel.grid.minor = element_blank(),
+        legend.position="bottom") +
+  #scale_color_manual(values=my_color_vector) +
+  scale_color_viridis(option="viridis") +
+  #scale_color_distiller(palette = "YlGn", direction=-1) +
+  #ggtitle("Duplicated vs Non-duplicated TS genes - all ancestors") +
+  scale_y_continuous(breaks=number_ticks(6)) +
+  scale_x_continuous(breaks=number_ticks(6)) +
+  coord_fixed() +
+  #coord_fixed(xlim=c(-0.5, 0.9), ylim=c(-0.45, 0.87)) +
+  ylab("Delta (non-TS - NO dup TS)") +
+  xlab("Delta (non-TS - Dup TS)") +
+  geom_abline(slope = 1, yintercept=0) +
+  guides(color="none")
+
+print(all_dup_status_plot)
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelH.pdf", width=3, height=3)
+print(all_dup_status_plot)
+dev.off()
+```
+
+
+<!-- Generate pdfs to add to Mendeley Data repository -->
+```{r all_expression_patterns_v1_ancestors, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("seutp", "functions"), fig.width=12, fig.height=7, eval=FALSE}
+#### Build expression table: all genes from all species across all tissues
+all_species_expr_df = vector()
+for (species in ordered_species) {
+  input_file = paste0(tau_dir, my_version, "/", species, "-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab")
+  input_df = read.delim(input_file, header=TRUE, row=1)
+  scaled_input_df = input_df
+  ######
+  long_scaled_input_df = melt(as.matrix(scaled_input_df))
+  colnames(long_scaled_input_df) = c("GeneID", "Tissue", "Scaled_expr")
+  long_scaled_input_df$Species = rep(species, nrow(long_scaled_input_df))
+  all_species_expr_df = rbind(all_species_expr_df, long_scaled_input_df)
+}
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#### Upload losses info
+tissue_losses_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_losses_df = rbind(tissue_losses_df, input_df)
+}
+
+###### Filter only for gains that happened in the node of interest
+all_OGs_tissue_gains = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_OG_IDs = all_OGs_tissue_gains[!duplicated(all_OGs_tissue_gains)]
+tissue_gains_df$OG_ID_tissue = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_df = subset(tissue_gains_df, OG_ID_tissue %in% single_tissue_gains_OG_IDs)
+
+###### Upload OG_ID, gene correspondence from which the inference was performed
+all_tissue_tau_df = vector()
+for (tissue in ordered_tissues) {
+  tissue_tau_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-", tissue, "_specific_OGs.tab"),
+                           header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Expr_cutoff"))
+  tissue_tau_df$Query_tissue = rep(tissue, nrow(tissue_tau_df))
+  all_tissue_tau_df = rbind(all_tissue_tau_df, tissue_tau_df)
+}
+
+#Build GeneID - OG_ID dictionary
+unique_tissue_tau_df = unique(all_tissue_tau_df[,c("OG_ID", "Species", "GeneID")])
+GeneID_OG_ID_dict = hashmap(as.vector(unique_tissue_tau_df$GeneID), as.vector(unique_tissue_tau_df$OG_ID))
+
+#### Filter on ancestors and tissue gains, then combine in a unique dataframe
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/all_ancestors_gains-expression_between_TS_and_nonTS_species.pdf", width=12, height=7)
+for (ancestor in all_ancestors[all_ancestors!="Bilateria"]) {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species %in% get(ancestor)] = "TS" #Distinguish between genes belonging to the node or not
+    
+    #### Cycle on each OG_ID and remove species with losses
+    for (my_OG_ID in unique(as.vector(selected_expr_df$OG_ID))) {
+      species_with_losses = as.vector(subset(tissue_losses_df, (Tissue==tissue) & (OG_ID==my_OG_ID) & 
+                                               (TS_losses %in% get(ancestor) | TS_losses %in% get(paste0("sub_", ancestor))))$TS_losses)
+      ancestral_losses = species_with_losses[!(species_with_losses %in% ordered_species)]
+      if (length(ancestral_losses>0)) {
+        ancestral_losses_species = unique(unlist(lapply(list(ancestral_losses), get)))
+        species_with_losses = c(species_with_losses[!(species_with_losses != ancestral_losses)], ancestral_losses_species)
+      }
+      #### For each OG, remove species with losses
+      selected_expr_df$Category[(selected_expr_df$OG_ID==my_OG_ID & selected_expr_df$Species %in% species_with_losses)] = "NO_TS"
+      #### Remove the species whose tau is NA (so the gene is not expressed enough to pass the cutoffs
+      selected_expr_df = subset(selected_expr_df, !(OG_ID==my_OG_ID & 
+                                                      Species %in% as.vector(subset(all_tissue_tau_df, 
+                                                                                    Query_tissue==tissue & 
+                                                                                      OG_ID==my_OG_ID & 
+                                                                                      is.na(Tau)))))
+      #
+    }
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+  all_selected_expr_df$Category = factor(all_selected_expr_df$Category, levels=c("TS", "NO_TS"))
+  
+  final_all_selected_expr_df = all_selected_expr_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue) %>%
+    summarise(Median=median(Scaled_expr))
+  
+  Query_tissue_number_raw = table(as.vector(unique(final_all_selected_expr_df[,c("OG_ID", "Query_tissue")]))$Query_tissue)
+  Query_tissue_number = paste0(names(Query_tissue_number_raw), " ~ ", unname(Query_tissue_number_raw), " OGs")
+  names(Query_tissue_number) = names(Query_tissue_number_raw)
+  
+  #### Plot
+  clade_expr_plot = ggplot(data=final_all_selected_expr_df, aes(x=Tissue, y=Median, fill=Tissue)) +
+  geom_boxplot(alpha=0.8, color="black", outlier.size = 0.5, stroke=0.8) +
+  theme_bw() +
+  theme(axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1),
+        plot.title = element_text(color="black", face="bold")) +
+  scale_fill_manual(values=my_color_vector) +
+  ggtitle(paste0(ancestor)) +
+  coord_cartesian(ylim = c(0,8)) +
+  guides(fill=FALSE)
+
+  final_clade_expr_plot = clade_expr_plot + facet_nested_wrap(~Query_tissue+Category, labeller = labeller(Query_tissue=Query_tissue_number), drop=FALSE, nrow=2, scales = "free")
+  print(final_clade_expr_plot)
+}
+dev.off()
+
+# pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelE.pdf", width=12, height=7)
+# print(final_clade_expr_plot)
+# dev.off()
+```
+
+```{r all_expression_patterns_v1_species, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("seutp", "functions"), fig.width=12, fig.height=7, eval=FALSE}
+#### Build expression table: all genes from all species across all tissues
+all_species_expr_df = vector()
+for (species in ordered_species) {
+  input_file = paste0(tau_dir, my_version, "/", species, "-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab")
+  input_df = read.delim(input_file, header=TRUE, row=1)
+  scaled_input_df = input_df
+  ######
+  long_scaled_input_df = melt(as.matrix(scaled_input_df))
+  colnames(long_scaled_input_df) = c("GeneID", "Tissue", "Scaled_expr")
+  long_scaled_input_df$Species = rep(species, nrow(long_scaled_input_df))
+  all_species_expr_df = rbind(all_species_expr_df, long_scaled_input_df)
+}
+
+#### Upload gains info
+tissue_gains_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_gains_df = rbind(tissue_gains_df, input_df)
+}
+
+#### Upload losses info
+tissue_losses_df = vector()
+for (tissue in ordered_tissues) {
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  input_df$Tissue = rep(tissue, nrow(input_df))
+  tissue_losses_df = rbind(tissue_losses_df, input_df)
+}
+
+###### Filter only for gains that happened in the node of interest
+all_OGs_tissue_gains = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_OG_IDs = all_OGs_tissue_gains[!duplicated(all_OGs_tissue_gains)]
+tissue_gains_df$OG_ID_tissue = paste0(tissue_gains_df$OG_ID, "_", tissue_gains_df$Tissue)
+single_tissue_gains_df = subset(tissue_gains_df, OG_ID_tissue %in% single_tissue_gains_OG_IDs)
+
+###### Upload OG_ID, gene correspondence from which the inference was performed
+all_tissue_tau_df = vector()
+for (tissue in ordered_tissues) {
+  tissue_tau_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-", tissue, "_specific_OGs.tab"),
+                           header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Expr_cutoff"))
+  tissue_tau_df$Query_tissue = rep(tissue, nrow(tissue_tau_df))
+  all_tissue_tau_df = rbind(all_tissue_tau_df, tissue_tau_df)
+}
+
+#Build GeneID - OG_ID dictionary
+unique_tissue_tau_df = unique(all_tissue_tau_df[,c("OG_ID", "Species", "GeneID")])
+GeneID_OG_ID_dict = hashmap(as.vector(unique_tissue_tau_df$GeneID), as.vector(unique_tissue_tau_df$OG_ID))
+
+#### Filter on ancestors and tissue gains, then combine in a unique dataframe
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/all_species_gains-expression_between_TS_and_nonTS_species.pdf", width=12, height=7)
+for (ancestor in ordered_species) {
+  all_selected_expr_df = vector()
+  for (tissue in ordered_tissues) {
+    ancestor_tissue_gains_OG_IDs = as.vector(subset(single_tissue_gains_df, TS_gains==ancestor & Tissue==tissue)$OG_ID)
+    ancestor_tissue_gains_genes = as.vector(subset(all_tissue_tau_df, OG_ID %in% ancestor_tissue_gains_OG_IDs & Query_tissue==tissue)$GeneID)
+    selected_expr_df = subset(all_species_expr_df, GeneID %in% ancestor_tissue_gains_genes)
+    #### Add OG_ID
+    selected_expr_df$OG_ID = GeneID_OG_ID_dict$find(selected_expr_df$GeneID)
+    selected_expr_df$Category = rep("NO_TS", nrow(selected_expr_df))
+    selected_expr_df$Category[selected_expr_df$Species==ancestor] = "TS" #Distinguish between genes belonging to the node or not
+    
+    #### Cycle on each OG_ID and remove the species whose tau is NA (so the gene is not expressed enough to pass the cutoffs
+    for (my_OG_ID in unique(as.vector(selected_expr_df$OG_ID))) {
+      selected_expr_df = subset(selected_expr_df, !(OG_ID==my_OG_ID & Species %in% as.vector(subset(all_tissue_tau_df, 
+                                                                                    Query_tissue==tissue & 
+                                                                                      OG_ID==my_OG_ID & 
+                                                                                      is.na(Tau)))))
+    }
+    selected_expr_df$Query_tissue = rep(tissue, nrow(selected_expr_df)) #Add query tissue for plotting
+    all_selected_expr_df = rbind(all_selected_expr_df, selected_expr_df)
+  }
+  all_selected_expr_df$Tissue = factor(all_selected_expr_df$Tissue, levels=ordered_tissues)
+  all_selected_expr_df$Query_tissue = factor(all_selected_expr_df$Query_tissue, levels=ordered_tissues)
+  all_selected_expr_df$Category = factor(all_selected_expr_df$Category, levels=c("TS", "NO_TS"))
+  
+  final_all_selected_expr_df = all_selected_expr_df %>% 
+    group_by(OG_ID, Category, Query_tissue, Tissue) %>%
+    summarise(Median=median(Scaled_expr))
+  
+  Query_tissue_number_raw = table(as.vector(unique(final_all_selected_expr_df[,c("OG_ID", "Query_tissue")]))$Query_tissue)
+  Query_tissue_number = paste0(names(Query_tissue_number_raw), " ~ ", unname(Query_tissue_number_raw), " OGs")
+  names(Query_tissue_number) = names(Query_tissue_number_raw)
+  
+  #### Plot
+  clade_expr_plot = ggplot(data=final_all_selected_expr_df, aes(x=Tissue, y=Median, fill=Tissue)) +
+  geom_boxplot(alpha=0.8, color="black", outlier.size = 0.5, stroke=0.8) +
+  theme_bw() +
+  theme(axis.title = element_text(color="black"),
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1),
+        plot.title = element_text(color="black", face="bold")) +
+  scale_fill_manual(values=my_color_vector) +
+  ggtitle(paste0(ancestor)) +
+  #scale_y_continuous(limits=c(0,1)) +
+  #coord_cartesian(ylim = c(0,1)) +
+  guides(fill=FALSE)
+
+  final_clade_expr_plot = clade_expr_plot + facet_nested_wrap(~Query_tissue+Category, labeller = labeller(Query_tissue=Query_tissue_number), drop=FALSE, nrow=2, scales = "free")
+  print(final_clade_expr_plot)
+}
+dev.off()
+```
