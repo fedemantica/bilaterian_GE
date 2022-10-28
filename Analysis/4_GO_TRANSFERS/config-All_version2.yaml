@@ -1,0 +1,26 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  GO_raw_files: "/users/mirimia/fmantica/projects/bilaterian_GE/src/snakemake/4_GO_TRANSFERS/downloaded_files"
+  GO_transfers: "/users/mirimia/fmantica/projects/bilaterian_GE/data/GO_transfers"
+  orthogroups_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/broccoli" 
+  clueGO_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/src/snakemake/4_GO_TRANSFERS/downloaded_files/clueGO"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  pfam_raw_files: "/users/mirimia/fmantica/projects/bilaterian_GE/data/PFAM_transfers/raw_files"
+  pfam_transfers: "/users/mirimia/fmantica/projects/bilaterian_GE/data/PFAM_transfers"
+
+tools:
+  retrieve_ensembl_IDs: "bin/retrieve_ensembl_IDs.py"
+  get_cluego_annot: "bin/get_clueGO_annot.py"
+  transfer_GO: "bin/TransferGOs_toOrthogroups.py"
+  get_gtm_files: "bin/get_gmt_files.py"
+ 
+variables:
+  my_version: "All_version2"
+  cluego_cat: ["BiologicalProcess", "MolecularFunction", "CellularComponent"]
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  higher_GO_cutoff_dict: {"Hs2" : 1500, "Dme" : 500}
+  lower_GO_cutoff_dict: {"Hs2" : 3, "Dme" : 3}
