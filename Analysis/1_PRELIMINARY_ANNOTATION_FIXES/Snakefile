@@ -1,0 +1,888 @@
+########## config file #########
+configfile: "config.yaml"
+
+########## paths ###############
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+BROCCOLI = config["paths"]["broccoli"]
+DATABASE = config["paths"]["database"]
+GENOME_DIR = config["paths"]["genome_dir"]
+GTF_REF_DIR = config["paths"]["gtf_ref_dir"]
+GTF_MASTER_DIR = config["paths"]["gtf_master_dir"]
+EXINT_REF_DIR = config["paths"]["exint_ref_dir"]
+GENEID_PARAMS = config["paths"]["geneID_params"]
+PROBLEMATIC_GENES = config["paths"]["problematic_genes"]
+
+########## variables ###########
+ALL_SPECIES = config["variables"]["all_species"]
+SPECIES_TO_CORRECT = config["variables"]["species_to_correct"]
+MY_VERSION = config["variables"]["my_version"]
+GENE_NUM = config["variables"]["gene_num"]
+SEQSIM_CUTOFF = config["variables"]["seqsim_cutoff"]
+HUMAN_MATCH_CUTOFF = config["variables"]["human_match_cutoff"]
+
+#ALL_CLUSTERS_PART = list(range(1,5)) #This refers to the old chimeric genes pipeline. Probably to be removed.
+ALL_CLUSTERS_PART, = glob_wildcards(BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/splitted_clusters/part_{cluster_part}_clusters.txt")
+
+#generate list of chimeric genes
+#This still will not work with a single command from the very beginning. I need to find an alternative.
+import os
+import re
+import pandas as pd
+chimeric_protein_file = BROCCOLI+"/"+MY_VERSION+"/chimeric_proteins/chimeric_orthogroups.tab"
+if os.path.isfile(chimeric_protein_file):
+  chimeric_genes_df = pd.read_table(chimeric_protein_file, sep="\t", header=0, index_col=False)
+  chimeric_genes = sorted(list(set(list(chimeric_genes_df[chimeric_genes_df["Chimeric_label"]=="chimeric"]["GeneID"])))) #remove duplicates and sort list
+  n = 50 #generate batches of 50 chimeric genes
+  chimeric_genes_batches = [chimeric_genes[i:i+n] for i in range(0, len(chimeric_genes), n)]
+  CHIMERIC_GENES = [[",".join(element)] for element in chimeric_genes_batches]
+  CHIMERIC_GENES_BATCHES = list(range(len(CHIMERIC_GENES))) #number of batches, to use as index
+else:
+  CHIMERIC_GENES = ""
+  CHIMERIC_GENES_BATCHES = "1"
+
+OVERLAP_STRINGENCY = config["variables"]["overlap_stringency"]
+MIN_ALIGNED = config["variables"]["min_aligned"]
+HUMAN_ID = config["variables"]["human_id"]
+
+######### tools ################
+BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli
+GET_EXINT_FASTA = config["tools"]["get_exint_fasta"]
+GET_START_STOP_INFO = config["tools"]["get_start_stop_info"]
+COMPUTE_PROT_LEN = config["tools"]["compute_prot_len"]
+FILTER_BY_SAME_CHR_STRAND = config["tools"]["filter_by_same_chr_strand"]
+FILTER_BY_SEQUENTIALITY = config["tools"]["filter_by_sequentiality"]
+FILTER_OG_WITH_BROKEN_GENES = config["tools"]["filter_orthogroups_with_broken_genes"]
+GET_BROKEN_HUMAN_GENE_PAIRS = config["tools"]["get_broken_human_genes_pairs"]
+SELECT_LONGEST_HUMAN_PAIRS = config["tools"]["select_longest_human_pairs"]
+GET_CONTROL_GENE_PAIRS = config["tools"]["get_control_gene_pairs"]
+MY_MAFFT = config["tools"]["mafft"]
+COMBINE_BROKEN_PAIRS_INFO = config["tools"]["combine_broken_pairs_info"]
+COMBINE_LONGEST_HUMAN_INFO = config["tools"]["combine_longest_human_info"]
+JOIN_BROKEN_AND_LONGEST_HUMAN_INFO = config["tools"]["join_broken_and_longest_human_info"]
+SELECT_FINAL_BROKEN_GENES = config["tools"]["select_final_broken_genes"]
+ISOLATE_CHIMERIC_ORTHOGROUPS = config["tools"]["isolate_chimeric_orthogroups"]
+COMPUTE_PROT_OVERLAP = config["tools"]["compute_prot_overlap"]
+COMPUTE_SIM_SCORE = config["tools"]["compute_sim_score"]
+TARGET_MATCH_PORTION = config["tools"]["target_matched_portion"]
+GET_AA_POSITIONS = config["tools"]["get_aa_position"]
+ALIGN_CHIMERIC_OG = config["tools"]["align_chimeric_OG"]
+GET_CHIMERIC_ALIGNED_REGION = config["tools"]["get_chimeric_aligned_region"]
+CLASSIFY_CHIMERIC_GENES = config["tools"]["classify_chimeric_genes"]
+GENERATE_BROCHI_GENE_IDS = config["tools"]["generate_brochi_geneIDs"]
+CORRECT_REF_GTF = config["tools"]["correct_ref_gtf"]
+CORRECT_MASTER_GTF = config["tools"]["correct_master_gtf"]
+CORRECT_ORTHOGROUPS = config["tools"]["correct_gene_orthogroups"]
+FORMAT_ORTHOPAIRS = config["tools"]["format_orthopairs"]
+ENRICH_HUMAN_AND_MERGE_ONHOLOGS = config["tools"]["enrich_human_and_merge_onhologs"]
+CORRECT_HUMAN_REF_GTF = config["tools"]["correct_human_ref_gtf"]
+
+########## targets #############
+RUN_BROCCOLI=expand("{path}/{my_version}/dir_step4/orthologous_pairs.txt", path=BROCCOLI, my_version=MY_VERSION)
+PARSED_ORTHOGROUPS=expand("{path}/{my_version}/parsed_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
+SELECTED_BROKEN_GENES=expand("{path}/{my_version}/broken_genes/{species}-selected_broken_genes.tab", path=BROCCOLI, my_version=MY_VERSION, species=SPECIES_TO_CORRECT)
+
+#Chimeric genes: the difference here is that it runs for all species
+CHIMERIC_CLUSTERS = expand("{path}/{my_version}/chimeric_proteins/splitted_clusters/part_1_clusters.txt", path=BROCCOLI, my_version=MY_VERSION)
+CHIMERIC_PROT_SIM_SCORES = expand("{path}/{my_version}/chimeric_proteins/sim_scores/scores_part_{part}.txt", path=BROCCOLI, my_version=MY_VERSION, part=ALL_CLUSTERS_PART)
+LONGEST_FRAGMENT = expand("{path}/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab", path=BROCCOLI, my_version=MY_VERSION)
+COMBINED_EX_POS_INFO = expand("{path}/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab", path=BROCCOLI, my_version=MY_VERSION)
+CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups.tab", path=BROCCOLI, my_version=MY_VERSION)
+#MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
+MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
+ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
+CLASSIFIED_CHIMERIC_GENES = expand("{path}/{my_version}/chimeric_proteins/classified_chimeric_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
+NEW_GENE_IDS = expand("{path}/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt", path=BROCCOLI, my_version=MY_VERSION, species = SPECIES_TO_CORRECT)
+
+REF_PROT_AA_POS = expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
+FINAL_FRAGMENTS_YAMI = expand("{path}/{my_version}/chimeric_proteins/Final_fragments_chim_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
+BROCHI_CORRECTED_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species=SPECIES_TO_CORRECT)
+CORRECTED_MASTER_GTF = expand("{path}/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf", path=BROCCOLI, my_version=MY_VERSION, species=SPECIES_TO_CORRECT)
+
+JOINT_FILES = expand("{path}/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt", path=BROCCOLI, my_version=MY_VERSION)
+CORRECTED_OG = expand("{path}/{my_version}/corrected_orthogroups.txt", path=BROCCOLI, my_version=MY_VERSION)
+CORRECTED_FASTAS = expand("{path}/{my_version}/corrected_fastas/{species}_ref_exint.fasta", path=BROCCOLI, my_version=MY_VERSION, species=SPECIES_TO_CORRECT)
+FORMATTED_ORTHOPAIRS = expand("{path}/{my_version}/formatted_orthopairs.txt", path=BROCCOLI, my_version=MY_VERSION)
+BUSCO_RUNS = expand("{path}/{my_version}/BUSCO/{fasta_type}/{species}/run_{lineage_name}/full_table.tsv", path=BROCCOLI, my_version=MY_VERSION, fasta_type=["fastas", "corrected_fastas", "extra_fastas"], species=ALL_SPECIES, lineage_name = "metazoa_odb10")
+
+######### rules ################
+
+rule all:
+	input:
+		#RUN_BROCCOLI,
+		#PARSED_ORTHOGROUPS, 
+		#SELECTED_BROKEN_GENES,
+		#CHIMERIC_OG,
+		#MULTIPLE_ALN,
+		#ALIGNED_FRAGMENT_INFO,
+		#CLASSIFIED_CHIMERIC_GENES,
+		#NEW_GENE_IDS,
+		#BROCHI_CORRECTED_GTF,
+		#CORRECTED_MASTER_GTF,
+		#JOINT_FILES,
+		#CORRECTED_OG,
+		#CORRECTED_FASTAS,
+		#FORMATTED_ORTHOPAIRS,
+		BUSCO_RUNS
+
+###############################################
+######## GET REF_PROTEINS FASTA  ##############
+###############################################
+
+#Get a fasta file containing only reference proteins
+rule ref_proteins_exint:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+		genome = GENOME_DIR+"/{species}_gDNA.fasta"
+	output:
+		EXINT_REF_DIR+"/{species}_ref_exint.fasta"
+	shell:
+		"""
+		perl {GET_EXINT_FASTA} -GTF {input.gtf} -G {input.genome} -out {output}
+		"""
+
+#Generate links in the fasta input directory for the current version
+rule link_to_exint:
+	input:
+		expand("{path}/{species}_ref_exint.fasta", path=EXINT_REF_DIR, species=ALL_SPECIES)
+	output:
+		expand("{path}/{{my_version}}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, species=ALL_SPECIES)
+	params:
+		output_dir = BROCCOLI+"/{my_version}/fastas" 
+	shell:
+		"""
+		cd {params.output_dir}; for file in $(echo {input}); do ln -s $file ./; done
+		"""
+
+###############################################
+########### RUN BROCCOLI  #####################
+###############################################
+
+rule run_broccoli_20_species:
+	input:
+		expand("{path}/{my_version}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, my_version=MY_VERSION, species=ALL_SPECIES)
+	output:
+		BROCCOLI+"/{my_version}/dir_step3/orthologous_groups.txt",
+		BROCCOLI+"/{my_version}/dir_step4/orthologous_pairs.txt",
+		BROCCOLI+"/{my_version}/dir_step3/chimeric_proteins.txt"
+	params:
+		working_dir = BROCCOLI+"/{my_version}",
+		fasta_dir = BROCCOLI+"/{my_version}/fastas"
+	conda:
+		CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:		
+		"""
+		cd {params.working_dir}; \
+		python {BROCCOLI_MAIN} -dir {params.fasta_dir} -threads 16
+		"""
+
+# generate a file with geneID-species for all my species of interest
+# the file suffix has to match *_ref_exint.fasta
+rule geneID_species_file:
+	input:
+		expand("{path}/{{my_version}}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, species=ALL_SPECIES)
+	output:
+		BROCCOLI+"/{my_version}/geneID_species_dict.tab"
+	params:
+		input_dir = BROCCOLI+"/{my_version}/fastas"
+	shell:
+		"""
+		for file in $(ls {input}); do \
+			my_species=$(basename $file | sed 's/_ref_exint.fasta//'); \
+			cat $file | grep ">" | sed 's/>//; s/.*|//' \
+			| awk -v OFS="\t" -v sp=$my_species '{{print $1,sp}}'; \
+		done > {output}
+		"""
+
+#An NA will be added when the gene does not have a name
+rule parse_orthogroups:
+	input:
+		orthogroups = BROCCOLI+"/{my_version}/dir_step3/orthologous_groups.txt", 
+		gene_names = expand("{path}/gene_names/{species}.ID.names.txt", path=DATABASE, species=ALL_SPECIES),
+		gene_species_dict = BROCCOLI+"/{my_version}/geneID_species_dict.tab"
+	output:
+		BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	run:
+		import pandas as pd
+		import re
+		import ntpath
+
+		gene_ID_gene_name_dict = {} #build dictionary with {gene_ID : gene_name} for all species
+		#build a dictionary with {gene_id : species} for all species
+		gene_ID_species_df = pd.read_table(str(input.gene_species_dict), sep="\t", header=None, names=["GeneID", "Species"])
+		gene_ID_species_dict = pd.Series(gene_ID_species_df.Species.values, index=gene_ID_species_df.GeneID).to_dict()
+		for my_file in input.gene_names:
+		  my_species = re.sub(".ID.names.txt", "", ntpath.basename(my_file))
+		  gene_names_df = pd.read_table(str(my_file), header=None, sep="\t", names=["GeneID", "GeneName"])
+		  gene_ID_gene_name_dict.update(pd.Series(gene_names_df.GeneName.values, index=gene_names_df.GeneID).to_dict())
+		
+		#read df with orthogroups
+		my_df = pd.read_table(str(input.orthogroups), sep="\t", header=0)
+		my_df["ClusterID"] = [re.sub(".*_", "GF_"+str("0"*(9-len(element))), element) for element in list(my_df["#OG_name"])]
+		grouped_df = my_df.groupby("ClusterID")
+		final_df = pd.DataFrame(columns=["ClusterID", "GeneID"])
+
+		for name, group in grouped_df:
+		  genes_list = [re.sub(".*\|", "", element) for element in list(group["protein_names"])[0].split(" ")]
+		  my_group_df = pd.DataFrame({"ClusterID" : name, "GeneID" : genes_list})
+		  final_df = pd.concat([final_df, my_group_df])
+
+		final_df["Species"] = final_df["GeneID"].map(gene_ID_species_dict) #add species
+		final_df["GeneName"] = final_df["GeneID"].map(gene_ID_gene_name_dict) #add gene name
+		final_df = final_df[["ClusterID", "Species", "GeneID", "GeneName"]]#reorder columns
+		final_df.to_csv(str(output), sep="\t", header=False, index=False, na_rep="NA")
+
+
+###############################################
+########### BROKEN GENES  #####################
+###############################################
+
+#Generate a file with chr and strand info for each gene (start from the reference protein).
+rule chr_strand_info_by_gene:
+	input:
+		GTF_REF_DIR+"/{species}_annot-B.gtf"	
+	output:
+		DATABASE+"/gene_extra_info/{species}_chr_strand.tab"
+	shell:
+		"""
+		cat {input} | grep "gene_id" | cut -f1,7,9 | tr ";" "\t" | cut -f1-3 \
+		| sed 's/gene_id //; s/"//g' \
+		| awk -v OFS="\t" '{{print $3,$1,$2}}' | sort | uniq > {output}
+		"""
+
+rule start_stop_info_by_gene:
+	input:
+		GTF_REF_DIR+"/{species}_annot-B.gtf"
+	output:
+		DATABASE+"/gene_extra_info/{species}_start_stop.tab"
+	shell:
+		"""
+		python {GET_START_STOP_INFO} --input {input} --output {output}
+		"""
+
+
+##### Add a rule to get the protein lenght.
+#protein lenght: get a file with the geneID and the length of the all the proteins in fasta file.
+
+rule protein_length:
+	input:
+		EXINT_REF_DIR+"/{species}_ref_exint.fasta"
+	output:
+		DATABASE+"/gene_extra_info/{species}_ref_proteins_lengths"
+	conda:
+		CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:
+		"""
+		python {COMPUTE_PROT_LEN} -i {input} -o {output}
+		"""
+
+###############################################
+############### STEPS ######################### 
+###############################################
+
+#For all species to be corrected, isolate all the orthogroups with 2 or more genes from the same species
+rule isolate_potential_broken:
+	input:
+		BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step1.tab"
+	shell:
+		"""
+		cat {input} | awk '$1!="" && $2=="{wildcards.species}"' \
+		| filter_1col 1 <(cat {input} | awk '$2=="{wildcards.species}"' \
+		| cut -f1 | sort | uniq -c \
+		| sed 's/^[ \t]*//; s/ /\t/' | awk '$1>=2' | cut -f2) > {output}
+		"""
+
+#Select only those orthogroups where the genes are on the same chr and strand
+rule filter_by_same_chr_strand:
+	input:
+		orthogroups = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step1.tab",
+		chr_strand_info = DATABASE+"/gene_extra_info/{species}_chr_strand.tab"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step2.tab"
+	shell:
+		"""
+		python {FILTER_BY_SAME_CHR_STRAND} 	--input {input.orthogroups} \
+							--chr_strand_info {input.chr_strand_info} \
+							--output {output}
+		"""
+
+#Select only those orthogroups where the genes on the same strand and chr are sequential
+rule filter_by_sequentiality:
+	input:
+		orthogroups = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step2.tab",
+		coord_info = DATABASE+"/gene_extra_info/{species}_start_stop.tab",
+		chr_strand_info = DATABASE+"/gene_extra_info/{species}_chr_strand.tab"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step3.tab"
+	shell:
+		"""
+		python {FILTER_BY_SEQUENTIALITY}	--input {input.orthogroups} \
+							--coord_info {input.coord_info} \
+							--chr_strand_info {input.chr_strand_info} \
+							--species {wildcards.species} \
+							--output {output}
+		"""
+
+#### Derive pairs of genes to align
+#Filter only for those orthogroups where there are exactly 2 or multiple broken genes (that depends on the gene_num wildcards)
+#19/03/21: Modify the rule so that they work also without gene names
+#19/03/21: I think the header is:
+#1: OrthogroupID
+#2: Species
+#3: GeneID
+rule filter_orthogroups_with_broken_genes:
+	input:
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step3.tab",
+		orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		filtered_orthogroups = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step4.tab",
+		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes_pairs.tab"
+	shell:
+		"""
+		python {FILTER_OG_WITH_BROKEN_GENES}	--broken_genes {input.broken_genes} \
+							--orthogroups {input.orthogroups} \
+							--species {wildcards.species} \
+							--filtered_orthogroups {output.filtered_orthogroups} \
+							--broken_pairs {output.broken_pairs}
+		"""
+		
+#I want a file with:
+#1: OrhtogroupID
+#2: BrokenID 1
+#3: humanID
+#For all the combinations of broken genes and human ones. 
+rule get_broken_human_genes_pairs:
+	input:
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step4.tab",
+		orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_human_pairs.tab"
+	shell:
+		"""
+		python {GET_BROKEN_HUMAN_GENE_PAIRS}	--broken_genes {input.broken_genes} \
+							--orthogroups {input.orthogroups} \
+							--species {wildcards.species} \
+							--human_id {HUMAN_ID} \
+							--output {output}
+		"""
+		
+rule select_longest_human_pairs:
+	input:
+		human_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_human_pairs.tab",
+		prot_length = DATABASE+"/gene_extra_info/Hs2_ref_proteins_lengths"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human_pairs.tab"
+	shell:
+		"""
+		python {SELECT_LONGEST_HUMAN_PAIRS}	--human_pairs {input.human_pairs} \
+							--prot_length {input.prot_length} \
+							--output {output}
+		"""
+
+
+#Here I select a set of control genes against which to select the cutoffs of similarity scores and overlap.
+rule get_control_genes_pairs:
+	input:
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-potentially_broken-step4.tab",
+		orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-control_genes_pairs.tab"
+	shell:
+		"""
+		python {GET_CONTROL_GENE_PAIRS}	--broken_genes {input.broken_genes} \
+						--orthogroups {input.orthogroups} \
+						--species {wildcards.species} \
+						--output {output}
+		"""
+	
+######### Alignments
+rule perform_alignment:
+	input:
+		pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}_pairs.tab",
+		fasta = EXINT_REF_DIR+"/{species}_ref_exint.fasta",
+		fasta_hsa = EXINT_REF_DIR+"/Hs2_ref_exint.fasta"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_{category}.txt"
+	params:
+		out_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/{category}"
+	shell:
+		"""
+		if [[ ! -d {params.out_dir} ]]; then \
+			mkdir {params.out_dir}; \
+		fi; \
+		TOT=$(cat {input.pairs} | wc -l); \
+		for number in $(echo $(seq $TOT)); do \
+			gene1=$(cat {input.pairs} | awk -v num=$number 'NR==num {{print $2}}'); \
+			gene2=$(cat {input.pairs} | awk -v num=$number 'NR==num {{print $3}}'); \
+			if [ {wildcards.category} == "longest_human" ]; then \
+				{MY_MAFFT} --auto --quiet <(cat \
+					<(grep -A1 -w $gene1 {input.fasta} | sed "s/>.*/>$gene1/") \
+					<(grep -A1 -w $gene2 {input.fasta_hsa} | sed "s/>.*/>$gene2/")) \
+			> {params.out_dir}/$gene1-$gene2.gde; else \
+				{MY_MAFFT} --auto --quiet <(cat \
+					<(grep -A1 -w $gene1 {input.fasta} | sed "s/>.*/>$gene1/") \
+					<(grep -A1 -w $gene2 {input.fasta} | sed "s/>.*/>$gene2/")) \
+			> {params.out_dir}/$gene1-$gene2.gde; fi; 
+		done; \
+		paste <(echo "alignments_performed") <(ls {params.out_dir} | wc -l) > {output}
+		"""
+
+#Here I will have a file for category: 
+rule compute_similarity_scores:
+	input:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_{category}.txt"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-similarity_scores.tab"
+	params:
+		input_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/{category}"
+	shell:
+		"""
+		for file in $(ls {params.input_dir}); do \
+			perl {COMPUTE_SIM_SCORE} <(cat {params.input_dir}/$file | sed 's/>/%/'); done > {output}
+		"""
+
+rule compute_percentage_overlap:
+	input:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_{category}.txt"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-overlap.tab"
+	params:
+		input_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/{category}"
+	shell:
+		"""
+		for file in $(ls {params.input_dir}); do \
+			python {COMPUTE_PROT_OVERLAP} -i {params.input_dir}/$file; done > {output}
+		"""
+
+#This is only for the comparison with the longest human protein
+rule compute_human_overlap:
+	input:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/alignments_check_longest_human.txt"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/longest_human-interval_overlap.tab"
+	params:
+		input_dir = BROCCOLI+"/{my_version}/broken_genes/{species}/longest_human"
+	conda:
+		CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:
+		"""
+		for file in $(ls {params.input_dir}); do \
+			python {TARGET_MATCH_PORTION} -i {params.input_dir}/$file; done > {output}
+		"""	
+
+#HEADER
+#col1=OG_ID; col2=species; col3=geneID1; col4=geneID2; col5=protsim 1vs2; col6=protsim 2vs1; col7=overlap 1vs2; col8=overlap 2vs1
+#This is in principle where I should modify the pipeline for Sp2.
+rule combine_broken_pairs_info:
+	input:
+		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}_pairs.tab",
+		sim_scores = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-similarity_scores.tab",
+		overlap = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-overlap.tab"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-{category}-combined_info.tab"
+	shell:
+		"""
+		python {COMBINE_BROKEN_PAIRS_INFO}	--broken_pairs {input.broken_pairs} \
+							--sim_scores {input.sim_scores} \
+							--overlap {input.overlap} \
+							--species {wildcards.species} \
+							--output {output}
+		"""
+
+###### Combine info human comparison
+rule combine_longest_human_info:
+	input:
+		broken_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes_pairs.tab",
+		human_pairs = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human_pairs.tab",
+                interval_overlap = BROCCOLI+"/{my_version}/broken_genes/{species}/longest_human-interval_overlap.tab" 
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human-interval_overlap.tab"
+	shell:
+		"""
+		python {COMBINE_LONGEST_HUMAN_INFO}	--broken_pairs {input.broken_pairs} \
+							--human_pairs {input.human_pairs} \
+							--interval_overlap {input.interval_overlap} \
+							--output {output}
+		"""
+
+
+#Header output:
+#col1=OG_ID; col2=species; col3=geneID1; col4=geneID2; col5=longest_humanID; col5=geneID1_sim_score (geneID1 vs geneID2); col6=geneID2_sim_score (geneID2 vs geneID1); col7=matched proportion
+rule join_broken_and_longest_human_info:
+	input:
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-broken_genes-combined_info.tab",
+		longest_human = BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-longest_human-interval_overlap.tab"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_tofilter.tab"
+	shell:
+		"""
+		python {JOIN_BROKEN_AND_LONGEST_HUMAN_INFO}	--broken_info {input.broken_genes} \
+								--human_info {input.longest_human} \
+								--output {output}
+		"""
+	
+#Header input: 
+#1	OG_ID;
+#2	Species	
+#3	GeneID1
+#4	GeneID2
+#5	GeneID1_sim_score
+#6	GeneID2_sim_score
+#7	GeneID1_overlap
+#8	GeneID2_overlap
+
+rule select_potentially_broken_genes:
+	input:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_tofilter.tab"
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_filtered.tab"
+	shell:
+		"""
+		cat {input} | awk '($4<={SEQSIM_CUTOFF} || $5 <={SEQSIM_CUTOFF}) && $6<={HUMAN_MATCH_CUTOFF}' > {output}
+		"""
+
+rule select_final_broken_genes:
+	input:
+		BROCCOLI+"/{my_version}/broken_genes/{species}/{species}-ALL_combined_info_filtered.tab",
+	output:
+		BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab"
+	shell:
+		"""
+		python {SELECT_FINAL_BROKEN_GENES} --input {input} --output {output}
+		"""
+
+
+
+##############################################
+########### CHIMERIC GENES  ###################
+###############################################
+
+rule geneID_refproteinID:
+	input:
+		EXINT_REF_DIR+"/{species}_ref_exint.fasta"
+	output:
+		DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"
+	shell:
+		"""
+		cat {input} | grep ">" | sed 's/>//; s/|/\t/' | awk -v OFS="\t" '{{print $2,$1}}' > {output}
+		"""
+
+rule aa_position:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+		ref_proteins = DATABASE+"/ref_prot_info/{species}_gene_ref_prot_dict"		
+	output:
+		DATABASE+"/aa_position/{species}_refprots_exons_pos.tab"
+	params:
+		out_dir = DATABASE+"/aa_position"
+	shell:
+		"""
+		mkdir -p {params.out_dir}; \
+		python {GET_AA_POSITIONS} --gtf {input.gtf} --ref_prot {input.ref_proteins} --output {output}
+		"""
+
+#Header output
+#1. clusterID
+#2. species
+#3. geneID
+#4. label: CHIMERIC/NOT_CHIMERIC
+#The chimeric genes are simply the ones which appear in more OGs.
+rule isolate_chimeric_orthogroups:
+	input:
+		BROCCOLI+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		chimeric_OG = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+		potentially_fused_OG = BROCCOLI+"/{my_version}/chimeric_proteins/potentially_fused_orthogroups.tab"
+	shell:
+		"""
+		python {ISOLATE_CHIMERIC_ORTHOGROUPS}	--input {input} \
+							--output_chimeric {output.chimeric_OG} \
+							--output_fused {output.potentially_fused_OG} 
+		"""
+
+
+#CHIMERIC_GENES has to be modified so that it generated batches of 50 genes.
+#Generate the multiple alignments within the clusters containing each chimeric gene
+#Input header: OG_ID, species, geneID, geneName, chimeric_label
+rule generate_multiple_alignments:
+	input:
+		chimeric_OG = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+		fastas = expand("{path}/{{my_version}}/fastas/{species}_ref_exint.fasta", path=BROCCOLI, species=ALL_SPECIES)
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log"
+	params:
+		fastas_dir = BROCCOLI+"/{my_version}/fastas",
+		chimeric_genes = lambda wildcards: str(CHIMERIC_GENES[int(wildcards.batch_index)][0]),
+		output_dir = BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln"
+	conda:
+		CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:
+		"""
+		python {ALIGN_CHIMERIC_OG}	--input_fasta {params.fastas_dir} \
+						--input_OG {input.chimeric_OG} \
+						--chimeric_genes {params.chimeric_genes} \
+						--mafft {MY_MAFFT} \
+						--output {params.output_dir}; \
+		echo -e "Performed multiple alignments for the orthogroups of the following chimeric genes:\n{params.chimeric_genes}" > {output}
+		"""	
+
+#I need to extract the portion of the chimeric gene which aligns with the other genes in the orthogroup
+#NB: for all the orthogroups in which a chimeric gene is contained.
+#Header of the potential output:
+#1. chimeric geneID
+#2. orthogroupID
+#3. first AA in the chimeric gene aligned with at least 20% of the other genes in the orthogroup.
+#4. last AA in the chimetic gene aligned with at least 20% of the other genes in the orthogroup.
+#5. Exon num of the chimeric gene in which the first aligned AA falls.
+#6. Exon num of the chimeric gene in which the last aligned AA falls.
+rule extract_aligned_fragments:
+	input:
+		expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES),
+		expand("{path}/aa_position/{species}_refprots_exons_pos.tab", path=DATABASE, species=ALL_SPECIES)
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab"
+	params:
+		input_dir = BROCCOLI+"/{my_version}/chimeric_proteins/multiple_aln",
+		exon_position_dir = DATABASE+"/aa_position" 
+	shell:
+		"""
+		echo $(ls {params.input_dir}/*-multiple_aln | xargs -n1 basename) | sed 's/-multiple_aln//g; s/ /;/g' > {output}.tmp; \
+		python {GET_CHIMERIC_ALIGNED_REGION} 	--input_dir {params.input_dir} \
+							--exon_positions_dir {params.exon_position_dir} \
+							--alignment {output}.tmp \
+							--overlap_stringency {OVERLAP_STRINGENCY} \
+							--min_aligned {MIN_ALIGNED} \
+							--output {output};
+		rm {output}.tmp
+		"""		
+
+rule classify_chimeric_genes:
+	input:
+		aligned_fragments = BROCCOLI+"/{my_version}/chimeric_proteins/aligned_fragments_info.tab",
+		gene_ID_species_dict = BROCCOLI+"/{my_version}/geneID_species_dict.tab"
+	output:
+		BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab"
+	shell:
+		"""
+		python {CLASSIFY_CHIMERIC_GENES} -i {input.aligned_fragments} -s {input.gene_ID_species_dict} -o {output}
+		"""
+
+##############################################
+############ CORRECT GTF #####################
+##############################################
+#Correct the gtf taking into account the broken and the chimeric genes
+#Generate new geneIDs for the broken and the chimeric genes
+#Header: geneID, new_IDs, category (chimeric, broken)
+
+#Generate conditional rules in case problematic genes have been identified or not
+
+import os
+if (os.path.exists(PROBLEMATIC_GENES)):
+rule generate_new_IDs_and_filter:
+	input:
+		chimeric = BROCCOLI+"/{my_version}/chimeric_proteins/chimeric_orthogroups.tab",
+		broken = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab"
+	output:
+		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+	shell:
+		"""
+		python {GENERATE_BROCHI_GENE_IDS}	--species {wildcards.species} \
+							--params_file {GENEID_PARAMS} \
+							--input_chimeric {input.chimeric} \
+							--input_broken {input.broken} \
+							--output {output} \
+							--problematic_genes {PROBLEMATIC_GENES}
+		"""
+
+#Correct gtf
+rule correct_ref_gtf:
+	input:
+		gtf = GTF_REF_DIR+"/{species}_annot-B.gtf",
+		broken_genes = BROCCOLI+"/{my_version}/broken_genes/{species}-selected_broken_genes.tab",
+		chimeric_genes = BROCCOLI+"/{my_version}/chimeric_proteins/classified_chimeric_genes.tab",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+	output:
+		unresolved = BROCCOLI+"/{my_version}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab",
+		resolved = BROCCOLI+"/{my_version}/corrected_gtfs/{species}-resolved_chimeric_genes.tab",
+		brochi = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi_only.gtf",
+		gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf"
+	shell:
+		"""
+		python {CORRECT_REF_GTF}	--species {wildcards.species} \
+						--gtf {input.gtf} --broken {input.broken_genes} \
+						--chimeric {input.chimeric_genes} \
+						--IDs {input.geneIDs} \
+						--params_file {GENEID_PARAMS} \
+						--output {output.gtf} \
+						--output_brochi {output.brochi} \
+						--output_unresolved {output.unresolved} \
+						--output_resolved {output.resolved} \
+						--problematic_genes {PROBLEMATIC_GENES}
+		"""
+
+rule correct_master_gtf:
+	input:
+		gtf = GTF_MASTER_DIR+"/{species}_annot.gtf",
+		brochi_ref_gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi_only.gtf",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_new_geneIDs.txt"
+	output:
+		BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-master-brochi.gtf"
+	shell:
+		"""
+		python {CORRECT_MASTER_GTF} 	--species {wildcards.species} \
+						--gtf {input.gtf} \
+						--brochi_gtf {input.brochi_ref_gtf} \
+						--IDs {input.geneIDs} \
+						--output {output}
+		"""
+
+##############################################
+########### CORRECT ORTHOGROUPS ##############
+##############################################
+
+#join together the files generated for the different species separately
+rule join_species_files:
+	input:
+		geneIDs = expand("{path}/{{my_version}}/corrected_gtfs/{species}_new_geneIDs.txt", path=BROCCOLI, species=SPECIES_TO_CORRECT),
+		unresolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-unresolved_chimeric_genes.tab", path=BROCCOLI, species=SPECIES_TO_CORRECT),
+		resolved_chimeric = expand("{path}/{{my_version}}/corrected_gtfs/{species}-resolved_chimeric_genes.tab", path=BROCCOLI, species=SPECIES_TO_CORRECT)
+	output:
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt",
+		unresolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-unresolved_chimeric_genes.tab",
+		resolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-resolved_chimeric_genes.tab"
+	run:
+		import pandas as pd
+		#geneIDs
+		complete_geneIDs_df = pd.DataFrame()
+		for my_file in list(input.geneIDs):
+		  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=0)
+		  complete_geneIDs_df = pd.concat([complete_geneIDs_df, my_df])
+		complete_geneIDs_df.to_csv(str(output.geneIDs), sep="\t", index=False, header=True, na_rep="NA")
+		#unresolved chimeric
+		unresolved_chimeric_df = pd.DataFrame()
+		for my_file in list(input.unresolved_chimeric):
+		  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=0)
+		  unresolved_chimeric_df = pd.concat([unresolved_chimeric_df, my_df])
+		unresolved_chimeric_df.to_csv(str(output.unresolved_chimeric), sep="\t", index=False, header=True, na_rep="NA")
+		#resolved_chimeric
+		resolved_chimeric_df = pd.DataFrame()
+		for my_file in list(input.resolved_chimeric):
+		  my_df = pd.read_table(my_file, sep="\t", index_col=False, header=0)
+		  resolved_chimeric_df = pd.concat([resolved_chimeric_df, my_df])
+		resolved_chimeric_df.to_csv(str(output.resolved_chimeric), sep="\t", index=False, header=True, na_rep="NA")
+
+rule correct_orthogroups:
+	input:
+		orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt",
+		unresolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-unresolved_chimeric_genes.tab",
+		resolved_chimeric = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-resolved_chimeric_genes.tab"
+	output:
+		BROCCOLI+"/{my_version}/corrected_orthogroups.txt"
+	shell:
+		"""
+		python {CORRECT_ORTHOGROUPS} 	--orthogroups {input.orthogroups} --geneIDs {input.geneIDs} \
+						--unresolved_chimeric {input.unresolved_chimeric} \
+						--resolved_chimeric {input.resolved_chimeric} \
+						--output {output}
+		"""
+
+###############################
+rule enrich_human_and_merge_onhologs:
+	input:
+		orthogroups = BROCCOLI+"/{my_version}/corrected_orthogroups.txt",
+		human_orthologs = DATABASE+"/ensembl_orthologs/Hs2-Mm2_Bt2_one2one_orthologs_NOredundant-v88" #same version as the human GTF we downloaded
+		onhologs = DATABASE+"/onholog_info/Ohnologs-Hs2-V6-formatted.tab" 
+	output:
+		human = BROCCOLI+"/{my_version}/enriched_human_orthologs.tab",
+		orthogroups = BROCCOLI+"/{my_version}/corrected_and_enriched_orthogroups.txt",
+		merged = BROCCOLI+"/{my_version}/onholog_orthogroups_id_dict.txt",
+		mixed = BROCCOLI+"/{my_version}/mixed_up_onhologs.tab"
+	shell:
+		"""
+		python {ENRICH_HUMAN_AND_MERGE_ONHOLOGS}	--orthogroups {input.orthogroups} \
+								--human_orthologs {input.human_orthologs} \
+								--onhologs {input.onhologs} \
+								--output_human {output.human} \
+								--output_orthogroups {output.orthogroups} \
+								--output_merged {output.merged} \
+								--output_mixed {output.mixed}
+		"""
+
+rule correct_human_ref_gtf:
+	input:
+		original_gtf = DATABASE+"/gtf/ref/Hs2_annot-B.gtf",
+		longest_gtf = DATA+"/original_gtfs/Hs2/Hs2_annot-B.gtf",
+		entries_to_correct = BROCCOLI+"/{my_version}/enriched_human_orthologs.tab"
+	output:
+		DATABASE+"/corrected_gtf/{my_version}/human_enriched/Hs2_annot-B.gtf"	
+	shell:
+		"""
+		{CORRECT_HUMAN_REF_GTF}	--original_gtf {input.original_gtf} \
+					--longestCDS_gtf {input.longest_cds} \
+					--entries_to_correct {input.entries_to_correct} \
+					--output {output}
+		"""
+
+###############################
+rule format_orthopairs:
+	input:
+		parsed_orthogroups = BROCCOLI+"/{my_version}/parsed_orthogroups.txt",
+		corrected_orthogroups = BROCCOLI+"/{my_version}/corrected_orthogroups.txt",
+		orthopairs = BROCCOLI+"/{my_version}/dir_step4/orthologous_pairs.txt",
+		geneIDs = BROCCOLI+"/{my_version}/corrected_gtfs/all_species-new_geneIDs.txt" 
+	output:
+		BROCCOLI+"/{my_version}/formatted_orthopairs.txt"
+	shell:
+		"""
+		python {FORMAT_ORTHOPAIRS}	--orthogroups {input.parsed_orthogroups} \
+						--corrected_orthogroups {input.corrected_orthogroups} \
+						--orthopairs {input.orthopairs} \
+						--geneIDs {input.geneIDs} \
+						--output {output}
+		"""
+
+rule orthopairs_by_species:
+	input:
+		BROCCOLI+"/{my_version}/formatted_orthopairs.txt"
+	output:
+		BROCCOLI+"/{my_version}/species_orthopairs/{species}_orthopairs.txt"
+	shell:
+		"""
+		cat {input} | awk -v OFS="\t" '$1=="{wildcards.species}" {{print $2,$3,$4}}' > {output}
+		"""
+
+##############################################
+########### GENERATE NEW FASTAS ##############
+##############################################
+#Generate new protein fasta files starting from the corrected_ref_gtf
+
+rule generate_corrected_fastas:
+	input:
+		gtf = BROCCOLI+"/{my_version}/corrected_gtfs/{species}_annot-B-brochi.gtf",
+		genome = GENOME_DIR+"/{species}_gDNA.fasta"
+	output:
+		BROCCOLI+"/{my_version}/corrected_fastas/{species}_ref_exint.fasta"
+	shell:
+		"""
+		perl {GET_EXINT_FASTA} -GTF {input.gtf} -G {input.genome} -out {output}
+		"""
+
+##############################################
+########### RUN BUSCO ########################
+##############################################
+
+rule run_busco:
+	input:
+		BROCCOLI+"/{my_version}/{fasta_type}/{species}_ref_exint.fasta"
+	output:
+		BROCCOLI+"/{my_version}/BUSCO/{fasta_type}/{species}/run_{lineage_name}/full_table.tsv"
+	params:
+		out_dir = BROCCOLI+"/{my_version}/BUSCO/{fasta_type}"
+	#conda:
+	#	CONDA_ENVS+"/busco_env.yml"
+	shell:
+		"""
+		busco -i {input} -o {wildcards.species} -f --out_path {params.out_dir} -m proteins -l {wildcards.lineage_name}
+		"""

@@ -1,0 +1,58 @@
+{
+  "__default__" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "5G",
+    "time" : "01:00:00",
+    "disk" : "2G",
+    "queue" : "short-sl7"
+  },
+  "run_broccoli_20_species" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\" -pe smp 16",
+    "ram" : "3G",
+    "time" : "08:00:00",
+    "disk" : "2G",
+    "queue" : "long-sl7"
+  },
+  "compute_human_overlap":
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "5G",
+    "time" : "03:00:00",
+    "disk" : "2G",
+    "queue" : "short-sl7"
+  },
+  "generate_multiple_alignments" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "7G",
+    "time" : "00:45:00",
+    "disk" : "2G",
+    "queue" : "short-sl7" 
+  },
+  "extract_aligned_fragments" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "10G",
+    "time" : "03:00:00",
+    "disk" : "2G",
+    "queue" : "short-sl7" 
+  },
+  "correct_gtf" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "3G",
+    "time" : "00:20:00",
+    "disk" : "2G",
+    "queue" : "short-sl7" 
+  },
+  "run_busco" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "3G",
+    "time" : "00:30:00",
+    "disk" : "2G",
+    "queue" : "long-sl7"
+  }
+}
