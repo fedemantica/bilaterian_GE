@@ -1,0 +1,18 @@
+{
+  "__default__" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "3G",
+    "time" : "00:12:00",
+    "disk" : "1G",
+    "queue" : "short-sl7"
+  },
+  "get_third_tissue_difference" :
+  {
+    "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\"",
+    "ram" : "5G",
+    "time" : "00:40:00",
+    "disk" : "1G",
+    "queue" : "short-sl7"
+  } 
+}

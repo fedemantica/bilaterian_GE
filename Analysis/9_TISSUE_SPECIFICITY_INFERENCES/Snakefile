@@ -1,0 +1,346 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+CORRECTED_GTFS_DIR = config["paths"]["corrected_gtfs"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+TS_CALL_DIR = config["paths"]["ts_call_dir"]
+TS_GAINS_LOSSES_DIR = config["paths"]["ts_gains_losses_dir"]
+GO_TRANSFERS = config["paths"]["go_transfers"]
+
+######## tools ############
+INFER_TS_GAINS = config["tools"]["infer_ts_gains"]
+INFER_TS_LOSSES = config["tools"]["infer_ts_losses"]
+ASSOCIATE_TISSUE_WITH_TS = config["tools"]["associate_tissue_with_ts"]
+RUN_GPROFILER2 = config["tools"]["run_gprofiler2"]
+ADD_GENE_ENTRY = config["tools"]["add_gene_entry"]
+COMPUTE_RELATIVE_EXPR_DIFF = config["tools"]["compute_relative_expr_diff"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+TAU_CUTOFF = config["variables"]["tau_cutoff"]
+TAU_UP_CUTOFF = config["variables"]["tau_up_cutoff"]
+TAU_LOW_CUTOFF = config["variables"]["tau_low_cutoff"]
+TAU_LOW_CUTOFF_LOSSES = config["variables"]["tau_low_cutoff_losses"]
+TISSUE_DIFF_CUTOFF = config["variables"]["tissue_diff_cutoff"]
+
+ANCESTRAL_CLADES = config["variables"]["ancestral_clades"]
+DEUTEROSTOME_NODES = config["variables"]["deuterostome_nodes"]
+PROTOSTOME_NODES = config["variables"]["protostome_nodes"]
+NODE_NAME_DICT = config["variables"]["node_name_dict"]
+NODE_SPECIES_DICT = config["variables"]["node_species_dict"]
+ALL_NODES = config["variables"]["all_nodes"]
+ALL_TISSUE_COMBS = config["variables"]["all_tissue_combs"]
+
+###### targets ##########
+OG_ASSOCIATED_TISSUE = expand("{path}/{category}/{my_version}/Bilateria_conserved_orthogroups-{OG_type}_genes-associated_tissues.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, OG_type="All", category=["species_QN_5_TPM_v6"])
+OG_FILTERED_BY_TS_TISSUE = expand("{path}/{category}/{my_version}/Bilateria_conserved_orthogroups-{OG_type}_genes-{tissue}_specific_OGs.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, OG_type="All", tissue=ALL_TISSUES, category=["species_QN_5_TPM_v6"])
+INFERRED_GAINS = expand("{path}/{category}/{my_version}/inferences/Bilateria_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_gains.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, OG_type="All", tissue=ALL_TISSUES, category=["species_QN_5_TPM_v6"])
+INFERRED_LOSSES = expand("{path}/{category}/{my_version}/inferences/Bilateria_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_losses.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, OG_type="All", tissue=ALL_TISSUES, category=["species_QN_5_TPM_v6"])
+GO_ENRICHMENTS_RES = expand("{path}/{category}/{my_version}/inferences/GO_enrichments/Bilateria_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_{inference_category}-{node}-orthogroups_from_{species}-GO_res.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, OG_type="All", tissue=ALL_TISSUES, category="species_QN_5_TPM_v6", inference_category=["gains", "losses"], species=["Hs2"], node=ALL_NODES)
+ADD_GTF_GENE_ENTRIES = expand("{path}/{my_version}/ref_gene_entries/{species}_annot-B-brochi.gtf", path=CORRECTED_GTFS_DIR, my_version=MY_VERSION, species=["Dme","Bge","Bla","Cdi","Eba","Sma"])
+NO_TS_PRONE_GO_ENRICHMENTS = expand("{path}/{category}/{my_version}/non-TS_prone/non-TS_prone-orthogroups_from_{species}-GO_res.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, category=["species_QN_5_TPM_v6"], species="Hs2")
+THIRD_TISSUE_DIFF = expand("{path}/{category}/{my_version}/{species}-third_tissue_relative_expr_diff.tab", path=TS_GAINS_LOSSES_DIR, my_version=MY_VERSION, category=["species_QN_5_TPM_v6"], species=ALL_SPECIES)
+
+####### rules ############
+rule all:	
+	input:
+
+#################################################
+####### GENERATE INPUT  ##########################
+##################################################
+#For each tissue: get the complete orthogroups with:
+#1: OG_ID
+#2: Species
+#3: GeneID
+#4: Tau
+#5: Associated Tissue: it can be more than one tissue (e.g. Neural;Testis)
+
+#This is the same rule I was using to define tissue specificity, but I do it for all genes instead
+rule associate_genes_to_tissue:
+	input:
+		TS_CALL_DIR+"/species_QN_taus/{my_version}/{species}-protein_coding_relative_ts.tab"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{species}-protein_coding-associated_tissue.tab"
+	shell:
+		"""
+		python {ASSOCIATE_TISSUE_WITH_TS} --input {input} --output {output}
+		"""
+
+##################################################
+####### ALTERNATIVE TISSUE ASSOCIATION ###########
+##################################################
+
+#Be careful not to use the Taus in the species_QN_5_TPMs. In this way, they are computed also for the genes that do not pass tha cutoff
+rule associate_all_OGs_to_tissue:
+	input:
+		orthogroups = GENE_SETS_DIR+"/{my_version}/STRICT/{clade}/conserved/{clade}_conserved_orthogroups-EXPR_genes.txt",
+		taus = expand(TS_CALL_DIR+"/species_QN_taus/{{my_version}}/{species}-protein_coding_taus.tab", species=ALL_SPECIES),
+		associated_tissue = expand(TS_GAINS_LOSSES_DIR+"/{{category}}/{{my_version}}/{species}-protein_coding-associated_tissue.tab", species=ALL_SPECIES)
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues-unfiltered.tab"
+	shell:
+		"""
+		cat {input.orthogroups} \
+		| translate -a -v -e NA <(cat {input.associated_tissue} | cut -f1,3) 3 \
+		| translate -a -v -e NA <(cat {input.associated_tissue} | cut -f1,2) 3 \
+		| translate -a -v -e NA <(cat {input.taus}) 3 \
+		| sed 's/BmA/Bmo/g' > {output}
+		"""
+
+
+
+##################################################
+####### 5 TPMs CUTOFF ############################
+##################################################
+
+#In this case, the file in species_QN_5_TPM_taus and species_QN_taus should be identical
+rule filter_genes_by_expr_cutoff:
+	input:
+		tissue_association = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues-unfiltered.tab",
+		species_QN_expr = expand(TS_CALL_DIR+"/species_QN_5_TPM_taus/{{my_version}}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab", species=ALL_SPECIES) 
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues.tab"
+	params:
+		tpm_cutoff = 5
+	run:
+		import pandas as pd
+		import numpy as np
+		import math
+
+		#Upload tissue association dataframe
+		tissue_association_df = pd.read_table(str(input.tissue_association), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_Tissue"])
+		#I need to cycle on all expr file because they have different number of fields
+		all_excluded_geneIDs = []
+		for my_file in input.species_QN_expr:
+		  species_expr_df = pd.read_table(str(my_file), sep="\t", index_col=0, header=0)
+		  species_selected_geneIDs = species_expr_df[(species_expr_df >= math.log2(params.tpm_cutoff)).any(1)].index.values.tolist()
+		  species_excluded_geneIDs = [geneID for geneID in list(species_expr_df.index.values) if geneID not in species_selected_geneIDs]
+		  all_excluded_geneIDs = all_excluded_geneIDs + species_excluded_geneIDs 
+		#For the excluded genes, add a column with YES_EXPR or NO_EXPR (indicating if they pass the EXPR cutoff or not)
+		tissue_association_df["Expr_cutoff"] = ["NO_EXPR" if element in all_excluded_geneIDs else "YES_EXPR" for element in list(tissue_association_df["GeneID"])] 
+		#tissue_association_df.loc[tissue_association_df["GeneID"].isin(all_excluded_geneIDs),"Tau"] = -np.inf
+		#tissue_association_df.loc[tissue_association_df["GeneID"].isin(all_excluded_geneIDs),"Tissue"] = "None"
+		tissue_association_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+
+##################################################
+######### FILTER_BY_TISSUE #######################
+##################################################
+rule filter_all_OGs_by_tissue_association:
+	input:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues.tab"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-{tissue}_specific_OGs.tab"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_Tissue", "Expr_cutoff"])
+		tissue_specific_OGs = list(orthogroups_df.loc[(orthogroups_df["Tau"] >= TAU_UP_CUTOFF) & (orthogroups_df["Tissue"].str.contains(str(wildcards.tissue))) & (orthogroups_df["Expr_cutoff"]=="YES_EXPR")]["OG_ID"])
+		tissue_orthogroups_df = orthogroups_df.loc[orthogroups_df["OG_ID"].isin(tissue_specific_OGs)]
+		grouped_tissue_orthogroups_df = tissue_orthogroups_df.groupby("OG_ID")
+		#Initialise final dataframe
+		final_df = pd.DataFrame()
+		#Cycle on all the orthogroups
+		for OG_ID, group in grouped_tissue_orthogroups_df:
+		  for species in list(set(list(group["Species"]))):
+		    species_group = group.loc[group["Species"]==species]
+		    species_query_tissue = [element for element in list(species_group["Paralog_Tissue"]) if str(wildcards.tissue) in element]
+		    if len(species_query_tissue) > 0:
+		      #Select the species entry associated to tissue and with the highest tau
+		      ordered_species_tissue_group = species_group.loc[species_group["Paralog_Tissue"].str.contains(wildcards.tissue)].sort_values(by="Tau", ascending=False)
+		      #If there are YES_EXPR entries, give precedence to those
+		      expr_ordered_species_tissue_group = ordered_species_tissue_group.loc[ordered_species_tissue_group["Expr_cutoff"]=="YES_EXPR"]
+		      if expr_ordered_species_tissue_group.shape[0] > 0:
+		        OG_species_final_entry = pd.DataFrame(expr_ordered_species_tissue_group.iloc[0,:]).transpose()
+		      else: #If NO_EXPR entries, just select the highest Tau in that tissue
+		        OG_species_final_entry = pd.DataFrame(ordered_species_tissue_group.iloc[0,:]).transpose()
+		    else:
+                      #Just select the species entry with the highest tau
+                      OG_species_final_entry = pd.DataFrame(species_group.sort_values(by="Tau", ascending=False).iloc[0,:]).transpose()
+		    final_df = pd.concat([final_df, OG_species_final_entry])
+		#If there are still some taus == -Inf, replace with nan
+		final_df["Tau"] = [tau if ~np.isneginf(tau) else np.nan for tau in list(final_df["Tau"])]
+		#Remove the paralog Tissue entry
+		final_df = final_df.drop(columns=["Paralog_Tissue"])
+		#Save to file
+		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")		    
+
+
+
+##################################################
+####### INFER TS GAINS ###########################
+##################################################
+
+rule infer_TS_gains:
+	input:
+		orthogroups = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_specific_OGs.tab"
+		#species_paralog_tissue = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues.tab"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/preliminary_gains/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_gains_preliminary.tab"
+	params:
+		deut_species = ",".join(DEUTEROSTOMA),
+		prot_species = ",".join(PROTOSTOMA),
+		ancestral_clades = ",".join(ANCESTRAL_CLADES),
+		node_name_dict = NODE_NAME_DICT
+	shell:
+		"""
+		python {INFER_TS_GAINS}		--input {input.orthogroups} \
+						--up_tau_cutoff {TAU_UP_CUTOFF} \
+						--low_tau_cutoff {TAU_LOW_CUTOFF} \
+						--deut_species {params.deut_species} \
+						--prot_species {params.prot_species} \
+						--ancestral_clades {params.ancestral_clades} \
+						--output {output} \
+						--query_tissue {wildcards.tissue} \
+						--node_name_dict \'{params.node_name_dict}\'
+		"""
+
+##################################################
+####### INFER TS LOSSES ##########################
+##################################################
+#This will be used to properly estimate the losses
+rule get_third_tissue_difference:
+	input:
+		TS_CALL_DIR+"/species_QN_taus/{my_version}/{species}-protein_coding_relative_ts.tab"
+		#expand("{path}/species_QN_taus/{{my_version}}/{species}-protein_coding_relative_ts.tab", path=TS_CALL_DIR, species=ALL_SPECIES)
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{species}-third_tissue_relative_expr_diff.tab"
+		#TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/All_species-third_tissue_relative_expr_diff.tab"
+	shell:
+		"""
+		python {COMPUTE_RELATIVE_EXPR_DIFF} --input {input} --output {output}
+		"""
+
+rule infer_TS_losses:
+	input:
+		orthogroups = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_specific_OGs.tab",
+		all_orthogroups = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues.tab",
+		TS_gains = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/preliminary_gains/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_gains_preliminary.tab",
+		tissue_differences = expand("{path}/{{category}}/{{my_version}}/{species}-third_tissue_relative_expr_diff.tab", path=TS_GAINS_LOSSES_DIR, species=ALL_SPECIES)
+	output:
+		losses = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_losses.tab",
+		gains = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_gains.tab"
+	params:
+		deut_species = ",".join(DEUTEROSTOMA),
+		prot_species = ",".join(PROTOSTOMA),
+		deut_nodes = ",".join(DEUTEROSTOME_NODES),
+		prot_nodes = ",".join(PROTOSTOME_NODES),
+		node_species_dict = NODE_SPECIES_DICT,
+		node_name_dict = NODE_NAME_DICT,
+		tissue_diff_cutoff = TISSUE_DIFF_CUTOFF
+	shell:
+		"""
+		python {INFER_TS_LOSSES}	--input {input.orthogroups} \
+						--all_orthogroups_input {input.all_orthogroups} \
+						--ts_gains_input {input.TS_gains} \
+						--tissue_differences_input {input.tissue_differences} \
+						--up_tau_cutoff {TAU_UP_CUTOFF} \
+						--low_tau_cutoff {TAU_LOW_CUTOFF_LOSSES} \
+						--deut_species {params.deut_species} \
+						--prot_species {params.prot_species} \
+						--deut_nodes {params.deut_nodes} \
+						--prot_nodes {params.prot_nodes} \
+						--tissue_diff_cutoff {params.tissue_diff_cutoff} \
+						--output {output.losses} \
+						--output_gains {output.gains} \
+						--query_tissue {wildcards.tissue} \
+						--node_species_dict \'{params.node_species_dict}\' \
+						--node_name_dict \'{params.node_name_dict}\'
+		"""
+
+
+##################################################
+####### GO ENRICHMENTS ALL INFERENCES ############
+##################################################
+rule GO_enrichments_inputs:
+	input:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_{inference_category}.tab"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/GO_enrichments/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_{inference_category}-{node}-OG_IDs.tab"
+	shell:
+		"""
+		cat {input} | grep "{wildcards.node}" | cut -f1 > {output}
+		"""
+
+rule GO_enrichments:
+	input:
+		gene_set = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/GO_enrichments/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_{inference_category}-{node}-OG_IDs.tab",
+		background = GO_TRANSFERS+"/{my_version}/GO_backgrounds/orthogroups-GO_background.txt",
+		annot = GO_TRANSFERS+"/{my_version}/GO_annot/{species}_transfers/orthogroups_from_{species}-transferred_GO-reduced.gmt"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/inferences/GO_enrichments/{clade}_conserved_orthogroups-{OG_type}_genes-{tissue}_inferred_{inference_category}-{node}-orthogroups_from_{species}-GO_res.tab"
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {RUN_GPROFILER2} {input.gene_set} {input.background} {input.annot} {output}
+		"""
+
+##################################################
+####### NO TS PRONE GENES ########################
+##################################################
+
+rule get_no_ts_prone_input:
+	input:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/non-TS_prone/non-TS_prone-OG_IDs-GO_input.txt"
+	shell:
+		"""
+		cat {input} | filter_1col -v 1 <(cat {input} | awk '$4>=0.75 && $7=="YES_EXPR" {{print $1}}' | sort | uniq) | cut -f1 | sort | uniq > {output}
+		"""
+
+
+rule no_ts_prone_GO_enrichments:
+	input:
+		gene_set = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/non-TS_prone/non-TS_prone-OG_IDs-GO_input.txt",
+		background = GO_TRANSFERS+"/{my_version}/GO_backgrounds/orthogroups-GO_background.txt",
+		annot = GO_TRANSFERS+"/{my_version}/GO_annot/{species}_transfers/orthogroups_from_{species}-transferred_GO-reduced.gmt"
+	output:
+		TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/non-TS_prone/non-TS_prone-orthogroups_from_{species}-GO_res.tab"
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {RUN_GPROFILER2} {input.gene_set} {input.background} {input.annot} {output}
+		"""
+
+
+##################################################
+####### SOME EXTRA GTF CORRECTION ################
+##################################################
+
+rule add_gene_entry_gtf:
+	input:
+		CORRECTED_GTFS_DIR+"/{my_version}/ref/{species}_annot-B-brochi.gtf"
+	output:
+		CORRECTED_GTFS_DIR+"/{my_version}/ref_gene_entries/{species}_annot-B-brochi.gtf"
+	shell:
+		"""
+		grep -v -P '\tgene\t' {input} | grep -v -P '\ttranscript\t' > {output}.tmp; \
+		perl {ADD_GENE_ENTRY} {output}.tmp {output}; \
+		rm {output}.tmp
+		"""

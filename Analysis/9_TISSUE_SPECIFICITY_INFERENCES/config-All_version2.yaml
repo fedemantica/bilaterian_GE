@@ -1,0 +1,48 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+  database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
+
+paths:
+  metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
+  corrected_gtfs: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/corrected_gtf"
+  metasamples_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/metasamples" 
+  average_expr_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/average_expr_by_tissue"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  ts_call_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/ts_call" 
+  ts_gains_losses_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/ts_gains_losses"
+  go_transfers: "/users/mirimia/fmantica/projects/bilaterian_GE/data/GO_transfers"
+ 
+tools:
+  infer_ts_gains: "bin/infer_ts_gains-v14.py"
+  infer_ts_losses: "bin/infer_ts_losses-v14.py"
+  associate_tissue_with_ts: "bin/associate_tissue_with_ts-v3.py"
+  run_gprofiler2: "bin/run_gprofiler2.R"
+  add_gene_entry: "bin/AddGeneTranscriptsRows_toGTF-Fede.pl"
+  compute_relative_expr_diff: "bin/compute_relative_expr_diff.py"
+
+variables:
+  my_version: "All_version2"
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  vertebrata: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  insecta: ["Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi"]
+  deuterostoma: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2"]
+  protostoma: ["Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  clades: ["Bilateria"]
+  evo_types: ["conserved"]
+  categories: ["STRICT"]
+  expr_types: ["metasamples", "tissues"]
+  all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"] 
+  tau_cutoff: ["0.75", "0.60", "0"]
+  tau_up_cutoff: 0.75
+  tau_low_cutoff: 0.60
+  tau_low_cutoff_losses: 0.45
+  tissue_diff_cutoff: 0.1
+  all_nodes: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi", "Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma", "Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma", "Bilateria"]
+  ancestral_clades: ["Chordata", "Deuterostoma", "Arthropoda", "Protostoma", "Vertebrata", "Insecta"]
+  node_name_dict: '{"Hs2":"Hs2", "Hs2;Mm2":"Euarchontoglires", "Mm2":"Euarchontoglires", "Bt2":"Eutheria", "Mdo":"Mammalia", "Gga":"Amniota", "Xtr":"Tetrapoda", "Dre":"Euteleostomi", "Cmi":"Vertebrata", "Bla":"Chordata", "Sp2":"Deuterostoma", "Dme":"Dme", "Dme;Eba":"Cyclorrapha", "Eba":"Cyclorrapha", "Aae":"Diptera", "Bmo":"Panorpidae", "Tca":"Oligoneoptera", "Ame":"Holometabola", "Bge":"Neoptera", "Cdi":"Insecta", "Sma":"Arthropoda", "Obi":"Protostoma"}'
+  deuterostome_nodes: ["Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma"]
+  protostome_nodes: ["Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma"]
+  node_species_dict: '{"Euarchontoglires":["Hs2","Mm2"], "Eutheria":["Hs2","Mm2","Bt2"], "Mammalia":["Hs2","Mm2","Bt2","Mdo"], "Amniota":["Hs2","Mm2","Bt2","Mdo","Gga"], "Tetrapoda":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr"], "Euteleostomi":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre"], "Vertebrata":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi"], "Chordata":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi","Bla"], "Deuterostoma":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi","Bla","Sp2"], "Cyclorrapha":["Dme","Eba"], "Diptera":["Dme","Eba","Aae"], "Panorpidae":["Dme","Eba","Aae","Bmo"], "Oligoneoptera":["Dme","Eba","Aae","Bmo","Tca"], "Holometabola":["Dme","Eba","Aae","Bmo","Tca","Ame"], "Neoptera":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge"], "Insecta":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi"], "Arthropoda":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi","Sma"], "Protostoma":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi","Sma","Obi"], "Bilateria":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi","Bla","Sp2","Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi","Sma","Obi"]}'
+  all_tissue_combs: ["Neural_Testis", "Neural_Ovary", "Neural_Muscle", "Neural_Kidney", "Neural_Epithelial", "Neural_DigestiveTract", "Neural_Adipose", "Testis_Ovary", "Testis_Muscle", "Testis_Kidney", "Testis_Epithelial", "Testis_DigestiveTract", "Testis_Adipose", "Ovary_Muscle", "Ovary_Kidney", "Ovary_Epithelial", "Ovary_DigestiveTract", "Ovary_Adipose", "Muscle_Kidney", "Muscle_Epithelial", "Muscle_DigestiveTract", "Muscle_Adipose", "Kidney_Epithelial", "Kidney_DigestiveTract", "Kidney_Adipose", "Epithelial_DigestiveTract", "Epithelial_Adipose", "DigestiveTract_Adipose"]
