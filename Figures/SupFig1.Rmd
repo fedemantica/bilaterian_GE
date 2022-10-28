@@ -1,0 +1,298 @@
+---
+title: "SupFig1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#set Knitr option
+knitr::opts_chunk$set(echo = TRUE)
+knitr::knit_engines$set(python = reticulate::eng_python)
+
+#upload libraries
+library(ggplot2)
+library(extrafont)
+library(hashmap)
+library(reshape2)
+library(pheatmap)
+library(RColorBrewer)
+library(cowplot)
+library(tidyverse)
+library(kableExtra)
+
+#set directories
+home="/Users/federica/mnt/"
+gene_sets_dir=paste0(home, "projects/bilaterian_GE/data/gene_sets/")
+#tissue_expr_dir=paste0(home, "projects/bilaterian_GE/data/preprocessing/average_expr_by_tissue/")
+pca_dir=paste0(home, "projects/bilaterian_GE/data/pca_analysis_all_norms/")
+metadata_dir=paste0(home, "projects/bilaterian_GE/data/samples_metadata/")
+splsda_dir= paste0(home, "projects/bilaterian_GE/data/splsda_analysis/")
+diff_expr_dir = paste0(home, "projects/bilaterian_GE/data/differential_expression/")
+
+#set variables
+my_version = "All_version2"
+my_category = "STRICT"
+my_evo_type = "conserved"
+clades = c("Vertebrata", "Insecta", "Bilateria")
+clades_PCA = c("Vertebrata", "Insecta", "Bilateria")
+options("scipen"=100, "digits"=4)
+
+all_species = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+ordered_species = all_species
+Bilateria = all_species
+Vertebrata = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi")
+Insecta = c("Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi")
+Outgroups = c("Bla", "Sp2", "Sma", "Obi")
+all_tissues=c("Adipose", "DigestiveTract", "Kidney", "Epithelial", "Muscle", "Neural", "Ovary", "Testis")
+ordered_tissues = c("Neural", "Testis", "Ovary", "Muscle", "Kidney", "Epithelial", "DigestiveTract", "Adipose")
+
+#set aestetics vectors
+my_color_vector = c("Neural"="mediumblue", "Testis"="violet", "Ovary"="darkorchid", "Muscle"="springgreen3", 
+                    "Kidney"="gold", "Epithelial"="steelblue1", "DigestiveTract"="chocolate1", "Adipose"="firebrick1")
+my_shapes_vector = c("Hs2"=0, "Mm2"=1, "Bt2"=2, "Mdo"=3, "Gga"=4, "Xtr"=5, "Dre"=6, "Cmi"=7, "Bla"=9, "Sp2"=8, 
+                     "Dme"=15, "Eba"=18, "Aae"= 23, "BmA"=25, "Tca"=17, "Bge"=10, "Ame"=16, "Cdi"=13, "Sma"=14, "Obi"=11)
+my_alpha_vector=c("Hs2"=1, "Mm2"=1, "Bt2"=1, "Mdo"=1, "Gga"=1, "Xtr"=1, "Dre"=1, "Cmi"=1, "Bla"=0.5, "Sp2"=0.5, "Sma"=0.5, "Ame"=0.5, "Dme"=0.5, "Cdi"=0.5, "Obi"=0.5, "Bge"=0.5, "BmA"=0.5, "Tca"=0.5)
+my_sets_color = c("Vertebrata"= "mediumorchid", "Deuterostoma"="olivedrab3", "Insecta"="tan3", "Protostoma"="yellow", "Bilateria"="firebrick1", "Outgroups"="dimgray")
+my_species_colors=c("Hs2"="#00BFFF", "Mm2"="#159DFF", "Bt2"="#1873CD", "Mdo"="#174B8B", "Gga"="#3F3F8B", "Xtr"="#64398B", "Dre"="#82359D", "Cmi"="#9932CC", "Bla"="#2E8B57", "Sp2"="#96B12B", "Obi"="#FFFF00", "Sma"="#FFCC33", "Cdi"="goldenrod", "Bge"="burlywood2", "Ame"="#FF9966", "Tca"="#FF6600", "BmA"="#CC6600", "Aae"="#993300", "Eba"="firebrick3", "Dme"="red")
+my_copy_status_colors = c("single_copy_ortholog"="gray18", "duplicated"="gray76")
+
+#Create named vector with PC and corresponding tissue
+PC_tissue_named_vector = c("1"="Neural", "2"="Testis", "3"="Ovary", 
+                          "4"="Muscle", "5"="DigestiveTract", "6"="Epithelial", 
+                          "7"="Kidney", "8"="Adipose")
+
+
+tissue_PC_vector = c("Neural"="Negative_PC1",
+                     "Testis"="Positive_PC2",
+                     "Ovary"="Negative_PC3",
+                     "Muscle"="Positive_PC4",
+                     "DigestiveTract"="Negative_PC5",
+                     "Epithelial"="Positive_PC6",
+                     "Kidney"="Negative_PC7",
+                     "Adipose"="Negative_PC8")
+
+#Plot aestetics
+paletteLength = 75
+my_sets_color = c("Vertebrata"= "mediumorchid", "Insecta"="tan3", "Outgroups"="dimgray")
+palette_brewer = colorRampPalette(rev(brewer.pal(11, "RdBu")))(paletteLength)
+
+#Phenotypes variables
+all_categories = c("Mammals_and_fly", "Mammals_only", "Fly_only", "Mammals_or_fly", "Neither_mammals_nor_fly")
+phenotype_categories = c("Mammals_and_fly", "Mammals_only", "Fly_only", "Neither_mammals_nor_fly")
+phenotype_categories_colors = c("Mammals_and_fly"="forestgreen", "Mammals_only"="olivedrab3", "Fly_only"="coral3", "Neither_mammals_nor_fly"="brown")
+
+#Ancestrality variables
+ancestry_categories = c("Pre_bilaterian", "Bilaterian", "Unclassified")
+ancestry_categories_colors = c("Pre_bilaterian"="dodgerblue3", "Bilaterian"="rosybrown4", "Unclassified"="rosybrown1")
+```
+
+```{r functions, warning=FALSE, message=FALSE, echo=FALSE, dependson="setup"}
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+plot_gene_expr = function(original_OG_ID, loadings_expr_df_long, OGID_humanID_dict, Vertebrata, Insecta, Outgroups) {
+  all_plots = list()
+  i = 1
+  for (clade in c("Vertebrata", "Insecta", "Outgroups")) {
+    my_OG_ID = paste0(OGID_humanID_dict$find(original_OG_ID), " ~ ", original_OG_ID)
+    OG_expr_df = subset(loadings_expr_df_long, OG_ID == original_OG_ID)
+    my_max = max(OG_expr_df$Expr, na.rm=TRUE)
+    my_min = min(OG_expr_df$Expr, na.rm=TRUE)
+    if (clade == "Vertebrata") {OG_expr_df = subset(OG_expr_df, Species %in% Vertebrata)}
+    if (clade == "Insecta") {OG_expr_df = subset(OG_expr_df, Species %in% Insecta)}
+    if (clade == "Outgroups") {OG_expr_df = subset(OG_expr_df, Species %in% Outgroups)}
+    
+    expr_plot = ggplot(data=OG_expr_df, aes(x=Tissue, y=Expr, fill=Tissue), color="black") +
+      geom_boxplot(alpha=0.7, outlier.shape = NA) +
+      geom_jitter(aes(shape=Species), width=0.2, fill="black") +
+      scale_fill_manual(values=my_color_vector) +
+      scale_shape_manual(values=my_shapes_vector) +
+      theme_bw() +
+      theme(axis.title = element_text(color="black"),
+            axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1)
+            ) +
+      guides(fill=FALSE) +
+      ggtitle(paste0(my_OG_ID, " ~ ", clade)) +
+      ylim(c(my_min, my_max))
+    
+    all_plots[[i]] = expr_plot
+    i = i+1
+  }
+  final_plot = plot_grid(all_plots[[1]], all_plots[[2]], all_plots[[3]], ncol=3, rel_widths = c(1,1,1))
+  return(final_plot)
+}
+```
+
+```{r generate_metadata_table, echo=FALSE, warning=FALSE, message=FALSE, dependson="setup"}
+all_metadata_df = vector()
+for (species in all_species) {
+  file_species = species
+  if (species == "BmA") {file_species= "Bmo"}
+  metadata_df = unique(read.delim(paste0(metadata_dir, file_species, "_samples_info.tab"), header=TRUE)[,1:3])
+  colnames(metadata_df) = c("species", "tissues", "metasample")
+  metadata_df$species = rep(species, nrow(metadata_df)) #This is necessary only to translate Bmo to BmA
+  rownames(metadata_df) = paste0(rep(species, nrow(metadata_df)), "_", as.vector(metadata_df$metasample))
+  metadata_df$metasample = NULL
+  all_metadata_df = rbind(all_metadata_df, metadata_df)
+}
+colnames(all_metadata_df) = c("species", "tissues")
+
+sample_tissue_dict = hashmap(rownames(all_metadata_df), as.vector(all_metadata_df$tissues))
+sample_species_dict = hashmap(rownames(all_metadata_df), as.vector(all_metadata_df$species))
+```
+
+<!-- Panels A-F: Print all PCs -->
+```{r splsDA_coords_background_colors, echo=FALSE, warning=FALSE, message=FALSE, fig.width=16, fig.height=12}
+#### Get PC df
+my_PC_df = read.delim(paste0(splsda_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, "/loadings/metasamples_median_expr/all_PC_coordinates.txt"), 
+                      header=TRUE)
+my_PC_df$tissues = sample_tissue_dict$find(rownames(my_PC_df))
+my_PC_df$species = sample_species_dict$find(rownames(my_PC_df))
+
+#### Get variance df
+explained_variance_df = read.delim(paste0(splsda_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, "/loadings/metasamples_median_expr/explained_variance.txt"),
+                                header=FALSE, col.names=c("PC", "variance"))
+#Transform to dict
+explained_variance_dict = hashmap(as.vector(explained_variance_df$PC), round(as.vector(explained_variance_df$variance)*100, 2))
+
+#Create a name vector which I use only for one run, to get the legend exactly as I need it:
+my_fake_species_colors = rep("black", length(my_species_colors))
+names(my_fake_species_colors) = names(my_species_colors)
+#Create a name vector which I use only for one run, to get the legend exactly as I need it:
+my_background_tissue_colors = rep("dimgray", length(my_color_vector))
+names(my_background_tissue_colors) = names(my_color_vector)
+#Create a reduced version of the tissue_PC_vector
+reduced_tissue_PC_vector = sub(".*_", "", tissue_PC_vector)
+
+all_PC_plots = list()
+for (i in seq(1,7)) {
+  PC1=paste0("PC", i)
+  PC2=paste0("PC", i+1)
+  ### Define vectors for coloring
+  if (i>1) {
+  query_tissue1 = names(reduced_tissue_PC_vector[reduced_tissue_PC_vector==PC1])
+  query_tissue2 = names(reduced_tissue_PC_vector[reduced_tissue_PC_vector==PC2])
+  my_temp_color_vector = my_background_tissue_colors
+  my_temp_color_vector[query_tissue1] = my_color_vector[query_tissue1]
+  my_temp_color_vector[query_tissue2] = my_color_vector[query_tissue2]
+  } else {
+    my_temp_color_vector = my_color_vector
+  }
+  
+  PC_plot = ggplot() + 
+    geom_point(data=as.data.frame(my_PC_df), 
+               aes_string(x=PC1, y=PC2, 
+                   color="tissues", 
+                   fill="tissues",
+                   shape="species"), size=2, stroke=0.8) + 
+    #ggtitle(paste0("Bilaterian sPLS-DA ~ comp ", i, " vs comp", i+1)) + 
+    theme_bw() +
+    xlab(paste0("sPLS-DA comp ", i, ": ", explained_variance_dict$find(PC1), "%")) + 
+    ylab(paste0("sPLS-DA comp ", i+1, ": ", explained_variance_dict$find(PC2), "%")) +
+    theme(axis.title = element_text(color="black", size=14), 
+          axis.text = element_text(color="black", size=12),
+          legend.text = element_text(color="black", size=13), 
+          legend.title = element_text(color="black", size=14),
+          plot.title = element_text(color="black", hjust=0.5)) +
+    scale_colour_manual(values=my_temp_color_vector) + #this is great because I can have named vectors
+    scale_fill_manual(values=my_temp_color_vector) +
+    scale_shape_manual(name = "Species", values=my_shapes_vector) + 
+    guides(shape=guide_legend(title="Species"), 
+           color=guide_legend(title="Tissues"), 
+           fill=guide_legend(title="Tissues"))
+  
+  if (i==1) {
+    my_legend = cowplot::get_legend(PC_plot)
+  }
+  PC_plot = PC_plot + guides(shape=FALSE, color=FALSE, fill=FALSE)
+  all_PC_plots[[i]] = PC_plot
+}
+
+
+splda_plot = plot_grid(all_PC_plots[[2]], all_PC_plots[[3]], all_PC_plots[[4]],
+                       all_PC_plots[[5]], all_PC_plots[[6]], all_PC_plots[[7]],
+                       labels=c("A","B","C","D","E","F"),
+                       ncol=3, align="hv")
+
+legend_plot = plot_grid(NA, my_legend, NA, ncol=1, rel_heights = c(0.5,1,0.5))
+
+final_plot = plot_grid(splda_plot, legend_plot, ncol=2, rel_widths = c(1,0.1))
+print(final_plot)
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig3-v1.pdf", width=16, height=12)
+print(final_plot)
+dev.off()
+```
+
+<!-- Panels G-L: Print expression across ancestral tissue-restricted modules -->
+```{r ancestral_tissue_restricted_modules_expression, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.width=12, fig.height=8}
+##### Load the expr df at the tissue level.
+expr_df = read.table(paste0(pca_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, "/Bilateria_", 
+                              my_evo_type, "-tissue_average_expr-NOSVA-log2-TPMs-NORM-species_zscore-BH_genes.tab"), header=TRUE, row=1)
+
+all_plots_list = list()
+i = 1
+for (my_tissue in ordered_tissues[3:length(ordered_tissues)]) {
+  #### Load the interesting OG_IDs
+  ancestral_OG_IDs = as.vector(read.delim(paste0(splsda_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, "/loadings", "/metasamples_median_expr/splsda_zscore_comb/", my_tissue, "_splsda-zscore_loadings_orthogroups-GO_input.txt"), header=FALSE)$V1)
+  
+  ancestral_expr_df = expr_df[rownames(expr_df) %in% ancestral_OG_IDs,] #Subset the expression dataframe only to the selected loadings
+  ancestral_expr_long_df = melt(as.matrix(ancestral_expr_df))
+  colnames(ancestral_expr_long_df) = c("OG_ID", "Metasample", "Expr")
+  ancestral_expr_long_df$Species = sub("_.*", "", ancestral_expr_long_df$Metasample)
+  ancestral_expr_long_df$Tissue = sub(".*_", "", ancestral_expr_long_df$Metasample)
+  #Add clade label based on the species
+  clade_expr_df = ancestral_expr_long_df %>% 
+  mutate(Clade = case_when(Species %in% Vertebrata ~ "Vertebrata",
+                           Species %in% Insecta ~ "Insecta",
+                           Species %in% Outgroups ~ "Outgroups")
+             )
+  
+  #Compute the median and the zscore
+  OG_zscore_df = clade_expr_df %>% group_by(OG_ID, Tissue, Clade) %>% #Group dataframe by orthogroup, tissue and clade
+    summarize(zscore=median(Expr, na.rm=TRUE)) %>% #Compute the median value for each tissue in each clade
+    ungroup #%>%
+    #group_by(OG_ID) %>% #Group only by orthogroup
+    #mutate(zscore = (median_expr - mean(median_expr, na.rm=TRUE))/sd(median_expr, na.rm=TRUE)) #compute the zscore across the median values
+    
+  OG_zscore_df$ID = paste0(OG_zscore_df$Clade, "_", OG_zscore_df$Tissue) #Combine clade and tissue in a unique ID
+  
+  #Order factors for plotting
+  OG_zscore_df$Tissue = factor(OG_zscore_df$Tissue, levels=ordered_tissues)
+  
+  ancestral_genes_expr_plot = ggplot(data=OG_zscore_df, aes(x=Tissue, y=zscore, fill=Tissue)) +
+    #geom_jitter(aes(shape=Clade), alpha=0.2) +
+    geom_jitter(alpha=0.1, size=0.5) +
+    geom_boxplot(color="black", alpha=0.8, outlier.shape = NA) +
+    theme_bw() +
+    theme(text=element_text(family="sans"),
+          axis.text.y = element_text(color="black", size=10),
+          axis.title = element_text(color="black", size=12), 
+          #axis.text.x = element_text(color="black", size=10, angle=30, hjust=1, vjust=1),
+          plot.margin = unit(c(0,0,0,0), "cm"),
+          #axis.text.x = element_blank(),
+          #axis.ticks.x = element_blank(),
+          #axis.title.x = element_blank()
+          axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1),
+          #axis.ticks.x = element_blank(),
+          axis.title.x = element_blank()
+          ) +
+    scale_fill_manual(values=my_color_vector) +
+    guides(fill=FALSE)
+  
+  #print(ancestral_genes_expr_plot)
+  all_plots_list[[i]] = ancestral_genes_expr_plot
+  i = i+1
+}
+
+final_plot = plot_grid(plotlist = all_plots_list, ncol=3, labels=c("A","B","C","D","E","F"))
+print(final_plot)
+
+####Save to file
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig4-v1.pdf", width=12, height=8)
+print(final_plot)
+dev.off()
+```
