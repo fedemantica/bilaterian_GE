@@ -1,0 +1,39 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
+  database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  pca_analysis: "/users/mirimia/fmantica/projects/bilaterian_GE/data/pca_analysis_all_norms"
+  splsda_analysis: "/users/mirimia/fmantica/projects/bilaterian_GE/data/splsda_analysis"
+  branches_length_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/branches_length_analysis"  
+  general_patterns: "/users/mirimia/fmantica/projects/bilaterian_GE/data/vertebrates_vs_insects_general_patterns"
+  go_transfers: "/users/mirimia/fmantica/projects/bilaterian_GE/data/GO_transfers"
+
+tools:
+  rscript: "/software/as/el7.2/EasyBuild/CRG/software/R/3.6.0-foss-2019a/bin/Rscript"
+  run_gprofiler2: "bin/run_gprofiler2.R"
+  plot_branches_length: "bin/plot_branches_length.R"
+  plot_branches_length_complete: "bin/plot_branches_length_complete.R"
+
+variables:
+  my_version: "All_version2"
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  vertebrata: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  insecta: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi"]
+  deuterostoma: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2"]
+  protostoma: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  clades: ["Bilateria"]
+  evo_types: ["conserved"]
+  categories: ["STRICT"]
+  expr_types: ["metasamples_median_expr", "tissue_average_expr"]
+  all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"] 
+  higher_GO_cutoff: 2500
+  lower_GO_cutoff: 3
+  expr_suffix: "-NOSVA-log2-TPMs-NORM-BH_genes.tab"
+  reduced_expr_suffix: "NOSVA-log2-TPMs"
+  my_measures: ["sequence_similarities", "expression_correlations_spearman"]
+  go_categories: ["Vertebrata_seq_slow_evolving", "Vertebrata_expr_slow_evolving", "Insecta_seq_slow_evolving", "Insecta_expr_slow_evolving"]
