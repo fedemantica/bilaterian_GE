@@ -1,0 +1,120 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+CORRECTED_GTFS_DIR = config["paths"]["corrected_gtfs"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+METASAMPLES_DIR = config["paths"]["metasamples_dir"]
+AVERAGE_EXPR_DIR = config["paths"]["average_expr_dir"]
+TS_CALL_DIR = config["paths"]["ts_call_dir"]
+GO_TRANSFERS = config["paths"]["go_transfers"]
+
+######## tools ############
+QUANTILE_NORMALIZE = config["tools"]["quantile_normalize"]
+COMPUTE_TAU = config["tools"]["compute_tau"]
+COMPUTE_RELATIVE_TS = config["tools"]["compute_relative_ts"] 
+GET_PROTEIN_CODING_GENES_FROM_GTF = config["tools"]["get_protein_coding_genes_from_gtf"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+TAU_CATEGORY = config["variables"]["tau_category"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+OG_SPECIES_DICT = config["variables"]["og_species_dict"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+EXPR_SUFFIX = config["variables"]["expr_suffix"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+###### targets ##########
+
+####### rules ############
+rule all:	
+	input:
+
+##################################################
+####### COMPUTE TAU INPUT BY SPECISE #############
+##################################################
+rule get_protein_coding_genes:
+	input:
+		CORRECTED_GTFS_DIR+"/{my_version}/ref/{species}_annot-B-brochi.gtf"		
+	output:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding_genes.txt"
+	shell:
+		"""
+		python {GET_PROTEIN_CODING_GENES_FROM_GTF} --input {input} --output {output}
+		"""
+
+rule filter_expr_by_protein_coding:
+	input:
+		expr_table = AVERAGE_EXPR_DIR+"/{species}-tissue_average_expr-NOSVA-log2-TPMs.tab",
+		protein_coding = TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding_genes.txt"
+	output:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	run:
+		import pandas as pd
+
+		expr_df = pd.read_table(str(input.expr_table), index_col=0, header=0, sep="\t")
+		protein_coding = list(pd.read_table(str(input.protein_coding), index_col=False, header=None, names=["protein_coding"])["protein_coding"])
+		#final_df = expr_df.loc[protein_coding]
+		#final_df = expr_df.reindex[protein_coding]
+		final_df = expr_df.loc[expr_df.index.intersection(protein_coding)]
+		final_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+rule quantile_normalize_by_species:
+	input:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	output:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output}
+		"""
+
+##################################################
+####### COMPUTE TAU BY SPECIES ###################
+##################################################
+
+rule compute_tau:
+	input:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab"
+	output:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding_taus.tab"
+	shell:
+		"""
+		python {COMPUTE_TAU} 	--input {input} \
+					--output {output}
+		"""
+
+##################################################
+####### COMPUTE RELATIVE TS ######################
+##################################################
+
+rule compute_relative_ts:
+	input:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab"
+	output:
+		TS_CALL_DIR+"/{tau_category}_taus/{my_version}/{species}-protein_coding_relative_ts.tab"
+	shell:
+		"""
+		python {COMPUTE_RELATIVE_TS}	--input {input} \
+						--output {output}
+		"""

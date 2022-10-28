@@ -1,0 +1,35 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
+  corrected_gtfs: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/corrected_gtf"
+  metasamples_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/metasamples" 
+  average_expr_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant/tissues_average_quantification"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  ts_call_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/ts_call" 
+  go_transfers: "/users/mirimia/fmantica/projects/bilaterian_GE/data/GO_transfers"
+ 
+tools:
+  quantile_normalize: "bin/quantile_normalize.R"
+  compute_tau: "bin/compute_tau-v3.py"
+  compute_relative_ts: "bin/compute_relative_ts.py"
+  get_protein_coding_genes_from_gtf: "bin/get_protein_coding_genes_from_gtf.py" 
+
+variables:
+  my_version: "All_version2"
+  tau_category: "species_QN_5_TPM"
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  vertebrata: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  insecta: ["Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi"]
+  deuterostoma: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2"]
+  protostoma: ["Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  clades: ["Bilateria"]
+  evo_types: ["conserved"]
+  categories: ["STRICT"]
+  expr_types: ["metasamples", "tissues"]
+  expr_suffix: "-tissue_average_expr-NOSVA-log2-TPMs.tab"
+  all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"] 
+  og_species_dict: {"Hs2":"Hs2", "Mm2":"Mm2", "Bt2":"Bt2", "Mdo":"Mdo", "Gga":"Gga", "Xtr":"Xtr", "Dre":"Dre", "Cmi":"Cmi", "Bla":"Bla", "Sp2":"Sp2", "Dme":"Dme", "Eba":"Eba", "Aae":"Aae", "Bmo":"BmA", "Tca":"Tca", "Ame":"Ame", "Bge":"Bge", "Cdi":"Cdi", "Sma":"Sma", "Obi":"Obi"}
