@@ -1,0 +1,391 @@
+---
+title: "Dataset figure"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#update library path
+#.libPaths(c("/Users/federica/mnt/software/R/3.5", "/Users/federica/mnt/software/R", .libPaths()))
+#set Knitr option
+knitr::opts_chunk$set(echo = TRUE)
+
+#Upload libraries
+library(ggplot2)
+library(gridExtra)
+library(cowplot)
+library(reshape2)
+library(hashmap)
+library(gtools)
+library(ggtree)
+library(ape)
+library(dplyr)
+library(stringr)
+library(ggforce)
+library(pheatmap)
+library(impute)
+library(ggpubr)
+
+#Set paths for input/output directories
+home = "/Users/federica/mnt/"
+metadata_dir = paste0(home, "projects/bilaterian_GE/data/samples_metadata/")
+evo_distances_dir = paste0(home, "projects/bilaterian_GE/data/evo_distances/")
+pca_dir = paste0(home, "projects/bilaterian_GE/data/pca_analysis_all_norms/")
+GO_zscores_dir = paste0(home, "projects/bilaterian_GE/data/GO_zscore_approach_v4/")
+#GO_zscores_dir = paste0(home, )
+version = "All_version2"
+category = "STRICT"
+clade = "Bilateria"
+evo_type = "conserved"
+
+#Generate variables
+original_species = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+all_species = c("Hsa", "Mmu", "Bta", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+ordered_species = all_species
+Bilateria = all_species
+Vertebrata = c("Hsa", "Mmu", "Bta", "Mdo", "Gga", "Xtr", "Dre", "Cmi")
+Insecta = c("Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi")
+Outgroups = c("Bla", "Spu", "Sma", "Obi")
+all_tissues=c("Adipose", "DigestiveTract", "Kidney", "Epithelial", "Muscle", "Neural", "Ovary", "Testis")
+ordered_tissues = c("Neural", "Testis", "Ovary", "Muscle", "Kidney", "Epithelial", "DigestiveTract", "Adipose")
+
+
+#Set aestetics vectors
+tissue_colors = c("Adipose"="firebrick1", "Neural"="mediumblue", 
+                  "Muscle"="springgreen3", "Ovary"="darkorchid", 
+                  "Kidney"="gold", "Testis"="violet", 
+                  "DigestiveTract"="chocolate1", "Epithelial"="steelblue1")
+
+tissue_letters = c("Neural" = utf8ToInt("N"), "Testis"=utf8ToInt("T"),
+                   "Ovary" = utf8ToInt("O"), "Muscle"=utf8ToInt("M"), 
+                   "Kidney" = utf8ToInt("X"), "Epithelial"=utf8ToInt("E"),
+                   "DigestiveTract"=utf8ToInt("D"), "Adipose"=utf8ToInt("A"))
+
+species_colors = c("Hsa"="#00BFFF", "Mmu"="#159DFF", "Bta"="#1873CD", "Mdo"="#174B8B", "Gga"="#3F3F8B", "Xtr"="#64398B",
+                 "Dre"="#82359D", "Cmi"="#9932CC", "Bla"="#2E8B57", "Spu"="#96B12B", rev(c("Obi"="#FFFF00",
+                 "Sma"="#FFCC33", "Cdi"="goldenrod", "Bge"="burlywood2", "Ame"="#FF9966", "Tca"="#FF6600",
+                 "Bmo"="#CC6600", "Aae"="#993300", "Eba"="firebrick3", "Dme"="red")))
+
+species_shapes = c("Hsa"=0, "Mmu"=1, "Bta"=2, "Mdo"=3, "Gga"=4, "Xtr"=5, 
+                   "Dre"=6, "Cmi"=7, "Bla"=9, "Spu"=8, "Dme"=15, "Eba"=18, "Aae"= 23, 
+                   "Bmo"=25, "Tca"=17, "Bge"=10, "Ame"=16, "Cdi"=13, "Sma"=14, "Obi"=11)
+species_alphas = c("Hs2"=1, "Mm2"=1, "Bt2"=1, "Mdo"=1, "Gga"=1, "Xtr"=1, "Dre"=1, 
+                   "Cmi"=1, "Bla"=0.5, "Sp2"=0.5, "Sma"=0.5, "Ame"=0.5, "Dme"=0.5, "Cdi"=0.5, 
+                   "Obi"=0.5, "Bge"=0.5, "BmA"=0.5, "Tca"=0.5)
+clade_colors = c("Vertebrata"= "mediumorchid", "Deuterostoma"="olivedrab3", 
+                 "Insecta"="tan3", "Protostoma"="yellow", "Bilateria"="firebrick1", 
+                 "Outgroups"="dimgray")
+
+scientific_names_vector = c("Hsa"="Homo sapiens (Hsa)", "Mmu"="Mus musculus (Mmu)", "Bta"="Bos taurus (Bta)", "Mdo"="Monodelphis domestica (Mdo)", 
+                            "Gga"="Gallus gallus (Gga)", "Xtr"="Xenopus tropicalis (Xtr)", "Dre"="Danio rerio (Dre)", "Cmi"="Callorhinchus milii (Cmi)", 
+                            "Bla"="Branchiostoma lanceolatum (Bla)", "Spu"="Strongylocentrotus purpuratus (Spu)", "Dme"="Drosophila melanogaster (Dme)",
+                            "Eba"="Episyrphus balteatus (Eba)", "Aae"="Aaedes aegypti (Aae)", "Bmo"="Bombyx mori (Bmo)", "Tca"="Tribolium castaneum (Tca)",
+                            "Ame"="Apis mellifera (Ame)", "Bge"="Blattella germanica (Bge)", "Cdi"="Cloeon dipterum (Cdi)",
+                            "Sma"="Strigamia marittima (Sma)", "Obi"="Octopus bimaculoides (Obi)")
+```
+
+```{r functions, echo=FALSE, message=FALSE, warning=FALSE, dependson="setup"}
+#######################################
+########## Dataset figure #############
+#######################################
+tree_y <-  function(ggtree, data){
+  if(!inherits(ggtree, "ggtree"))
+    stop("not a ggtree object")
+  left_join(select(data, label), select(ggtree$data, label, y)) %>%
+    pull(y)
+}
+
+#This is just to see if I can actually paier a ggtree with a ggplot decently.
+# overwrite the default expand for continuous scales
+scale_y_tree <- function(expand=expand_scale(0, 0.6), ...){
+    scale_y_continuous(expand=expand, ...)
+}
+
+# get the range of the ggtree y-axis data
+tree_ylim <- function(ggtree){
+  if(!inherits(ggtree, "ggtree"))
+    stop("not a ggtree object")
+  range(ggtree$data$y)
+}
+
+# plot data next to a ggtree aligned by shared labels
+ggtreeplot <- function(ggtree, data = NULL, mapping = aes(), flip=FALSE,
+     expand_limits=expand_scale(0,.6), ...){
+  
+  if(!inherits(ggtree, "ggtree"))
+    stop("not a ggtree object")
+
+  # match the tree limits
+  limits <- tree_ylim(ggtree)
+  limits[1] <- limits[1] + (limits[1] * expand_limits[1]) - expand_limits[2]
+  limits[2] <- limits[2] + (limits[2] * expand_limits[3]) + expand_limits[4]
+  
+  if(flip){
+    mapping <- modifyList(aes_(x=~x), mapping)
+    data <- mutate(data, x=tree_y(ggtree, data))
+    gg <- ggplot(data=data, mapping = mapping, ...) +
+      scale_x_continuous(limits=limits, expand=c(0,0))
+  }else{
+    mapping <- modifyList(aes_(y=~y), mapping)
+    data <- mutate(data, y=tree_y(ggtree, data))
+    gg <- ggplot(data=data, mapping = mapping, ...) +
+      scale_y_continuous(limits=limits, expand=c(0,0))
+  }
+  gg
+}
+
+#######################################
+########## PCA figure #################
+#######################################
+plot_PCA = function(expr_df, features_table, species_set, cluster_number) {
+  imputation_out = impute.knn(as.matrix(expr_df), k = 10) #impute missing values.
+  imputation_df = as.data.frame(imputation_out$data) #transform to a dataframe.
+  #compute PCA. I need the genes on columns in the input table.
+  PCA_res = prcomp(as.matrix(t(imputation_df)), center = TRUE, scale = TRUE) #center and scale the PCs.
+  ordered_PCA_res = as.data.frame(PCA_res$x[order(rownames(PCA_res$x)),]) 
+  #filter the sample only for the samples that made it after the sva correction
+  filtered_features_table = features_table[rownames(features_table) %in% colnames(imputation_df),]
+  ordered_features_table = filtered_features_table[order(rownames(filtered_features_table)),] #order the table
+  all(rownames(ordered_features_table) == rownames(ordered_PCA_res))
+  #compute the percentage of variance explained
+  eigs <- PCA_res$sdev^2
+  first_PC_var = round(eigs[1]/sum(eigs), 3)*100
+  second_PC_var = round(eigs[2]/sum(eigs), 3)*100
+  third_PC_var = round(eigs[3]/sum(eigs), 3)*100
+  fourth_PC_var = round(eigs[4]/sum(eigs), 3)*100
+  #filter shapes vector
+  my_filtered_shapes_vector = species_shapes[unique(as.vector(ordered_features_table$species))] #filter the shape vector
+  #filter ordered species
+  #filt_ordered_species = ordered_species[ordered_species %in% unique(as.vector(ordered_features_table$species))]
+  ordered_features_table$species <- factor(ordered_features_table$species, levels=ordered_species) #change the order of the levels in the factor
+  #plot the first two PC
+  ordered_PCA_res = as.data.frame(ordered_PCA_res)
+  ordered_PCA_res$tissues = ordered_features_table$tissues
+  ordered_PCA_res$species = ordered_features_table$species
+  print(levels(ordered_PCA_res$species))
+  
+  p = ggplot() + geom_point(data=ordered_PCA_res, 
+                            aes(x=PC1, y=PC2, 
+                                color=species, 
+                                #fill=species,
+                                shape=tissues), size=2.5, stroke=0.8) +
+    xlab(paste0("PC1: ", first_PC_var, "%")) + 
+    ylab(paste0("PC2: ", second_PC_var, "%")) + theme_bw() +
+    theme(axis.title = element_text(color="black", size=8), 
+          axis.text = element_text(color="black", size=7),
+          legend.text = element_text(color="black", size=8), 
+          legend.title = element_text(color="black", size=8, face="bold")) +
+    scale_colour_manual(name="Species", values=species_colors, labels=ordered_species) + #this is great because I can have named vectors
+    #scale_fill_manual(name="Species", values=species_colors, labels=ordered_species) +
+    scale_shape_manual(name="Tissues", values=tissue_letters, labels=ordered_tissues)
+    #guides(fill=FALSE)
+    #guides(color=guide_legend(title="Species"), shape=guide_legend(title="Species"), fill=FALSE) 
+  #+ coord_fixed()
+  
+  res = list()
+  res[[1]] = p
+  res[[2]] = p
+  
+  my_plots = plot_grid(p, p, rel_widths=c(1,1), align="h", ncol=2)
+  return(list("plots" = my_plots, "results"=res))
+}
+```
+
+```{r generate_metadata_table, echo=FALSE, warning=FALSE, message=FALSE, dependson="setup"}
+#initialize empty vectors
+all_metadata_df = vector()
+in_house_metasamples = vector()
+
+#cycle on species
+for (species in all_species) {
+  file_species = species
+  if (species == "BmA") {file_species= "Bmo"}
+  if (species == "Hsa") {file_species= "Hs2"}
+  if (species == "Mmu") {file_species= "Mm2"}
+  if (species == "Bta") {file_species= "Bt2"}
+  if (species == "Spu") {file_species= "Sp2"}
+  metadata_df = read.delim(paste0(metadata_dir, file_species, "_samples_info.tab"), header=TRUE)[,c(1,2,3,5)]
+  colnames(metadata_df) = c("species", "tissues", "sample", "db")
+  #Isolate all the in-house samples
+  species_in_house_metasamples = paste0(species, "_", as.vector(subset(metadata_df, db=="in_house")$tissues))
+  in_house_metasamples = c(in_house_metasamples, species_in_house_metasamples)
+  #Generate the metadata table
+  metadata_df = unique(metadata_df[,c(1:3)])[,c(1,2)]
+  metadata_df$species = rep(species, nrow(metadata_df)) #This is necessary only to translate Bmo to BmA
+  #rownames(metadata_df) = paste0(rep(species, nrow(metadata_df)), "_", as.vector(metadata_df$metasample))
+  #metadata_df$samples = NULL
+  all_metadata_df = rbind(all_metadata_df, metadata_df)
+}
+colnames(all_metadata_df) = c("species", "tissues")
+
+#Add species_tissue column to count the number of metasamples for each tissue and each species
+all_metadata_df$metasample = paste0(all_metadata_df$species, "_", all_metadata_df$tissues)
+metasample_counts_table = table(all_metadata_df$metasample)
+metasample_counts_dict = hashmap(names(metasample_counts_table), unname(metasample_counts_table))
+#Add count information (how many metasamples for each tissue and each species)
+all_metadata_df$sample_number = metasample_counts_dict$find(all_metadata_df$metasample)
+#Remove duplicates
+all_metadata_df = unique(all_metadata_df)
+#Change rownames
+rownames(all_metadata_df) = seq(1, nrow(all_metadata_df))
+#Add source (in house generated or public samples)
+all_metadata_df$source = ifelse(all_metadata_df$metasample %in% in_house_metasamples, "in_house", "public")
+
+#Order levels for plotting
+all_metadata_df$species = factor(all_metadata_df$species, levels=rev(ordered_species))
+all_metadata_df$tissues = factor(all_metadata_df$tissues, levels=ordered_tissues)
+```
+
+<br />
+<!-- Panel A: dataset plot -->
+```{r dataset_plot, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "random_functions"), fig.wdith=24, fig.height=6}
+my_dist_table = read.delim(paste0(evo_distances_dir, "ancestor_distances.txt"), header=TRUE, row=1)
+my_dist_matrix = as.matrix(my_dist_table)
+my_unrooted_tree = nj(my_dist_matrix)
+my_rooted_tree = root(my_unrooted_tree, "Nve", resolve.root=TRUE)
+my_rooted_tree = drop.tip(my_rooted_tree, "Nve")
+
+my_ggtree = ggtree(my_rooted_tree) + 
+  scale_x_continuous(expand=expand_scale(0.2)) +
+  scale_y_tree()
+
+### There must be a label column with the same labels as the tree in order for it to be properly aligned
+species_df = data.frame(ordered_species, rep(1, length(ordered_species)))
+colnames(species_df) = c("species", "value")
+species_df$status = rep("black", nrow(species_df))
+
+#add column to highlight the different status of the species
+species_df$species = factor(species_df$species, levels=rev(ordered_species))
+species_df$label = as.vector(species_df$species)
+
+species_names = ggtreeplot(my_ggtree, data=species_df, aes(x=species, y=value, fill=species)) +
+  geom_bar(stat="identity", alpha=0.75) +
+  theme_bw() +
+  scale_fill_manual(values=species_colors) +
+  theme(axis.title.y = element_blank(), 
+        axis.text.y = element_text(size=8, hjust=0.5, color = rev(species_df$status)),
+        axis.title.x = element_blank(), 
+        panel.background = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        axis.ticks = element_blank()) + 
+  panel_border(remove=TRUE) +
+  coord_flip() +
+  guides(fill=FALSE) + 
+  scale_y_discrete() + 
+  scale_x_discrete(position="top", labels = scientific_names_vector)
+
+##############################################
+##############################################
+##############################################
+
+#Add code to align to the tree
+all_metadata_df$label=as.vector(all_metadata_df$species)
+source_colors = c("in_house"="black", "public"="dimgray")
+source_sizes = c("in_house"=0.6, "public"=0.1)
+source_alphas = c("in_house"=0.5, "public"=0.2)
+#source_alphas = c("in_house"=0.65, "public"=0.3)
+
+
+samples_table_plot = ggtreeplot(my_ggtree, data=all_metadata_df, aes(x=species, y=tissues)) + 
+  geom_tile(aes(fill=tissues, alpha=source, color=source, size=source), stat="identity") + 
+  geom_text(aes(label=sample_number), size=3) +
+  scale_fill_manual(values=tissue_colors) + 
+  theme_bw() + 
+  theme(panel.background = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(), 
+        axis.ticks = element_blank(), 
+        #axis.text.y = element_text(color="black", size=12),
+        axis.text = element_blank(),
+        #axis.text.x = element_text(color="black", size=9),
+        panel.border = element_blank(),
+        axis.title = element_blank()) +
+  scale_y_discrete() +
+  #scale_x_discrete(labels = scientific_names_vector) +
+  scale_alpha_manual(values=source_alphas) +
+  scale_color_manual(values=source_colors) +
+  scale_size_manual(values=source_sizes) +
+  coord_flip() +
+  labs(fill = "Tissues") + guides(fill=FALSE, alpha=FALSE, color=FALSE, size=FALSE)
+
+
+##########################################
+###### Sample counts plot ################
+##########################################
+
+all_samples_df = vector()
+for (species in ordered_species) {
+  file_species = species
+  if (species == "BmA") {file_species = "Bmo"}
+  if (species == "Hsa") {file_species= "Hs2"}
+  if (species == "Mmu") {file_species= "Mm2"}
+  if (species == "Bta") {file_species= "Bt2"}
+  if (species == "Spu") {file_species= "Sp2"}
+  samples_df = unique(read.delim(paste0(metadata_dir, file_species, "_samples_info.tab"), header=TRUE)[,1:4])
+  colnames(samples_df) = c("species", "tissues", "metasample", "sample")
+  samples_df$species = rep(species, nrow(samples_df)) #This is necessary only to translate the different species
+  all_samples_df = rbind(all_samples_df , samples_df)
+}
+
+samples_count_df = as.data.frame(table(all_samples_df$species))
+colnames(samples_count_df) = c("species", "sample_number")
+samples_count_df$species = factor(samples_count_df$species, levels=rev(ordered_species))
+samples_count_df$label = as.vector(samples_count_df$species)
+
+samples_count_plot = ggtreeplot(my_ggtree, data=samples_count_df, aes(x=species, y=sample_number)) +
+  geom_bar(color="black", fill="dimgray", alpha=0.5, stat="identity") +
+  geom_text(aes(x=species, y=sample_number, label=sample_number), nudge_y=30, size=3) +
+  theme_void() +
+  theme(axis.title = element_blank(),
+        axis.text = element_blank()
+        ) +
+  scale_y_continuous(position="left", limits = c(0,max(samples_count_df$sample_number)+50)) +
+  coord_flip()
+
+########### Build final  plot with the tree and colors
+dataset_plot = plot_grid(my_ggtree, species_names, samples_table_plot, samples_count_plot,
+                      align="h", ncol=4, rel_widths = c(0.6,0.8,0.8,0.3))
+print(dataset_plot)
+```
+
+<!-- Panel B: PCA plot on metasamples expression -->
+```{r PCA_plot, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.wdith=10, fig.height=6}
+#Define path to expression file
+expr_file = paste0(pca_dir, "/", version, "/", category, "/", clade, "/", evo_type, "/Bilateria_conserved-metasamples_median_expr-NOSVA-log2-TPMs-NORM-BH_genes.tab")
+
+#Read input
+expr_df = read.delim(expr_file, sep="\t", header=TRUE, row=1)
+expr_df = expr_df[complete.cases(expr_df),] #I am using only the cases without NAs, so that I don't have to do any imputation.
+#Update colnames
+colnames(expr_df) = gsub("BmA", "Bmo", gsub("Hs2", "Hsa", gsub("Mm2", "Mmu", gsub("Bt2", "Bta", gsub("Sp2", "Spu", colnames(expr_df))))))
+
+#Generate metadata
+pca_metadata_df = vector()
+for (species in all_species) {
+  file_species = species
+  if (species == "BmA") {file_species = "Bmo"}
+  if (species == "Hsa") {file_species = "Hs2"}
+  if (species == "Mmu") {file_species = "Mm2"}
+  if (species == "Bta") {file_species = "Bt2"}
+  if (species == "Spu") {file_species = "Sp2"}
+  metadata_df = unique(read.delim(paste0(metadata_dir, file_species, "_samples_info.tab"), header=TRUE)[,1:3])
+  colnames(metadata_df) = c("species", "tissues", "metasample")
+  metadata_df$species = rep(species, nrow(metadata_df)) #This is necessary only to translate Bmo to BmA
+  rownames(metadata_df) = paste0(rep(species, nrow(metadata_df)), "_", as.vector(metadata_df$metasample))
+  metadata_df$metasample = NULL
+  pca_metadata_df = rbind(pca_metadata_df, metadata_df)
+}
+colnames(pca_metadata_df) = c("species", "tissues")
+
+#Run PCA
+orthogroups_number=nrow(expr_df)
+res_PCA = plot_PCA(expr_df, pca_metadata_df, clade, orthogroups_number)
+PC_plot = res_PCA$results[[1]] +
+  theme(legend.position = "right") +
+  #guides(guide_legend(ncol=3))
+  guides(color=guide_legend(ncol=2), shape=guide_legend(ncol=2), 
+         #fill=guide_legend(ncol=2)
+         )
+
+print(PC_plot)
+```
