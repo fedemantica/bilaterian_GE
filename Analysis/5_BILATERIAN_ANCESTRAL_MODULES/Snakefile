@@ -1,0 +1,360 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+DATABASE = config["paths"]["database"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+METASAMPLES_DIR = config["paths"]["metasamples_dir"]
+AVERAGE_EXPR_DIR = config["paths"]["average_expr_dir"]
+PCA_ANALYSIS_DIR = config["paths"]["pca_analysis"]
+SPLSDA_ANALYSIS_DIR = config["paths"]["splsda_analysis"]
+DELTA_ZSCORE_DIR = config["paths"]["delta_zscore_dir"]
+GO_TRANSFERS = config["paths"]["go_transfers_dir"]
+
+######## tools ############
+RSCRIPT = config["tools"]["rscript"]
+FINE_TUNE_SPLSDA = config["tools"]["fine_tune_splsda"]
+RUN_GPROFILER2 = config["tools"]["run_gprofiler2"]
+SAVE_LOADINGS = config["tools"]["save_loadings"]
+SAVE_EXTRA_FILES = config["tools"]["save_extra_files"]
+FILTER_SPLSDA_LOADINGS = config["tools"]["filter_splsda_loadings"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+OUTGROUPS = config["variables"]["outgroups"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+HIGHER_GO_CUTOFF = config["variables"]["higher_GO_cutoff"]
+LOWER_GO_CUTOFF =  config["variables"]["lower_GO_cutoff"]
+EXPR_SUFFIX = config["variables"]["expr_suffix"]
+EXPR_SUFFIX_FILTER = config["variables"]["expr_suffix_filter"]
+
+
+###### targets ##########
+FINE_TUNED_SPLSDA = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-tuned_sPLSDA.RDATA", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type=EVO_TYPES, expr_type=["metasamples_median_expr"])
+LOADINGS_TISSUE_ALL = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/PC{num}_loadings.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", num=list(range(1,9)), expr_type="metasamples_median_expr")
+FILES_FOR_PLOTTING = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/all_PC_coordinates.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", expr_type="metasamples_median_expr")
+LOADINGS_GENEID_TISSUE_ALL = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/Positive_PC{num}_loadings_all_geneID.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", num=list(range(1,9)), expr_type="metasamples_median_expr")
+
+SPLSDA_ZSCORE_COMMON_LOADINGS = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/{tissue}_splsda-zscore_loadings-all_geneID.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", tissue=ALL_TISSUES)
+SPLSDA_ZSCORE_COMMON_LOADINGS_GO = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/{tissue}_splsda-zscore_loadings_{input_type}-GO_res.tab", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", tissue=ALL_TISSUES, input_type=["orthogroups_from_Hs2", "orthogroups_from_Dme"])
+
+PHENOTYPE_STATS = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_stats.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", phenotype_type=["Bilateria_ancestral", "Bilateria_conserved"] ,tissue=ALL_TISSUES)
+PHENOTYPES_FOR_EXCEL = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels_AND_phenotypic_info.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", phenotype_type=["Bilateria_ancestral", "Bilateria_conserved"])
+NEURAL_AND_TESTIS_PHENOTYPES = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels_AND_phenotypic_info-Neural_and_Testis_stats.txt", path=SPLSDA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade="Bilateria", evo_type="conserved", phenotype_type=["Bilateria_ancestral", "Bilateria_conserved"])
+
+####### rules ############
+rule all:	
+	input:
+
+#######################################
+###### sPLS-DA FINE TUNING ############
+#######################################
+rule fine_tune_sPLSDA:
+	input:
+		expr_table = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}"+EXPR_SUFFIX,
+		metadata = expand("{path}/{species}_samples_info.tab", path=METADATA, species=ALL_SPECIES)
+	output:
+		SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-tuned_sPLSDA.RDATA"
+	params:
+		clade_species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade])
+	conda:
+		CONDA_ENVS+"/r_env.yml"	
+	shell:
+		"""
+		Rscript {FINE_TUNE_SPLSDA} {input.expr_table} {METADATA} {params.clade_species} {output} 
+		"""
+
+
+#######################################
+###### Get loadings ###################
+#######################################
+rule save_loadings_tissue:
+	input:
+		model = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-tuned_sPLSDA.RDATA",
+		expr_table= PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}"+EXPR_SUFFIX 
+	output:
+		SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/PC{num}_loadings.txt"
+	params:
+		metadata_dir = METADATA,
+		all_species = ",".join(ALL_SPECIES),
+		output_dir = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/",
+		output_prefix = "PC",
+		output_suffix = "_loadings.txt",
+		output_suffix_all = "_ALL_loadings.txt"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {SAVE_LOADINGS} {input.model} \
+					{input.expr_table} \
+					{wildcards.num} \
+					{params.metadata_dir} \
+					{params.all_species} \
+					{params.output_dir} \
+					{params.output_prefix} \
+					{params.output_suffix} \
+					{params.output_suffix_all}
+		"""
+
+rule save_extra_files:
+	input:
+		model = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-tuned_sPLSDA.RDATA",
+		expr_table= PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}"+EXPR_SUFFIX 
+	output:
+		PC_coords = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/all_PC_coordinates.txt",
+		variance = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/explained_variance.txt",
+		loadings_number = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/loadings_number.txt"
+	params:
+		metadata_dir = METADATA,
+		all_species = ",".join(ALL_SPECIES)
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {SAVE_EXTRA_FILES}	{input.model} \
+						{input.expr_table} \
+						{params.metadata_dir} \
+						{params.all_species} \
+						{output.PC_coords} \
+						{output.variance} \
+						{output.loadings_number}
+		"""
+
+
+rule get_loadings_geneIDs_ALL:
+	input:
+		loadings = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/PC{num}_loadings.txt",
+		orthogroups = GENE_SETS_DIR+"/{my_version}/{category}/{clade}/conserved/{clade}_conserved-reclustered_orthogroups-BH_genes.txt"
+	output:
+		human_negative = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/Negative_PC{num}_loadings_Hs2_geneID.txt",
+		human_positive = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/Positive_PC{num}_loadings_Hs2_geneID.txt",
+		all_negative = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/Negative_PC{num}_loadings_all_geneID.txt",
+		all_positive = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/{expr_type}/Positive_PC{num}_loadings_all_geneID.txt"
+	shell:	
+		"""
+		cat {input.loadings} | awk '$2<0'       | translate -k <(cat {input.orthogroups} | grep Hs2 | cut -f1,3) 1 | cut -f1 > {output.human_negative}; \
+		cat {input.loadings} | awk '$2>0'       | translate -k <(cat {input.orthogroups} | grep Hs2 | cut -f1,3) 1 | cut -f1 > {output.human_positive}; \
+		cat {input.loadings} | awk '$2<0' 	| translate -a -v -e NA <(cat {input.orthogroups} | grep Hs2 | cut -f1,3) 1 \
+							| translate -a -r -v -e NA <(cat {input.orthogroups} | grep Dme | cut -f1,3) 1 \
+							| translate -a -r -v -e NA <(cat {input.orthogroups} | grep Mm2 | cut -f1,3) 1 | cut -f1,2,4,5 > {output.all_negative}; \
+		cat {input.loadings} | awk '$2>0'	| translate -a -v -e NA <(cat {input.orthogroups} | grep Hs2 | cut -f1,3) 1 \
+							| translate -a -r -v -e NA <(cat {input.orthogroups} | grep Dme | cut -f1,3) 1 \
+							| translate -a -r -v -e NA <(cat {input.orthogroups} | grep Mm2 | cut -f1,3) 1 | cut -f1,2,4,5 > {output.all_positive}
+		"""
+
+rule filter_loadings_by_expr:
+	input:
+		expr_table = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr"+EXPR_SUFFIX_FILTER,
+		#expr_table = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr"+EXPR_SUFFIX,
+		loadings = expand("{path}/{{my_version}}/{{category}}/{{clade}}/{{evo_type}}/loadings/metasamples_median_expr/{loading_type}_PC{num}_loadings_all_geneID.txt", path=SPLSDA_ANALYSIS_DIR, loading_type=["Positive", "Negative"], num=list(range(1,9)))
+	output:
+		all_gene_IDs = expand("{path}/{{my_version}}/{{category}}/{{clade}}/{{evo_type}}/loadings/metasamples_median_expr/splsda_zscore_comb/{tissue}_splsda-zscore_loadings-all_geneID.txt", path=SPLSDA_ANALYSIS_DIR, tissue=ALL_TISSUES),
+		GO_input = expand("{path}/{{my_version}}/{{category}}/{{clade}}/{{evo_type}}/loadings/metasamples_median_expr/splsda_zscore_comb/{tissue}_splsda-zscore_loadings_{input_type}-GO_input.txt", path=SPLSDA_ANALYSIS_DIR, tissue=ALL_TISSUES, input_type=["Hs2", "orthogroups"])
+	params:
+		tissues = ",".join(ALL_TISSUES),
+		vertebrata = ",".join(VERTEBRATA),
+		insecta = ",".join(INSECTA),
+		outgroups = ",".join(OUTGROUPS),
+		loadings_dir = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr",
+		loadings_suffix = "_loadings_all_geneID.txt",
+		output_dir = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb",
+		output_suffix_all = "_splsda-zscore_loadings-all_geneID.txt",
+		output_suffix_Hs2_GO_input = "_splsda-zscore_loadings_Hs2-GO_input.txt",
+		output_suffix_orthogroups_GO_input = "_splsda-zscore_loadings_orthogroups-GO_input.txt"
+	shell:
+		"""
+		{RSCRIPT} {FILTER_SPLSDA_LOADINGS}	{input.expr_table} \
+							{params.tissues} \
+							{params.vertebrata} \
+							{params.insecta} \
+							{params.outgroups} \
+							{params.loadings_dir} \
+							{params.loadings_suffix} \
+							{params.output_dir} \
+							{params.output_suffix_all} \
+							{params.output_suffix_Hs2_GO_input} \
+							{params.output_suffix_orthogroups_GO_input}
+		"""
+
+#######################################
+###### GO enrichments #################
+#######################################
+rule GO_enrichment_gprofiler2_by_orthogroup:
+	input:
+		gene_set = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/{tissue}_splsda-zscore_loadings_orthogroups-GO_input.txt",
+		background = GO_TRANSFERS+"/{my_version}/GO_backgrounds/orthogroups-GO_background.txt",
+		annot = GO_TRANSFERS+"/{my_version}/GO_annot/{species}_transfers/orthogroups_from_{species}-transferred_GO-reduced.gmt"
+	output:
+		SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/{tissue}_splsda-zscore_loadings_orthogroups_from_{species}-GO_res.tab"
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {RUN_GPROFILER2} {input.gene_set} {input.background} {input.annot} {output}
+		"""
+
+
+#######################################
+###### Phenotypes overlaps ############
+#######################################
+rule bilaterian_conserved_phenotypes:
+	input:
+		all_phenotypes = DATABASE+"/phenotypic_info/all_species-phenotypic_info.tab",
+		bilaterian_conserved_OGs = GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/Bilateria_conserved_orthogroups-EXPR_genes.txt" 
+	output:
+		SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-Bilateria_conserved-OG_ID-phenotypic_info.tab"
+	shell:
+		"""
+		cat {input} | translate -a -n -k -d -j <(cut -f1,3 {input.bilaterian_conserved_OGs}) 2 \
+		| awk -v OFS="\t" '{{print $3,$1,$2,$4}}' > {output}
+		"""
+
+rule ancestral_bilaterian_phenotypes:
+	input:
+		bilaterian_conserved_phenotypes = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-Bilateria_conserved-OG_ID-phenotypic_info.tab",
+		#loadings = expand("{path}/{{my_version}}/{{category}}/{{clade}}/{{evo_type}}/loadings/{{expr_type}}/{tissue}_loadings_all_geneID.txt", path=SPLSDA_ANALYSIS_DIR, tissue=ALL_TISSUES)
+		loadings = expand("{path}/{{my_version}}/{{category}}/{{clade}}/{{evo_type}}/loadings/{expr_type}/splsda_zscore_comb/{tissue}_splsda-zscore_loadings_orthogroups-GO_input.txt", path=SPLSDA_ANALYSIS_DIR, expr_type="metasamples_median_expr", tissue=ALL_TISSUES)
+	output:
+		SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-Bilateria_ancestral-OG_ID-phenotypic_info.tab"
+	shell:
+		"""
+		cat {input.bilaterian_conserved_phenotypes} | filter_1col 1 <(cat {input.loadings}) > {output}
+		"""
+
+rule get_phenotypes_stats:
+	input:
+		phenotypes = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-OG_ID-phenotypic_info.tab",
+		bilaterian_conserved_OGs = GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/Bilateria_conserved_orthogroups-EXPR_genes.txt",
+		bilaterian_ancestral_OGs = expand("{path}/{{my_version}}/{{category}}/{{clade}}/{{evo_type}}/loadings/{expr_type}/splsda_zscore_comb/{tissue}_splsda-zscore_loadings_orthogroups-GO_input.txt", path=SPLSDA_ANALYSIS_DIR, expr_type="metasamples_median_expr", tissue=ALL_TISSUES)
+	output:
+		labels = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels.txt",
+		stats = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_stats.txt"
+	params:
+		input_suffix = "_splsda-zscore_loadings_orthogroups-GO_input.txt"
+	run:
+		import pandas as pd
+		import os
+		import re
+
+		#Upload phenotypes info
+		phenotypes_df = pd.read_table(str(input.phenotypes), sep="\t", header=None, index_col=False, names=["OG_ID", "Species", "GeneID", "Phenotype"])
+		#Remove those lines where the phenotype is viable (because it's not informative)
+		phenotypes_df = phenotypes_df.loc[~(phenotypes_df["Phenotype"].str.match("viable"))]
+                phenotypes_df = phenotypes_df.loc[phenotypes_df["Phenotype"]!="fertile"]
+		phenotypes_df = phenotypes_df.loc[phenotypes_df["Phenotype"]!="wild_type"]
+		#Upload all orthogroups info
+		orthogroups_df = pd.read_table(str(input.bilaterian_conserved_OGs), sep="\t", header=None, index_col=False, names=["OG_ID", "Species", "GeneID"])
+		all_orthogroups = list(set(list(orthogroups_df["OG_ID"])))
+		#Upload ancestral bilaterian tissue-specific orthogroups info
+		ancestral_orthogroups_df = pd.DataFrame()
+		for tissue_file in input.bilaterian_ancestral_OGs:
+		  tissue = re.sub(str(params.input_suffix), "", os.path.basename(tissue_file))
+		  tissue_df = pd.read_table(tissue_file, sep="\t", header=None, index_col=False, names=["OG_ID"])
+		  tissue_df["Tissue"] = tissue
+		  ancestral_orthogroups_df = pd.concat([ancestral_orthogroups_df, tissue_df])
+		orthogroups_tissue_dict = pd.Series(ancestral_orthogroups_df.Tissue.values, index=ancestral_orthogroups_df.OG_ID).to_dict()
+		ancestral_orthogroups = list(set(list(ancestral_orthogroups_df["OG_ID"])))
+		#Mammals phenotypes
+		mammals_phenotypes_df = phenotypes_df.loc[phenotypes_df["Species"].isin(["Hs2","Mm2"])]
+		mammals_orthogroups = list(set(list(mammals_phenotypes_df["OG_ID"])))
+		#Fly phenotypes
+		fly_phenotypes_df = phenotypes_df.loc[phenotypes_df["Species"]=="Dme"]
+		fly_orthogroups = list(set(list(fly_phenotypes_df["OG_ID"])))
+		#Compute labels
+		mammals_and_fly = [OG for OG in mammals_orthogroups if OG in fly_orthogroups]
+		mammals_only = [OG for OG in mammals_orthogroups if OG not in fly_orthogroups]
+		fly_only = [OG for OG in fly_orthogroups if OG not in mammals_orthogroups]
+		neither_mammals_nor_fly = [OG for OG in all_orthogroups if OG not in fly_orthogroups and OG not in mammals_orthogroups]
+		if wildcards.phenotype_type == "Bilateria_ancestral":
+		  neither_mammals_nor_fly = [OG for OG in ancestral_orthogroups if OG not in fly_orthogroups and OG not in mammals_orthogroups]
+		#Generate labels df
+		labels_df = pd.concat([pd.DataFrame({"OG_ID" : mammals_and_fly, "Label" : ["mammals_and_fly"]*len(mammals_and_fly)}), pd.DataFrame({"OG_ID" : mammals_only, "Label" : ["mammals_only"]*len(mammals_only)}), pd.DataFrame({"OG_ID" : fly_only, "Label" : ["fly_only"]*len(fly_only)}), pd.DataFrame({"OG_ID" : neither_mammals_nor_fly, "Label" : ["neither_mammals_nor_fly"]*len(neither_mammals_nor_fly)})])
+		labels_df["Tissue"] = labels_df["OG_ID"].map(orthogroups_tissue_dict)
+		#Compute stats
+		mammals_and_fly_counts = len(mammals_and_fly)
+		mammals_only_counts = len(mammals_only)
+		fly_only_counts = len(fly_only)
+		neither_mammals_nor_fly = len(neither_mammals_nor_fly)
+		#Generate stats df
+		if wildcards.phenotype_type == "Bilateria_conserved":
+		  tot_OGs = len(all_orthogroups)
+		elif wildcards.phenotype_type == "Bilateria_ancestral":
+		  tot_OGs = len(ancestral_orthogroups)
+		stats_df = pd.DataFrame({"Category" : ["Mammals_and_fly", "Mammals_only", "Fly_only", "Neither_mammals_nor_fly"], "Counts" : [mammals_and_fly_counts, mammals_only_counts, fly_only_counts, neither_mammals_nor_fly], "Percentage" : [mammals_and_fly_counts/tot_OGs, mammals_only_counts/tot_OGs, fly_only_counts/tot_OGs, neither_mammals_nor_fly/tot_OGs]})
+		#Save dataframes to file
+		labels_df.to_csv(str(output.labels), sep="\t", header=True, index=False, na_rep="NA")
+		stats_df.to_csv(str(output.stats), sep="\t", header=True, index=False, na_rep="NA")
+
+rule get_complete_phenotypes_annotations:
+	input:
+		phenotypes = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-OG_ID-phenotypic_info.tab",
+		conservation_labels = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels.txt"
+	output:
+		complete = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels_AND_phenotypic_info.txt",
+		partial = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-phenotypic_info_by_tissue.txt"
+	shell:
+		"""
+		cat {input.phenotypes} | translate -a <(cat {input.conservation_labels} | cut -f1,3) 1 | translate -a <(cat {input.conservation_labels} | cut -f1,2) 1 \
+		| awk -v OFS="\t" '{{print $1,$4,$3,$5,$2,$6}}' | grep -v viable | grep -v fertile | sort | uniq | sort -k3,3 > {output.complete}; \
+		cat {output.complete} | cut -f3,6 | sort | uniq > {output.partial}
+		"""
+
+#######################################
+###### Phenotypes overlaps by tissue ##
+#######################################
+rule subset_phenotype_annotation:
+	input:
+		phenotypes = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels_AND_phenotypic_info.txt",
+		conservation_labels = SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels.txt"
+	output:
+		SPLSDA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/loadings/metasamples_median_expr/splsda_zscore_comb/phenotype_overlap/all_species-{phenotype_type}-conservation_labels_AND_phenotypic_info-Neural_and_Testis_stats.txt"
+	run:
+		import pandas as pd
+
+		neural_terms = ["neuro", "behavior", "brain", "glia", "CNS", "Neuro", "Behavior", "Brain", "Glia"]
+		testis_terms = ["sperm", "infert", "sterile", "testis", "Sperm", "Infert", "Sterile", "Testis"]
+		#Read inputs
+		conservation_label_df = pd.read_table(str(input.conservation_labels), sep="\t", index_col=False, header=0) 
+		phenotype_df = pd.read_table(str(input.phenotypes), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "Tissue", "GeneID", "Conservation_label", "Phenotype"])
+		#Filter phenotypes by tissue
+		if wildcards.phenotype_type == "Bilateria_ancestral":
+		  neural_df = phenotype_df.loc[phenotype_df["Tissue"]=="Neural"]
+		  testis_df = phenotype_df.loc[phenotype_df["Tissue"]=="Testis"]
+		  tot_neural = len(list(set(list(conservation_label_df.loc[conservation_label_df["Tissue"]=="Neural"]["OG_ID"]))))
+		  tot_testis = len(list(set(list(conservation_label_df.loc[conservation_label_df["Tissue"]=="Testis"]["OG_ID"]))))
+		else:
+		  neural_df = phenotype_df
+		  testis_df = phenotype_df
+		  tot_neural = len(list(set(list(conservation_label_df["OG_ID"]))))
+		  tot_testis = len(list(set(list(conservation_label_df["OG_ID"]))))
+		#Count total genes with phenotype
+		neural_df = neural_df.loc[neural_df["Phenotype"].str.contains("|".join(neural_terms))]
+		tot_neural_phenotype = len(list(set(list(neural_df["OG_ID"]))))
+		testis_df = testis_df.loc[testis_df["Phenotype"].str.contains("|".join(testis_terms))]
+		tot_testis_phenotype = len(list(set(list(testis_df["OG_ID"]))))
+		#Build final dataframe
+		final_tissue_df = pd.DataFrame({"Tissue" : ["Neural", "Testis"], "Phenotype_genes" : [tot_neural_phenotype, tot_testis_phenotype], "Tot_genes" : [tot_neural, tot_testis], "Phenotype_percentage" : [tot_neural_phenotype/tot_neural, tot_testis_phenotype/tot_testis]})
+		final_not_tissue_df = pd.DataFrame({"Tissue" : ["Not_Neural", "Not_Testis"], "Phenotype_genes" : [tot_neural-tot_neural_phenotype, tot_testis-tot_testis_phenotype], "Tot_genes" : [tot_neural, tot_testis], "Phenotype_percentage" : [(tot_neural-tot_neural_phenotype)/tot_neural, (tot_testis-tot_testis_phenotype)/tot_testis]})
+		final_df = pd.concat([final_tissue_df, final_not_tissue_df])
+		#Write to file	
+		final_df.to_csv(str(output), sep="\t", header=True, index=False, na_rep="NA")
