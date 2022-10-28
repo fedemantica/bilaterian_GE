@@ -1,0 +1,160 @@
+---
+title: "EDF1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#update library path
+#.libPaths(c("/Users/federica/mnt/software/R/3.5", "/Users/federica/mnt/software/R", .libPaths()))
+#set Knitr option
+knitr::opts_chunk$set(echo = TRUE)
+
+#Upload libraries
+library(ggplot2)
+library(gridExtra)
+library(cowplot)
+library(reshape2)
+library(hashmap)
+library(dplyr)
+library(ggpubr)
+
+#Set paths for input/output directories
+home = "/Users/federica/mnt/"
+metadata_dir = paste0(home, "projects/bilaterian_GE/data/samples_metadata/")
+evo_distances_dir = paste0(home, "projects/bilaterian_GE/data/evo_distances/")
+pca_dir = paste0(home, "projects/bilaterian_GE/data/pca_analysis_all_norms/")
+GO_zscores_dir = paste0(home, "projects/bilaterian_GE/data/GO_zscore_approach_v4/")
+#GO_zscores_dir = paste0(home, )
+version = "All_version2"
+category = "STRICT"
+clade = "Bilateria"
+evo_type = "conserved"
+
+#Generate variables
+original_species = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+all_species = c("Hsa", "Mmu", "Bta", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+ordered_species = all_species
+Bilateria = all_species
+Vertebrata = c("Hsa", "Mmu", "Bta", "Mdo", "Gga", "Xtr", "Dre", "Cmi")
+Insecta = c("Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi")
+Outgroups = c("Bla", "Spu", "Sma", "Obi")
+all_tissues=c("Adipose", "DigestiveTract", "Kidney", "Epithelial", "Muscle", "Neural", "Ovary", "Testis")
+ordered_tissues = c("Neural", "Testis", "Ovary", "Muscle", "Kidney", "Epithelial", "DigestiveTract", "Adipose")
+
+
+#Set aestetics vectors
+tissue_colors = c("Adipose"="firebrick1", "Neural"="mediumblue", 
+                  "Muscle"="springgreen3", "Ovary"="darkorchid", 
+                  "Kidney"="gold", "Testis"="violet", 
+                  "DigestiveTract"="chocolate1", "Epithelial"="steelblue1")
+
+tissue_letters = c("Neural" = utf8ToInt("N"), "Testis"=utf8ToInt("T"),
+                   "Ovary" = utf8ToInt("N"), "Muscle"=utf8ToInt("M"), 
+                   "Kidney" = utf8ToInt("K"), "Epithelial"=utf8ToInt("E"),
+                   "DigestiveTract"=utf8ToInt("D"), "Adipose"=utf8ToInt("A"))
+
+species_colors = c("Hsa"="#00BFFF", "Mmu"="#159DFF", "Bta"="#1873CD", "Mdo"="#174B8B", "Gga"="#3F3F8B", "Xtr"="#64398B",
+                 "Dre"="#82359D", "Cmi"="#9932CC", "Bla"="#2E8B57", "Spu"="#96B12B", rev(c("Obi"="#FFFF00",
+                 "Sma"="#FFCC33", "Cdi"="goldenrod", "Bge"="burlywood2", "Ame"="#FF9966", "Tca"="#FF6600",
+                 "Bmo"="#CC6600", "Aae"="#993300", "Eba"="firebrick3", "Dme"="red")))
+
+species_shapes = c("Hsa"=0, "Mmu"=1, "Bta"=2, "Mdo"=3, "Gga"=4, "Xtr"=5, 
+                   "Dre"=6, "Cmi"=7, "Bla"=9, "Spu"=8, "Dme"=15, "Eba"=18, "Aae"= 23, 
+                   "Bmo"=25, "Tca"=17, "Bge"=10, "Ame"=16, "Cdi"=13, "Sma"=14, "Obi"=11)
+species_alphas = c("Hs2"=1, "Mm2"=1, "Bt2"=1, "Mdo"=1, "Gga"=1, "Xtr"=1, "Dre"=1, 
+                   "Cmi"=1, "Bla"=0.5, "Sp2"=0.5, "Sma"=0.5, "Ame"=0.5, "Dme"=0.5, "Cdi"=0.5, 
+                   "Obi"=0.5, "Bge"=0.5, "BmA"=0.5, "Tca"=0.5)
+clade_colors = c("Vertebrata"= "mediumorchid", "Deuterostoma"="olivedrab3", 
+                 "Insecta"="tan3", "Protostoma"="yellow", "Bilateria"="firebrick1", 
+                 "Outgroups"="dimgray")
+
+scientific_names_vector = c("Hsa"="Homo sapiens (Hsa)", "Mmu"="Mus musculus (Mmu)", "Bta"="Bos taurus (Bta)", "Mdo"="Monodelphis domestica (Mdo)", 
+                            "Gga"="Gallus gallus (Gga)", "Xtr"="Xenopus tropicalis (Xtr)", "Dre"="Danio rerio (Dre)", "Cmi"="Callorhinchus milii (Cmi)", 
+                            "Bla"="Branchiostoma lanceolatum (Bla)", "Spu"="Strongylocentrotus purpuratus (Spu)", "Dme"="Drosophila melanogaster (Dme)",
+                            "Eba"="Episyrphus balteatus (Eba)", "Aae"="Aaedes aegypti (Aae)", "Bmo"="Bombyx mori (Bmo)", "Tca"="Tribolium castaneum (Tca)",
+                            "Ame"="Apis mellifera (Ame)", "Bge"="Blattella germanica (Bge)", "Cdi"="Cloeon dipterum (Cdi)",
+                            "Sma"="Strigamia marittima (Sma)", "Obi"="Octopus bimaculoides (Obi)")
+```
+
+```{r functions, echo=FALSE, message=FALSE, warning=FALSE, dependson="setup"}
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+```
+
+`<!-- This is now I generate the input:
+(base) fmantica@ant-login5:~/projects/mixed_files/bilaterian_GE_figures$ SPECIES=$(echo Hs2 Mm2 Bt2 Mdo Gga Xtr Dre Cmi Bla Sp2 Dme Eba Aae BmA Tca Ame Bge Cdi Sma Obi)
+
+(base) fmantica@ant-login5:~/projects/mixed_files/bilaterian_GE_figures$ echo -e "Species\tProtein_coding\tBilaterian_conserved_genes\tBilaterian_OGs" > barplot_input.tab; for species in $SPECIES; do paste <(echo $species) <(cat ~/projects/bilaterian_GE/data/broccoli/All_version2/fastas/${species}_ref_exint.fasta | grep ">" | wc -l) <(cat /users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt | grep ${species} | wc -l) <(cat /users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.txt | cut -f1,2 | grep ${species} | sort | uniq | wc -l); done >> barplot_input.tab
+-->
+
+<!-- Panel D -->
+```{r plot_orthogroups_statistics, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.width=12, fig.height=4}
+#Set aestetics
+Category_colors = c("Protein_coding_not_conserved"="dimgray", "Bilaterian_conserved_genes"="brown4")
+
+#Read input
+input_file = paste0(home, "projects/mixed_files/bilaterian_GE_figures/barplot_input.tab")
+input_df = read.delim(input_file, header=TRUE, row=1)
+input_df$Protein_coding_not_conserved = input_df$Protein_coding - input_df$Bilaterian_conserved_genes
+input_df$Protein_coding = NULL
+input_long_df = melt(as.matrix(input_df))
+colnames(input_long_df) = c("Species", "Category", "Count")
+#Reorder factor levels for plotting
+input_long_df$Category = factor(input_long_df$Category, c("Protein_coding_not_conserved", "Bilaterian_conserved_genes", "Bilaterian_OGs"))
+
+#Plot
+orthogroup_stats_plot = ggplot() +
+  geom_bar(data=subset(input_long_df, Category!="Bilaterian_OGs"), 
+           aes(x=Species, y=Count, fill=Category), 
+           stat="identity", alpha=0.6) +
+  geom_line(data=subset(input_long_df, Category=="Bilaterian_OGs"),
+            aes(x=Species, y=Count, group=Category), color="brown4") +
+  geom_point(data=subset(input_long_df, Category=="Bilaterian_OGs"),
+            aes(x=Species, y=Count), color="brown4") +
+  scale_fill_manual(values=Category_colors) +
+  scale_y_continuous(breaks=number_ticks(10)) +
+  theme_bw() +
+  ylab("Number of genes or orthogroups") +
+  theme(text=element_text(family="sans"),
+        legend.position = "right",
+        axis.text.x = element_text(color="black", angle=30, hjust=1, vjust=1),
+        axis.text.y = element_text(color="black"))
+
+print(orthogroup_stats_plot)
+ggsave("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig1D.pdf", orthogroup_stats_plot, device="pdf", height=4, width=12)
+```
+
+<!-- And this is how I get the input for the following plot 
+(base) fmantica@ant-login5:~/projects/mixed_files/bilaterian_GE_figures$ cat /users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.txt | cut -f1 | sort | uniq -c | sed 's/^[\t ]*//; s/ /\t/' | cut -f1 | sort | uniq -c | sed 's/^[\t ]*//; s/ /\t/' | awk -v OFS="\t" '{print $2,$1}' > number_of_species_in_OGs.tab
+#Modified the 11 species manually
+-->
+
+<!-- Panel E -->
+```{r species_in_orthogroup_plot, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.height=6, fig.width=3}
+input_file = paste0(home, "projects/mixed_files/bilaterian_GE_figures/number_of_species_in_OGs.tab")
+input_df = read.delim(input_file, header=FALSE, col.names=c("Species_number", "OG_number"))
+input_df$Category = rep("OG_proportion", nrow(input_df))
+input_df$Species_number = factor(input_df$Species_number, levels=seq(12,20))
+tot_orthogroups = sum(input_df$OG_number)
+
+species_in_orthogroup_plot = ggplot(data=input_df, aes(x=Category, y=OG_number, fill=Species_number)) +
+  geom_bar(stat="identity", position="fill", color="black") +
+  geom_text(aes(label=OG_number), position=position_fill(vjust=0.5)) +
+  scale_fill_brewer(palette = "Blues") +
+  theme_bw() +
+  #scale_fill_manual(values=species_count_palette) +
+  theme(text=element_text(family="sans"),
+        panel.grid = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(color="black"),
+        #axis.title.x = element_blank(),
+        axis.title.y = element_text(color="black"),
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom") +
+  ylab("Proportion of bilaterian conserved orthogroups") +
+  xlab(paste0("Tot orthogroups: ", tot_orthogroups)) +
+  guides(fill=FALSE)
+
+print(species_in_orthogroup_plot)
+
+ggsave("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig1E.pdf", species_in_orthogroup_plot, device="pdf", height=6, width=3)
+```
