@@ -1,0 +1,702 @@
+###### config ##############
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+METADATA = config["paths"]["metadata"]
+FASTQ_DIR = config["paths"]["fastq_dir"]
+FASTQC_DIR = config["paths"]["fastQC_dir"]
+QUANTIFICATION = config["paths"]["quantification"]
+GENOME_DIR = config["paths"]["genome_dir"]
+GTF_REF_DIR = config["paths"]["gtf_ref"] 
+GTF_MASTER_DIR = config["paths"]["gtf_master"]
+PREPROCESSING_DIR = config["paths"]["preprocessing_dir"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+PCA_ANALYSIS_DIR = config["paths"]["pca_analysis"]
+NORM_COUNTS_DIR = config["paths"]["norm_counts_dir"]
+METASAMPLES_QUANT_DIR = config["paths"]["metasamples_quant_dir"] 
+TISSUES_QUANT_DIR = config["paths"]["tissues_quant_dir"]
+SVA_CORRECTION = config["paths"]["sva_correction_dir"]
+
+######## tools ############
+QUANTILE_NORMALIZE = config["tools"]["quantile_normalize"]
+GENERATE_METASAMPLES = config["tools"]["generate_metasamples"]
+GET_QUANT_FROM_NORM_COUNTS = config["tools"]["get_quant_from_norm_counts"]
+APPLY_SVA_CORRECTION = config["tools"]["apply_sva_correction"]
+AVERAGE_EXPR_BY_TISSUE = config["tools"]["average_expr_by_tissue"]
+COMPUTE_ZSCORE_BY_SPECIES = config["tools"]["compute_zscore_by_species"]
+
+
+###### variables ###########
+ALL_SPECIES = config["variables"]["all_species"]
+#generate list of samples of different categories for each species: in_house, PE, SE.
+#PE and SE are to be downloaded
+import pandas as pd
+PE_SRA_dict = {}
+SE_SRA_dict = {}
+downloaded_samples_PE_dict = {}
+downloaded_samples_SE_dict = {}
+in_house_samples_PE_dict = {}
+in_house_samples_SE_dict = {}
+for species in ALL_SPECIES:
+  species_df = pd.read_table(METADATA+"/"+species+"_samples_info.tab", sep="\t", index_col=False, header=0) #upload dataframe with metadata
+  #isolate SRAs 
+  PE_SRA_list = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="PE")]["SRA"])
+  SE_SRA_list = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="SE")]["SRA"])
+  #add to dictionary using species as key
+  PE_SRA_dict[species] = PE_SRA_list
+  SE_SRA_dict[species] = SE_SRA_list
+  #isolate samples
+  downloaded_samples_PE = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="PE")]["Sample"])
+  downloaded_samples_SE = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="SE")]["Sample"])
+  in_house_samples_PE = list(species_df.loc[(species_df["SRA"]=="in_house") & (species_df["SE_PE"]=="PE")]["Sample"])
+  in_house_samples_SE = list(species_df.loc[(species_df["SRA"]=="in_house") & (species_df["SE_PE"]=="SE")]["Sample"])
+  #add to dictionary using species as key
+  downloaded_samples_PE_dict[species] = downloaded_samples_PE
+  downloaded_samples_SE_dict[species] = downloaded_samples_SE
+  in_house_samples_PE_dict[species] = in_house_samples_PE
+  in_house_samples_SE_dict[species] = in_house_samples_SE
+  
+#create variable with fastq types
+FASTQ_TYPES = ["fastq-downloaded_renamed", "fastq-in_house"]
+#fastq-related parameters
+DOWNLOAD_THREADS_NUM = config["variables"]["download_threads_num"]
+MIN_READ_LEN = config["variables"]["min_read_len"]
+SUMMURIZING_MEASURES = config["variables"]["summarizing_measures"]
+
+#Second part
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+HUMAN_ID = config["variables"]["human_id"]
+QUERY_SPECIES_DICT = config["variables"]["query_species_dict"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+GENE_TYPES = config["variables"]["gene_types"]
+
+SVA_LOG_QUANT_VALUES = config["variables"]["sva_log_quant_values"]
+SVA_LOG_QUANT_NORM_VALUES = config["variables"]["sva_log_quant_norm_values"]
+
+###### targets ##########
+RENAMED_FASTQ = expand("{path}/{species}/fastq-downloaded_renamed/renamed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
+FASTQC_OUT = expand("{path}/{species}/fastQC_log.txt", path=FASTQC_DIR, species=ALL_SPECIES)
+MULTIQC_OUT = expand("{path}/all_species_multiQC/{species}_multiqc.html", path=FASTQC_DIR, species=ALL_SPECIES)
+
+MAP_READS_SE = []
+MAP_READS_PE = []
+for my_species in ALL_SPECIES:
+  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_SE_dict[my_species])
+  MAP_READS_SE = MAP_READS_SE + expand("{path}/{species}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_SE_dict[my_species])
+  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=downloaded_samples_PE_dict[my_species])
+  MAP_READS_PE = MAP_READS_PE + expand("{path}/{species}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, species=my_species, sample=in_house_samples_PE_dict[my_species])
+
+MAPPING_STATS = expand("{path}/{species}/mapping_stats.txt", path=QUANTIFICATION, species=ALL_SPECIES)
+EXPR_TABLES = expand("{path}/{species}/all_samples_transcript_TPMs.tab", path=QUANTIFICATION, species=ALL_SPECIES)
+CLEAN_UP_FASTQ = expand("{path}/{species}/fastq-downloaded/processed_fastq.txt", path=FASTQ_DIR, species=ALL_SPECIES)
+
+### Second part
+QUANTILE_NORM_TABLES = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-NORM-BH_genes.tab", path=PCA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type="conserved", sva_log_quant_value=SVA_LOG_QUANT_VALUES)
+TISSUE_AVERAGE_EXPR = expand("{path}/{species}-tissue_average_expr-{sva_log_quant_value}.tab", path=TISSUES_QUANT_DIR, species=ALL_SPECIES, sva_log_quant_value=SVA_LOG_QUANT_VALUES)
+
+
+####### rules ############
+rule all:	
+	input:
+		#IN_HOUSE_SAMPLES_PE, IN_HOUSE_SAMPLES_SE, SE_FASTQ, PE_FASTQ, IN_HOUSE_SAMPLES_SE, IN_HOUSE_SAMPLES_PE
+		#RENAMED_FASTQ
+		#This part will need to run separately because I still have not found a clever way to connect all the dependencies
+		#MAP_READS_SE, MAP_READS_PE, EXPR_TABLES, 
+		#MAPPING_STATS
+		#CLEAN_UP_FASTQ
+		
+############# DOWNLOAD FASTQS ######################
+rule prefetch_fastq:		
+	output:
+		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""
+		prefetch {wildcards.SRA} 	--output-file {output} \
+						--check-all \
+						--max-size 100000000 \
+						--log-level info
+		"""
+
+#--max-size: Maximum file size to download in KB (exclusive). Default: 20G
+rule download_SE_fastq:
+	input:
+		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra"
+	output:
+		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA, .+(?<!_[1,2])}.fastq"
+	params:
+		outdir = FASTQ_DIR+"/{species}/fastq-downloaded"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""
+		fastq-dump	{input} \
+				--outdir {params.outdir} \
+				--split-e \
+				--minReadLen {MIN_READ_LEN} \
+				--log-level info; \
+		rm {input}
+		"""
+
+rule download_PE_fastq:
+	input:
+		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}.sra"
+	output:
+		forward_reads = FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}_1.fastq",
+		rerverse_reads = FASTQ_DIR+"/{species}/fastq-downloaded/{SRA}_2.fastq",
+	params:
+		output_dir = FASTQ_DIR+"/{species}/fastq-downloaded"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""
+		fastq-dump 	{input} \
+				--outdir {params.output_dir} \
+				--split-e \
+				--minReadLen {MIN_READ_LEN} \
+				--log-level info; \
+		rm {input}
+		"""
+
+#Temporarily changing in the above rule for 35 fastqs which give me not 0 exit status
+#fasterq-dump {input}
+#--split-3
+#--threads {DOWNLOAD_THREADS_NUM}
+#--min-read-len {MIN_READ_LEN}
+rule compress_fastq:
+	input:
+		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA_suffix}.fastq"
+	output:
+		FASTQ_DIR+"/{species}/fastq-downloaded/{SRA_suffix}.fastq.gz"
+	shell:
+		"""
+		pigz {input} -9
+		"""
+
+rule rename_fastq:
+	input:
+		PE_forward = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}_1.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		PE_reverse = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}_2.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		SE = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.fastq.gz", path=FASTQ_DIR, SRA=SE_SRA_dict[wildcards.species]),
+		metadata = METADATA+"/{species}_samples_info.tab"
+	output:
+		my_log = FASTQ_DIR+"/{species}/fastq-downloaded_renamed/renamed_fastq.txt"
+	params:
+		output_dir = FASTQ_DIR+"/{species}/fastq-downloaded_renamed"
+	run:
+		import pandas as pd
+		import os
+		import re
+
+		#Header: Species, Tissue, Group, Sample, SRA, Read_number, Read_len, SE_PE, Path
+		output_log = open(output.my_log, "w")
+		metadata_df = pd.read_table(input.metadata, sep="\t", index_col=False, header=0)
+		for my_file in input.PE_forward:
+		  SRA_ID = re.sub("_1.fastq.gz", "", os.path.basename(my_file))
+		  sample_name = list(metadata_df.loc[metadata_df["SRA"]==SRA_ID]["Sample"])[0]
+		  new_filename = params.output_dir+"/"+sample_name+"_1.fastq.gz"
+		  ln_command = "ln -s %s %s" % (my_file, new_filename)
+		  os.system(ln_command)
+		  output_log.write(my_file+"\t"+new_filename+"\n")
+		for my_file in input.PE_reverse:
+		  SRA_ID = re.sub("_2.fastq.gz", "", os.path.basename(my_file))
+		  sample_name = list(metadata_df.loc[metadata_df["SRA"]==SRA_ID]["Sample"])[0]
+		  new_filename = params.output_dir+"/"+sample_name+"_2.fastq.gz"
+		  ln_command = "ln -s %s %s" % (my_file, new_filename)
+		  os.system(ln_command)
+		  output_log.write(my_file+"\t"+new_filename+"\n")
+		for my_file in input.SE:
+		  SRA_ID = re.sub(".fastq.gz", "", os.path.basename(my_file))
+		  sample_name = list(metadata_df.loc[metadata_df["SRA"]==SRA_ID]["Sample"])[0]
+		  new_filename = params.output_dir+"/"+sample_name+".fastq.gz"
+		  ln_command = "ln -s %s %s" % (my_file, new_filename)
+		  os.system(ln_command)
+		  output_log.write(my_file+"\t"+new_filename+"\n")
+		output_log.close()
+
+#For the in-house samples, just create links to the desired folder:
+rule link_SE_fastq:
+	input:
+		METADATA+"/{species}_samples_info.tab"
+	output:
+		FASTQ_DIR+"/{species}/fastq-in_house/{sample, .+(?<!_[1,2])}.fastq.gz"
+	shell:
+		"""
+		original_folder=$(cat {input} | grep {wildcards.sample} | awk '$4=="{wildcards.sample}" {{print $NF}}'); \
+		original_file=$(ls $original_folder | grep {wildcards.sample}); \
+		ln -s $original_folder/$original_file ${output}
+		"""
+
+rule link_PE_fastq:
+	input:
+		METADATA+"/{species}_samples_info.tab"
+	output:
+		forward_reads = FASTQ_DIR+"/{species}/fastq-in_house/{sample}_1.fastq.gz",
+		reverse_reads = FASTQ_DIR+"/{species}/fastq-in_house/{sample}_2.fastq.gz",
+	shell:
+		"""
+		original_folder=$(cat {input} | awk '$4=="{wildcards.sample}" {{print $NF}}'); \
+		original_file_1=$(ls $original_folder | grep "{wildcards.sample}" | grep R1); \
+		original_file_2=$(ls $original_folder | grep "{wildcards.sample}" | grep R2); \
+		ln -s ${{original_folder}}/${{original_file_1}} {output.forward_reads}; \
+		ln -s ${{original_folder}}/${{original_file_2}} {output.reverse_reads};
+		"""
+
+
+############# QUALITY CONTROL ######################
+rule run_fastQC:
+	input:
+		in_house = FASTQ_DIR+"/{species}/fastq-downloaded_renamed/renamed_fastq.txt", #this is just to make the connection with the previous rule.
+		in_house_PE = lambda wildcards: expand(FASTQ_DIR+"/{{species}}/fastq-in_house/{sample}_{num}.fastq.gz", species=ALL_SPECIES, sample=in_house_samples_PE_dict[wildcards.species], num=[1,2]),
+		in_house_SE = lambda wildcards: expand(FASTQ_DIR+"/{{species}}/fastq-in_house/{sample}.fastq.gz", species=ALL_SPECIES, sample=in_house_samples_SE_dict[wildcards.species])
+	output:
+		FASTQC_DIR+"/{species}/fastQC_log.txt"
+	params:
+		downloded_dir = FASTQ_DIR+"/{species}/fastq-downloaded",
+		output_dir = FASTQC_DIR+"/{species}"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""		
+		fastqc $(ls {params.downloded_dir} | grep ".fastq.gz") {input.in_house_PE} {input.in_house_SE} -o {params.output_dir} --extract; \
+		echo "all fastqc completed" > {output}
+		"""
+
+rule run_multiQC:
+	input:
+		FASTQC_DIR+"/{species}/fastQC_log.txt"
+	output:
+		FASTQC_DIR+"/all_species_multiQC/{species}_multiqc.html"
+	params:
+		input_dir = FASTQC_DIR+"/{species}",
+		output_dir = FASTQC_DIR+"/all_species_multiQC",
+		filaname = "{species}_multiqc.html"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"		
+	shell:
+		"""
+		multiqc {params.input_dir} --filename {output} --outdir ${params.output_dir} --profile-runtime --outdir ${params.output_dir}
+		"""
+
+############# GET TRANSCRIPTOME FASTA ##############
+#start from the reference GTF
+rule get_transcriptome_fasta:
+	input:
+		gtf = GTF_MASTER_DIR+"/{species}_annot-master-brochi.gtf",
+		genome = GENOME_DIR+"/{species}_gDNA.fasta"
+	output:
+		QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts_fasta"
+	shell:
+		"""
+		gffread -w {output} -g {input.genome} {input.gtf}
+		"""
+
+############## MAPPING AND QUANTIFICATION ##################
+rule build_transcriptome_index:
+	input:
+		QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts_fasta"
+	output:
+		QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""
+		kallisto index -i {output} {input}
+		"""
+
+##Trying with 100 bootstraps. I need to read what this means exactly.
+rule map_reads_SE:
+	input:
+		fastq = FASTQ_DIR+"/{species}/{type}/{sample}.fastq.gz",
+		index = QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
+	output:
+		#QUANTIFICATION+"/{species}/PE/{type}/{sample, .+(?<!_[1,2])}/run_info.json",
+		QUANTIFICATION+"/{species}/SE/{type}/{sample, .+(?<!_[1,2])}/abundance.tsv"
+	params:
+		out_dir = QUANTIFICATION+"/{species}/SE/{type}/{sample}"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""
+		kallisto quant -i {input.index} -o {params.out_dir} -b 100 --single -l 190 -s 20 {input} 
+		"""
+
+rule map_reads_PE:
+	input:
+		fastq1 = FASTQ_DIR+"/{species}/{type}/{sample}_1.fastq.gz",
+		fastq2 = FASTQ_DIR+"/{species}/{type}/{sample}_2.fastq.gz",
+		index = QUANTIFICATION+"/transcriptome_indexes/{species}_transcripts.idx"
+	output:
+		#QUANTIFICATION+"/{species}/PE/{type}/{sample}/run_info.json",
+		QUANTIFICATION+"/{species}/PE/{type}/{sample}/abundance.tsv"
+	params:
+		out_dir = QUANTIFICATION+"/{species}/PE/{type}/{sample}"
+	conda:
+		CONDA_ENVS+"/fastq_mapping.yml"
+	shell:
+		"""
+		kallisto quant -i {input.index} -o {params.out_dir} -b 100 <(zcat {input.fastq1}) <(zcat {input.fastq2}) 
+		"""
+
+########### GENE EXPRESSION TABLES ################
+#Get two tables with info from all samples: counts and TPM.
+rule expr_tables:
+	input:
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/abundance.tsv", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/abundance.tsv", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+	output:
+		counts = QUANTIFICATION+"/{species}/all_samples_transcript_counts.tab",
+		TPMs = QUANTIFICATION+"/{species}/all_samples_transcript_TPMs.tab"
+	shell:
+		"""
+		for file in {input}; do \
+			sample=$(basename $(dirname $file));
+			tail -n+2 $file | awk -v my_sample=$sample -v OFS="\t" '{{print $1,my_sample,$4}}' >> {output.counts}.tmp; \
+			tail -n+2 $file | awk -v my_sample=$sample -v OFS="\t" '{{print $1,my_sample,$5}}' >> {output.TPMs}.tmp; \
+		done; cat {output.counts}.tmp | tab2matrix > {output.counts}; cat {output.TPMs}.tmp | tab2matrix > {output.TPMs}; \
+		rm {output.counts}.tmp {output.TPMs}.tmp
+		"""
+
+############ MAPPING STATISTICS ##################
+#This will have to be automatized.
+#transcriptome length: 106184004 (count the number of bp in the initial fasta)
+rule mapping_stats:
+	input:
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/run_info.json", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/run_info.json", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/run_info.json", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/run_info.json", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+	output:
+		QUANTIFICATION+"/{species}/mapping_stats.txt"
+	shell:
+		"""
+		echo -e "Sample\tTOT_reads\tTOT_pseudoaligned_reads\tPERC_pseudoaligned_reads\tTOT_unique_reads\tPERC_unique_reads\tCoverage" > {output}
+		for file in {input}; do \
+			sample=$(basename $(dirname $file)); \
+			type=$(basename $(dirname $(dirname $file))); \
+			paste <(echo $sample) \
+			<(cat $file | grep "n_processed" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "n_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "p_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "n_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "p_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
+			| awk -v my_type=$type -v OFS="\t" 'BEGIN {{read_len=125; if(my_type=="mic") {{read_len=50}}}} \
+			{{print $1,$2,$3,$4,$5,$6,($2*read_len)/106184004}}'; \
+		done >> {output}	
+		"""
+
+########## CHECK RULE ####################
+#After everything finished running, remove the downloaded fastqs.
+rule clean_up_fastq:
+	input:
+		TPM_table = QUANTIFICATION+"/{species}/all_samples_transcript_TPMs.tab",
+		mapping_stats = QUANTIFICATION+"/{species}/mapping_stats.txt",
+		PE_forward = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}_1.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		PE_reverse = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}_2.fastq.gz", path=FASTQ_DIR, SRA=PE_SRA_dict[wildcards.species]),
+		SE = lambda wildcards: expand("{path}/{{species}}/fastq-downloaded/{SRA}.fastq.gz", path=FASTQ_DIR, SRA=SE_SRA_dict[wildcards.species])	
+	output:
+		FASTQ_DIR+"/{species}/fastq-downloaded/processed_fastq.txt"
+	shell:
+		"""
+		touch {output};
+		for file in {input.PE_forward} {input.PE_reverse} {input.SE}; do \
+			echo $file >> {output}; \
+			rm $file; \
+		done
+		"""
+
+######### GET INPUTS FOR GENE-LEVEL QUANTIFICATION ###
+rule build_transcript_gene_dict:
+	input:
+		gtf = GTF_MASTER_DIR+"/{species}_annot-master-brochi.gtf"
+	output:
+		QUANTIFICATION+"/{species}/transcript_gene_dict.tab"
+	run:
+		import pandas as pd
+		import re
+
+		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None)
+		input_df = input_df.loc[input_df[8].str.contains("transcript_id")]
+		attribute_field = input_df.iloc[:,8]
+		gene_id_list_raw = [part for element in list(attribute_field) for part in element.split(";") if "gene_id" in part]
+		input_df["geneID"] = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in gene_id_list_raw]
+		transcript_id_list_raw = [part for element in list(attribute_field) for part in element.split(";") if "transcript_id" in part]
+		input_df["transcriptID"] = [re.sub(".*[ ]", "", re.sub('"', "", element)) for element in transcript_id_list_raw]
+		final_df = input_df[["transcriptID", "geneID"]].drop_duplicates()		
+		final_df.to_csv(str(output), sep="\t", header=True, index=False, na_rep="NA")
+
+
+###############################################################
+############## WIDE TABLE WITH THE ORTHOLOGS ##################
+###############################################################
+#Transform gene orthogroups from the long format to the wide format.
+rule generate_BH_wide_table:
+	input:
+		GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.txt"	
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab"
+	run:
+		import pandas as pd
+		orthogroups_long_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		orthogroups_wide_df = orthogroups_long_df.pivot(index="OG_ID", columns="Species", values="GeneID")
+		orthogroups_wide_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+###############################################################
+###### RUN THE QUANTIFICATIONS WITH THE NORM COUNTS  ##########
+###############################################################
+#Here I am computing TPMs and RPKMs starting from the normalized counts.
+rule get_quant_from_norm_counts:
+	input:
+		tx2gene = PREPROCESSING_DIR+"/kallisto_out/{species}/transcript_gene_dict.tab",
+		transcript_counts = PREPROCESSING_DIR+"/kallisto_out/{species}/all_samples_transcript_counts.tab",
+		metadata = METADATA+"/{species}_samples_info.tab"
+	output:
+		NORM_COUNTS_DIR+"/{species}/all_samples_transcript-normcounts.tab",
+		NORM_COUNTS_DIR+"/{species}/all_samples_transcript_TPMs-normcounts.tab",
+		NORM_COUNTS_DIR+"/{species}/all_samples_transcript_RPKMs-normcounts.tab",
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_TPMs-normcounts.tab",
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_RPKMs-normcounts.tab",
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_log2-TPMs-normcounts.tab",
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_log2-RPKMs-normcounts.tab"
+	params:
+		samples_folder = PREPROCESSING_DIR+"/kallisto_out/{species}/",
+		output_folder = NORM_COUNTS_DIR+"/{species}/"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {GET_QUANT_FROM_NORM_COUNTS}	{wildcards.species} \
+							{input.tx2gene} \
+							{input.transcript_counts} \
+							{input.metadata} \
+							{params.samples_folder} \
+							{params.output_folder}
+		"""
+
+
+
+###############################################################
+############## GENERATE NO-LOG INPUTS  ########################
+###############################################################
+
+rule generate_noLog_input:
+	input:
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_{quant_value}-normcounts.tab"
+	output:
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_NOlog2-{quant_value}-normcounts.tab"
+	shell:
+		"""
+		ln -s {input} {output}
+		"""
+
+###############################################################
+################## COMPUTE SVA CORRECTION  ####################
+###############################################################
+
+#log_quant_value can be: log2-TPMs, NOlog2-TPMs, log2-RPMKs, NOlog2-RPKMs, log2-scaledTPMs, NOlog2-scaledTPMs
+rule apply_sva_correction:
+	input:
+		input_data = NORM_COUNTS_DIR+"/{species}/all_samples_gene_{log_quant_value}-normcounts.tab",
+		metadata = METADATA+"/sva_metadata/{species}_samples_info.tab"
+	output:
+		sva_corrected = SVA_CORRECTION+"/{species}-selected_samples_gene_SVA-{log_quant_value}.tab",
+		NOsva_corrected = SVA_CORRECTION+"/{species}-selected_samples_gene_NOSVA-{log_quant_value}.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	params:
+		out_dir = SVA_CORRECTION+"/{species}",
+		out_file = SVA_CORRECTION+"/{species}/{species}.tc.tsv" 
+	shell:
+		"""
+		Rscript {APPLY_SVA_CORRECTION} 	{input.input_data} \
+						{input.metadata} \
+						{params.out_dir} \
+						pearson \
+						0.2 0 1 \
+						"Neural|Muscle|Testis|Ovary|Kidney|Epithelial|DigestiveTract|Adipose"; \
+		cp {params.out_file} {output.sva_corrected}; \
+		ln -s {input.input_data} {output.NOsva_corrected};
+		"""
+
+########## METASAMPLES ######
+#sva_log_quant_value can be:
+#SVA-log2-TPMs, NOSVA-log2-TPMs, 
+#SVA-NOlog2-TPMs, NOSVA-NOlog2-TPMs, 
+#SVA-log2-RPMKs, NOSVA-log2-RPMKs, 
+#SVA-NOlog2-RPKMs, NOSVA-NOlog2-RPKMs, 
+#SVA-log2-scaledTPMs, NOSVA-log2-scaledTPMs
+
+rule generate_VastDB_metasamples:
+	input:
+		expr_table = SVA_CORRECTION+"/{species}-selected_samples_gene_{sva_log_quant_value}.tab",
+		metadata = METADATA+"/{species}_samples_info.tab"
+	output:
+		expr_table = METASAMPLES_QUANT_DIR+"/{species}-metasamples_median_expr-{sva_log_quant_value}.tab",
+		metadata = METASAMPLES_QUANT_DIR+"/{species}-metasamples_metadata-{sva_log_quant_value}.txt"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {GENERATE_METASAMPLES} {input.expr_table} {input.metadata} {output.expr_table} {output.metadata}
+		"""
+
+########## TISSUES ##########
+rule average_expression_by_tissue:
+	input:
+		expr_table = METASAMPLES_QUANT_DIR+"/{species}-metasamples_median_expr-{sva_log_quant_value}.tab",
+		metadata = METASAMPLES_QUANT_DIR+"/{species}-metasamples_metadata-{sva_log_quant_value}.txt"
+	output:
+		TISSUES_QUANT_DIR+"/{species}-tissue_average_expr-{sva_log_quant_value}.tab"
+	shell:
+		"""
+		python {AVERAGE_EXPR_BY_TISSUE}	--expr {input.expr_table} \
+						--metadata {input.metadata} \
+						--measure average \
+						--output {output}
+		"""
+
+#################################################
+###### GENERATE BEST HITS INPUT TABLES ##########
+#################################################
+
+#Transform gene orthogroups from the long format to the wide format.
+rule generate_BH_wide_table:
+	input:
+		GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.txt"	
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab"
+	run:
+		import pandas as pd
+		orthogroups_long_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		orthogroups_wide_df = orthogroups_long_df.pivot(index="OG_ID", columns="Species", values="GeneID")
+		orthogroups_wide_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+#This table has one row per gene orthogroups and one column per metasample.
+#The values correspond to the expression of best hit genes selected for that species in that particular orthogroup.
+rule generate_BH_metasamples_expr_table:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab",
+		samples_expression = expand("{path}/{species}-metasamples_median_expr-{{sva_log_quant_value}}.tab", path=METASAMPLES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-BH_genes.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		samples_expr_dir = METASAMPLES_QUANT_DIR,
+		samples_expr_suffix = lambda wildcards : "-metasamples_median_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		for species in params.clade_species:
+		  #Defining the metasample expression file for each species
+		  expr_file = params.samples_expr_dir+"/" + species + params.samples_expr_suffix
+		  #Reading in the metasample expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_samples_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_sample in species_samples_list:
+		    sample = species_sample.split("_", 1)[1]
+		    sample_expr_dict = pd.Series(expr_df[sample], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_sample] = orthologs_expr_df[species].map(sample_expr_dict)  #for each sample replace with the sample_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+rule generate_BH_tissue_expr_table:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab",
+		tissue_expression = expand("{path}/{species}-tissue_average_expr-{{sva_log_quant_value}}.tab", path=TISSUES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-BH_genes.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		tissue_expr_dir = TISSUES_QUANT_DIR,
+		tissue_expr_suffix = lambda wildcards : "-tissue_average_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		for species in params.clade_species:
+		  #Defining the tissue expression file for each species
+		  expr_file = params.tissue_expr_dir+"/" + species + params.tissue_expr_suffix
+		  #Reading in the tissue expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_tissue_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_tissue in species_tissue_list:
+		    tissue = species_tissue.split("_", 1)[1]
+		    tissue_expr_dict = pd.Series(expr_df[tissue], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_tissue] = orthologs_expr_df[species].map(tissue_expr_dict)  #for each tissue replace with the tissue_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+#######################################
+###### APPLY QUANTILE NORMALIZATION ###
+#######################################
+
+rule generate_metasamples_quantile_normalized_table:
+	input:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-BH_genes.tab"
+	output:
+		QN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-NORM-BH_genes.tab",
+		NoQN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-noNORM-BH_genes.tab" 
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output.QN_out}; \
+		ln -s {input} {output.NoQN_out}
+		"""
+
+rule generate_tissue_quantile_normalized_table:
+	input:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-BH_genes.tab"
+	output:
+		QN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-NORM-BH_genes.tab",
+		NoQN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-noNORM-BH_genes.tab" 
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output.QN_out}; \
+		ln -s {input} {output.NoQN_out}
+		"""
+
+
+#######################################
+###### ZSCORES BY SPECIES #############
+#######################################
+
+rule compute_zscore_by_species:
+	input:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-{sva_log_quant_value}-{norm_value}-BH_genes.tab"
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-{sva_log_quant_value}-{norm_value}-species_zscore-BH_genes.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {COMPUTE_ZSCORE_BY_SPECIES} {input} {output}
+		"""
