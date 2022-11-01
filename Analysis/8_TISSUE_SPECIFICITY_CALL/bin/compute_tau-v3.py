@@ -21,8 +21,8 @@ def compute_tau(x):
   #valid_tissues = [element if element >= 0 else 0 for element in valid_tissues] #This line was needed only for the SVA
   if valid_tissue_num == 0:
     my_tau = np.nan
-  elif max(valid_tissues) <= math.log2(5): #require the maximum to be at least 5 TPM
-    my_tau = np.nan
+  #elif max(valid_tissues) <= math.log2(5): #require the maximum to be at least 5 TPM
+  #  my_tau = np.nan
   else:
     my_tau = sum([1-element/max(valid_tissues) for element in valid_tissues])/(valid_tissue_num-1)
   return(my_tau)
