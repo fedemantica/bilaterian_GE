@@ -100,7 +100,7 @@ for (comb in clade_tissue_combs) {
   #Require that the other Clade does not have the highest zscore in the same tissue
   if (my_clade=="Vertebrata") {other_clade="Insecta"}
   if (my_clade=="Insecta") {other_clade="Vertebrata"}
-  other_clade_highest_in_tissue_OGs = subset(tissue_maximum_all_clades_raw_df, Tissue==my_tissue & Clade==other_clade)
+  other_clade_highest_in_tissue_OGs = as.vector(subset(tissue_maximum_all_clades_raw_df, Tissue==my_tissue & Clade==other_clade)$OG_ID)
   #### Get gene orthogroups with the highest zscore in each tissue
   tissue_zscore_selected_df = subset(tissue_maximum_all_clades_raw_df, Tissue==my_tissue & Clade==my_clade)
   tissue_zscore_selected_OGs = unique(as.vector(tissue_zscore_selected_df$OG_ID))
