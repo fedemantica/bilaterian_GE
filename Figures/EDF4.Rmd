@@ -251,7 +251,7 @@ print(panel_CD_horizontal)
 ```
 
 <!-- panel C: the loadings of the spls-DA coordinates (maybe for all tissues?) -->
-```{r plot_genes_connected_by_lines, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=5, fig.height=4}
+```{r plot_genes_connected_by_lines, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=5, fig.height=5.5}
 expr_df = read.table(paste0(pca_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, "/Bilateria_", 
                               my_evo_type, "-tissue_average_expr-NOSVA-log2-TPMs-NORM-species_zscore-BH_genes.tab"), header=TRUE, row=1)
 #expr_df = read.table(paste0(pca_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, "/Bilateria_", 
@@ -271,13 +271,13 @@ for (query_tissue in ordered_tissues) {
     my_loadings_vertebrates_OGs = vector()
   } else {
     my_loadings_vertebrate_file = paste0(splsda_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, 
-                                         "/loadings_clade_tissue/metasamples_median_expr/", query_tissue, "/splsda_zscore_comb/Vertebrata_",
+                                         "/loadings_clade_tissue/metasamples_median_expr/", query_tissue, "/splsda_zscore_comb_v1/Vertebrata_",
                                          query_tissue, "_splsda-zscore_loadings_orthogroups-GO_input.txt")
     my_loadings_vertebrates_OGs = as.vector(read.delim(my_loadings_vertebrate_file, header=FALSE)$V1)
   }
   
   my_loadings_insects_file = paste0(splsda_dir, my_version, "/", my_category, "/Bilateria/", my_evo_type, 
-                                     "/loadings_clade_tissue/metasamples_median_expr/", query_tissue, "/splsda_zscore_comb/Insecta_",
+                                     "/loadings_clade_tissue/metasamples_median_expr/", query_tissue, "/splsda_zscore_comb_v1/Insecta_",
                             query_tissue, "_splsda-zscore_loadings_orthogroups-GO_input.txt")
   my_loadings_insects_OGs = as.vector(read.delim(my_loadings_insects_file, header=FALSE)$V1)
   
@@ -344,10 +344,10 @@ for (query_tissue in ordered_tissues) {
   }
 }
 
-panel_K = plot_grid(plotlist = all_dot_plots, ncol=2)
-print(panel_K)
+#panel_c = plot_grid(plotlist = all_dot_plots, ncol=2)
+#print(panel_c)
 
-panel_K = egg::ggarrange(all_dot_plots[[1]], 
+panel_c = egg::ggarrange(all_dot_plots[[1]], 
                          all_dot_plots[[2]] +
                            theme(axis.text.y = element_blank(),
                         axis.ticks.y = element_blank(),
@@ -374,8 +374,11 @@ panel_K = egg::ggarrange(all_dot_plots[[1]],
                         axis.ticks.y = element_blank(),
                         axis.title.y = element_blank()),
                         ncol=4, byrow = TRUE, draw = FALSE,
-                        labels=c("K","","","","","","",""),
+                        labels=c("c","","","","","","",""),
                         bottom = "prova\nprova"
                            )
-print(panel_K)
+print(panel_c)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/EDF_4c.pdf", width = 5, height = 5.5)
+print(panel_c)
+dev.off()
 ```
