@@ -1,5 +1,5 @@
 ---
-title: "EDF8"
+title: "figS12"
 output: html_document
 ---
 
@@ -43,7 +43,7 @@ original_tau_dir = paste0(home, "projects/bilaterian_GE/data/ts_call/taus/")
 gene_sets_dir=paste0(home, "projects/bilaterian_GE/data/gene_sets/")
 randomization_dir=paste0(home, "projects/bilaterian_GE/data/ts_call/QN_randomizations/")
 evo_distances_dir = paste0(home, "projects/bilaterian_GE/data/evo_distances/")
-ts_gains_losses_dir = paste0(home, "projects/bilaterian_GE/data/ts_gains_losses/species_QN_5_TPM_v4/")
+ts_gains_losses_dir = paste0(home, "projects/bilaterian_GE/data/ts_gains_losses/species_QN_5_TPM_v6/")
 GO_transfers_dir = paste0(home, "projects/bilaterian_GE/data/GO_transfers/")
 intergenic_dist_dir = paste0(home, "projects/bilaterian_GE/data/ts_intergenic_regions/")
 # #tissue_expr_dir=paste0(home, "projects/bilaterian_GE/data/preprocessing/average_expr_by_tissue/")
@@ -575,7 +575,7 @@ plot_tree_structure_v1 = function(node_x_position, node_y_position, node_x_label
 tissue_gains_df = vector()
 for (inference_type in c("gains", "losses")) {
   for (tissue in ordered_tissues) {
-    input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+    input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", inference_type,  ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
     input_df$Tissue = rep(tissue, nrow(input_df))
     input_df$Inference = rep(inference_type, nrow(input_df))
     tissue_gains_df = rbind(tissue_gains_df, input_df)
@@ -616,7 +616,7 @@ total_gains_num_plots = ggplot(data=final_tissue_gains_df, aes(x=TS_gains, y=fre
 
 print(total_gains_num_plots)
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_sup/SupFig9-panel_gains_and_losses-v2.pdf", width=14, height=8)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_sup/SupFig9-panel_gains_and_losses-v4-CORRECTED.pdf", width=14, height=8)
 print(total_gains_num_plots)
 dev.off()
 ```
@@ -691,11 +691,10 @@ ohnolog_plot = ggplot(data=tissue_gains_df, aes(x=TS_gains, fill=Branch_Ohn_stat
 
 print(ohnolog_plot)
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_sup/SupFig9-panel_C.pdf", width=9, height=5)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/figS12-panel_B.pdf", width=9, height=5)
 print(ohnolog_plot)
 dev.off()
 ```
-
 
 <!-- Panel C: Ratio between duplication status of TS species and non-TS species -->
 ```{r duplication_barplot_with_background_species warning=FALSE, echo=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=8, fig.height=4, eval=FALSE}
@@ -842,7 +841,7 @@ species_specific_gains_duplication_status = ggplot(data=duplicated_status_df, ae
   
 print(species_specific_gains_duplication_status)
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_sup/SupFig9-panel_D.pdf", width=9, height=5)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/figS12-panel_C.pdf", width=9, height=5)
 print(species_specific_gains_duplication_status)
 dev.off()
 
@@ -850,7 +849,6 @@ dev.off()
 #print(species_specific_gains_duplication_status)
 #dev.off()
 ```
-
 
 <!-- Panel D: not-collapsed specialization scenario nodes (duplicated from Fig5) -->
 ```{r test_specialization_expression_nodes, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setutp", "functions"), fig.width=6, fig.height=8, eval=FALSE}
@@ -1147,7 +1145,6 @@ ancestor_final_density_plots = final_density_plots_df
 write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/ancestor_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
 write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/ancestor_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
 ```
-
 
 <!-- Panel E: not-collapsed specialization scenario species (duplicated from Fig5) -->
 ```{r test_specialization_expression_single_species, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setutp", "functions"), fig.width=6, fig.height=8, eval=FALSE}

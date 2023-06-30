@@ -1,5 +1,5 @@
 ---
-title: "Fig4 - final panels"
+title: "Fig3"
 output: html_document
 ---
 
@@ -483,7 +483,7 @@ i = 1
 for (species in c("Mm2", "Dme")) {
   #Upload the taus already computed already for the genes with at least 5 TPMs
   all_protein_coding_taus_df = read.delim(paste0(tau_dir, my_version, "/", species, "-protein_coding_taus.tab"), header=FALSE, col.names=c("GeneID", "Tau"))
-  all_protein_coding_taus_df$Category = rep("Post-bilaterian", nrow(all_protein_coding_taus_df))
+  all_protein_coding_taus_df$Category = rep("all", nrow(all_protein_coding_taus_df))
   #Filter only by genes in bilaterian conserved orthogroups
   bilaterian_conserved_taus_df = subset(all_protein_coding_taus_df, GeneID %in% as.vector(bilaterian_conserved_df$GeneID))
   bilaterian_conserved_taus_df$Category = rep("Bilaterian conserved", nrow(bilaterian_conserved_taus_df))
@@ -500,8 +500,8 @@ for (species in c("Mm2", "Dme")) {
           plot.title = element_text(color="black", face="bold", hjust=0.5),
           legend.position = c(0.9, 0.9),
           legend.justification = c("right", "top")) +
-    scale_color_manual(values=c("Bilaterian conserved"="brown3", "Post-bilaterian"="dimgray")) +
-    scale_fill_manual(values=c("Bilaterian conserved"="brown3", "Post-bilaterian"="dimgray")) +
+    scale_color_manual(values=c("Bilaterian conserved"="brown3", "all"="dimgray")) +
+    scale_fill_manual(values=c("Bilaterian conserved"="brown3", "all"="dimgray")) +
     scale_y_continuous(limits=c(0,2.5)) +
     scale_x_continuous(limits=c(0,1)) +
     ggtitle(paste0(species, " tau"))
@@ -514,8 +514,8 @@ for (species in c("Mm2", "Dme")) {
     theme_bw() +
     theme(axis.text = element_text(color="black"),
           plot.title = element_text(color="black", face="bold", hjust=0.5)) +
-    scale_color_manual(values=c("Bilaterian conserved"="brown3", "Post-bilaterian"="dimgray")) +
-    scale_fill_manual(values=c("Bilaterian conserved"="brown3", "Post-bilaterian"="dimgray")) +
+    scale_color_manual(values=c("Bilaterian conserved"="brown3", "all"="dimgray")) +
+    scale_fill_manual(values=c("Bilaterian conserved"="brown3", "all"="dimgray")) +
     scale_y_continuous(limits=c(0,2.5)) +
     scale_x_continuous(limits=c(0,1)) +
     ggtitle(paste0(species, " tau")) +

@@ -1,5 +1,5 @@
 ---
-title: "EDF10"
+title: "figS7"
 output: html_document
 ---
 
@@ -32,7 +32,6 @@ library(ggpubr)
 library(forcats)
 library(ggridges)
 library(ggalluvial)
-library(data.table)
 
 #set directories
 home="/Users/federica/mnt/"
@@ -118,26 +117,6 @@ Protostoma = c(Arthropoda, "Obi")
 
 all_ancestors = c("Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma",
               "Bilateria", "Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma")
-
-all_ancestors_colors = c("Euarchontoglires"="#159DFF",
-                         "Eutheria" = "#1873CD",
-                         "Mammalia" = "#174B8B",
-                         "Amniota" = "#3F3F8B",  
-                         "Tetrapoda" =  "#64398B",
-                         "Euteleostomi" = "#82359D",
-                         "Vertebrata" = "#9932CC",
-                         "Chordata" = "#2E8B57",
-                         "Deuterostoma" = "#96B12B",
-                         "Cyclorrapha" = "firebrick3",
-                         "Diptera" = "#993300",
-                         "Panorpidae" = "#CC6600",
-                         "Oligoneoptera" = "#FF6600", 
-                         "Holometabola" = "#FF9966",
-                         "Neoptera" = "burlywood2",
-                         "Insecta" = "goldenrod",
-                         "Arthropoda" = "#FFCC33",
-                         "Protostoma" = "#FFFF00",
-                         "species\nspecific" = "gray71")
 
 clade_species = c("Euarchontoglires" = list(Euarchontoglires),
                   "Eutheria" = list(Eutheria),
@@ -493,110 +472,79 @@ plot_taus_ts_gains = function(clade_tau_df, my_clade_species, nodelist) {
 }
 ```
 
-```{r plot_Fgf17_developmental_expression_brain_cerebellum_average, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.width=12, fig.height=15}
-#Generate variables
-Kaessman_species = c("Human", "Macaque", "Mouse", "Rat", "Rabbit", "Opossum")
-Kaessman_tissues = c("Brain", "Cerebellum", "Testis", "Ovary", "Heart", "Kidney", "Liver")
-#Kaessman_tissues = c("Brain", "Testis", "Ovary", "Heart", "Kidney", "Liver")
-Kaessman_tissue_colors = c("Brain"="mediumblue", 
-                           "Cerebellum"="dodgerblue2", 
-                           "Testis"="violet", 
-                           "Ovary"="darkorchid",
-                           "Heart"="springgreen3",
-                           "Kidney"="gold",
-                           "Liver"="tan4")
+```{r all_species_ts_genes_associated_tissues_heatmap, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setup", "functions"), fig.width=7, fig.height=10}
+#palette_brewer = colorRampPalette(rev(brewer.pal(11, "PRGn")))(paletteLength)
+tau_cutoff = 0.75
 
-
-#This is because human has some samples for cerebellum that are not included in brain
-human_order = c("Brain_4wpc", "Brain_5wpc", "Brain_6wpc", "Brain_7wpc", "Brain_8wpc", "Brain_9wpc","Brain_10wpc", "Brain_11wpc", "Brain_12wpc",
-                "Brain_13wpc", "Brain_16wpc", "Brain_18wpc", "Brain_19wpc", "Brain_20wpc", "Brain_newborn", "Brain_infant", "Brain_toddler",
-                "Brain_school", "Brain_teenager", "Brain_youngAdult", "Brain_youngMidAge", "Brain_olderMidAge", "Brain_senior",
-                "Testis_4wpc", "Testis_5wpc", "Testis_6wpc", "Testis_7wpc", "Testis_8wpc", "Testis_9wpc", "Testis_10wpc", "Testis_11wpc", "Testis_12wpc",
-                "Testis_13wpc", "Testis_16wpc", "Testis_18wpc", "Testis_19wpc", "Testis_infant", "Testis_toddler", "Testis_youngTeenager", "Testis_oldTeenager",
-                "Testis_youngAdult", "Testis_youngMidAge", "Testis_olderMidAge", "Testis_Senior", "Ovary_4wpc", "Ovary_5wpc", "Ovary_6wpc", "Ovary_7wpc",
-                "Ovary_8wpc", "Ovary_9wpc", "Ovary_10wpc", "Ovary_11wpc", "Ovary_12wpc", "Ovary_13wpc", "Ovary_16wpc", "Ovary_18wpc", "Heart_4wpc", "Heart_5wpc",
-                "Heart_6wpc", "Heart_7wpc", "Heart_8wpc", "Heart_9wpc", "Heart_10wpc", "Heart_11wpc", "Heart_12wpc", "Heart_13wpc", "Heart_16wpc", "Heart_18wpc",
-                "Heart_19wpc", "Heart_newborn", "Heart_infant", "Heart_toddler", "Heart_teenager", "Heart_youngAdult", "Heart_olderMidAge",
-                "Kidney_4wpc", "Kidney_5wpc", "Kidney_6wpc", "Kidney_7wpc", "Kidney_8wpc", "Kidney_9wpc", "Kidney_10wpc", "Kidney_11wpc", "Kidney_12wpc",
-                "Kidney_13wpc", "Kidney_16wpc", "Kidney_18wpc", "Kidney_19wpc", "Kidney_20wpc", "Kidney_newborn", "Kidney_infant", "Kidney_toddler", "Kidney_school",
-                "Liver_4wpc", "Liver_5wpc", "Liver_6wpc", "Liver_7wpc", "Liver_8wpc", "Liver_9wpc", "Liver_10wpc", "Liver_11wpc", "Liver_12wpc", "Liver_13wpc",
-                "Liver_16wpc", "Liver_18wpc", "Liver_19wpc", "Liver_20wpc", "Liver_newborn", "Liver_infant", "Liver_toddler", "Liver_school", "Liver_teenager",
-                "Liver_youngAdult", "Liver_olderMidAge", "Liver_senior")
-human_labels = sub(".*_", "", human_order)
-
-#Upload expression from Kaessman paper
-expr_file = paste0(home, "projects/bilaterian_GE/downloaded/Kaessman_dev_expr/Fgf17_Kaessman_orthologs_expr.tab")
-expr_long_df = read.delim(expr_file, header=FALSE, col.names=c("Species", "Sample", "GeneID", "Expr"))
-expr_long_df$Sample = sub("\\..*", "", sub("\\.", "_", expr_long_df$Sample))
-
-
-all_plots_list = list()
+all_heatmaps_list = list()
 i = 1
-for (species in Kaessman_species) {
-  species_expr_df = subset(expr_long_df, Species==species)
-  species_expr_df = species_expr_df %>%
-    separate(Sample, c("Tissue", "Timepoint"), remove=FALSE)
+for (my_species in ordered_species) {
+  #Filter for the conserved genes that pass the 5TPM expression cutoff
+  conserved_associated_tissues_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"),
+                                         header=FALSE, col.names=c("OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_tissue", "Expr_cutoff"))
+  #Select the species TS genes (Tau>=0.75) that pass the expression cutoff and the requirements to be assigned an associated tissue.
+  species_associated_tissues_df = subset(conserved_associated_tissues_df, 
+                                         Species==my_species & 
+                                           Tau >= 0.75 &
+                                           Expr_cutoff == "YES_EXPR" & 
+                                           Tissue != "None")[,c("GeneID", "Tissue")]
+  #Upload relative TS for all tissues
+  species_relative_ts_df = read.delim(paste0(tau_dir, my_version, "/", my_species, "-protein_coding_relative_ts.tab"), header=TRUE, row=1)
+  species_relative_ts_df = species_relative_ts_df[as.vector(species_associated_tissues_df$GeneID),]
+  #Order the colnames
+  species_relative_ts_df = species_relative_ts_df[,ordered_tissues[ordered_tissues %in% colnames(species_relative_ts_df)]]
+  tot_genes = nrow(species_relative_ts_df)
   
-  GeneID = unique(species_expr_df$GeneID)
+  #### Get annotation dfs
+  #annotation rows (gene tissue specificity)
+  annotation_row_df = species_associated_tissues_df
+  rownames(annotation_row_df) = as.vector(annotation_row_df$GeneID)
+  annotation_row_df$GeneID = NULL
   
-  #Order by samples by tissue
-  final_species_expr_df = vector()
-  for (tissue in Kaessman_tissues) {
-    tissue_df = subset(species_expr_df, Tissue==tissue)
-    final_species_expr_df = rbind(final_species_expr_df, tissue_df)
-  }
-  #Get sample order
-  sample_order = unique(final_species_expr_df$Sample)
-  sample_labels = unique(final_species_expr_df[,c("Sample", "Timepoint")])$Timepoint
-  if (species=="Human") {sample_order = human_order; samples_labels = human_labels}
+  #Add missing tissues to color vectors
+  missing_combs = unique(as.vector(annotation_row_df$Tissue[!(annotation_row_df$Tissue %in% ordered_tissues)]))
+  missing_combs_colors = rep("black", length(missing_combs))
+  names(missing_combs_colors) = missing_combs
+  complete_tissue_colors = c(my_color_vector, missing_combs_colors)
   
-  species_median_expr_long_df = final_species_expr_df %>%
-    group_by(Species, Sample, Tissue, Timepoint, GeneID) %>%
-    summarize(Median_expr = median(Expr)) %>%
-    #separate(Sample, c("Tissue", "Timepoint"), remove=FALSE) %>%
-    unite("Species_sample", c(Species, Sample), remove=FALSE)
+  #annotation cols (simply tissues)
+  annotation_col_df = data.frame(Tissue = ordered_tissues); 
+  rownames(annotation_col_df) = ordered_tissues
   
-  ####Get average between brain and cerebellum
-  species_median_expr_long_df$Tissue[species_median_expr_long_df$Tissue=="Cerebellum"] = "Brain"
-  species_median_expr_long_df$Sample = sub("Cerebellum", "Brain", species_median_expr_long_df$Sample)
+  palette_brewer = rev(colorRampPalette(rev(brewer.pal(11, "BuPu")))(paletteLength))
+  #Build heatmaps
+  relative_ts_heatmap = pheatmap(species_relative_ts_df,
+                                 main = my_species,
+                                 color = palette_brewer,
+                                 border_color = "black",
+                                 fontsize = 5,
+                                 #breaks = myBreaks,
+                                 #main = paste0(my_species, ": relative TS (min tau: ", tau_cutoff, "; ", tot_genes, " genes)"),
+                                 cluster_cols = FALSE,
+                                 cluster_rows = TRUE,
+                                 treeheight_row = 25,
+                                 annotation_row = annotation_row_df,
+                                 annotation_col = annotation_col_df,
+                                 annotation_colors = list(Tissue = complete_tissue_colors),
+                                 annotation_legend = FALSE, 
+                                 show_rownames = FALSE,
+                                 show_colnames = FALSE,
+                                 legend = FALSE,
+                                 angle_col = 0,
+                                 silent=TRUE,
+                                 fontsize_row = 7)
   
-  species_median_expr_long_df = species_median_expr_long_df %>%
-    group_by(Species, Sample, Tissue, Timepoint, GeneID) %>%
-    summarise(Avg_median_expr=mean(Median_expr))
-  
-  species_median_expr_long_df$Sample = factor(species_median_expr_long_df$Sample, levels=sample_order)
-  species_median_expr_long_df$Tissue = factor(species_median_expr_long_df$Tissue, levels=Kaessman_tissues[Kaessman_tissues!="Cerebellum"])
-  #species_median_expr_long_df$Log2_expr = log2(species_median_expr_long_df$Median_expr+1)
-  
-  species_plot = ggplot(data=species_median_expr_long_df, aes(x=Sample, y=Avg_median_expr, color=Tissue, fill=Tissue, group=Tissue)) +
-    geom_point() +
-    geom_line() +
-    scale_color_manual(values=Kaessman_tissue_colors) +
-    scale_fill_manual(values=Kaessman_tissue_colors) +
-    ggtitle(paste0(species, " ~ ", GeneID)) +
-    theme_bw() +
-    ylab("Median RPKM expr") +
-    scale_x_discrete(labels = sample_labels) +
-    scale_y_continuous(breaks = number_ticks(6)) +
-    theme(axis.text.x = element_text(color="black", angle=90, vjust=0, hjust=1),
-          axis.text.y = element_text(color="black"),
-          axis.title.y = element_text(color="black"),
-          axis.title.x = element_blank(),
-          legend.position = c(0.9,0.9),
-          legend.direction = "horizontal",
-          legend.justification = c("right", "top"),
-          plot.margin = unit(c(0,0,0,0), "cm")) +
-    coord_cartesian(ylim=c(0,30))
-  
-  #print(species_plot)
-  all_plots_list[[i]] = species_plot
+  all_heatmaps_list[[i]] = relative_ts_heatmap$gtable
   i = i+1
 }
 
-final_plots = plot_grid(plotlist = all_plots_list, ncol=1, align = "vh", labels=c("A", "B", "C", "D", "E", "F"))
+final_plots = plot_grid(plotlist = all_heatmaps_list, ncol=4, align="h", labels=c("A","B","C","D","E","F",
+                                                                                "G","H","I","J","K","L",
+                                                                                "M","N","O","P","Q","R",
+                                                                                "S","T"), label_size=7)
 print(final_plots)
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig10-v5.pdf", width=12, height=15)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig7-v2.pdf", width=7, height=10)
 print(final_plots)
 dev.off()
 ```
