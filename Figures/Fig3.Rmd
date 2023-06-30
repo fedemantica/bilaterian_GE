@@ -42,7 +42,7 @@ original_tau_dir = paste0(home, "projects/bilaterian_GE/data/ts_call/taus/")
 gene_sets_dir=paste0(home, "projects/bilaterian_GE/data/gene_sets/")
 randomization_dir=paste0(home, "projects/bilaterian_GE/data/ts_call/QN_randomizations/")
 evo_distances_dir = paste0(home, "projects/bilaterian_GE/data/evo_distances/")
-ts_gains_losses_dir = paste0(home, "projects/bilaterian_GE/data/ts_gains_losses/species_QN_5_TPM_v6/")
+ts_gains_losses_dir = paste0(home, "projects/bilaterian_GE/data/ts_gains_losses/species_QN_5_TPM_v4/")
 GO_transfers_dir = paste0(home, "projects/bilaterian_GE/data/GO_transfers/")
 intergenic_dist_dir = paste0(home, "projects/bilaterian_GE/data/ts_intergenic_regions/")
 # #tissue_expr_dir=paste0(home, "projects/bilaterian_GE/data/preprocessing/average_expr_by_tissue/")
@@ -728,10 +728,8 @@ ts_genes_by_group_plot = ggplot(data=all_ts_by_species_df, aes(x=Clade, y=Freq, 
 print(ts_genes_by_group_plot)
 
 panel_E = ts_genes_by_group_plot
-combined_extra_plots = plot_grid(panel_D, panel_E, nrow=1, align="hv", rel_widths = c(1,0.3))
-# pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/Fig4_extra.pdf", width=6.5, height = 3)
-# print(combined_extra_plots)
-# dev.off()
+print(panel_E)
+#combined_extra_plots = plot_grid(panel_D, panel_E, nrow=1, align="hv", rel_widths = c(1,0.3))
 ```
 
 <!-- Panel F,G: boxplots with decresing numbeer of high Taus orthologs -->
