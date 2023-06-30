@@ -478,3 +478,9 @@ print(testis_phenotype_plot)
 ```
 
 <!-- Panel I: GO enrichment networks in illustrator -->
+
+<!-- Panel J -->
+```{r motif_enrichments_results, warning=FALSE, echo=FALSE, message=FALSE, dependson=c("setup","functions")}
+
+```
+
