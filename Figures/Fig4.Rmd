@@ -571,8 +571,8 @@ plot_tree_structure_v1 = function(node_x_position, node_y_position, node_x_label
 ```
 
 <!-- FIRST ROW -->
-<!-- Panel A: super tree with gains and losses proportions -->
-```{r super_ggplot_tree, warning=FALSE, echo=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=11, fig.height=6, eval=FALSE}
+<!-- Panel A: tree with total numbers of gains/losses across nodes and species -->
+```{r tree_with_inerences_stats, warning=FALSE, echo=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=11, fig.height=6, eval=FALSE}
 #### Generate dictionaries with nodes position
 node_y_position_super = node_y_position
 node_x_position_super = node_x_position
@@ -587,100 +587,85 @@ node_x_position_dict = hashmap(names(node_x_position_super), unname(node_x_posit
 node_y_position_dict = hashmap(names(node_y_position_super), unname(node_y_position_super))
 
 #### Generate the input dataframe
-all_scaled_percent_df = vector()
+all_stats_df = vector()
 for (tissue in ordered_tissues) {
   for (category in c("gains", "losses")) {
     input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", category, ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
-    tot_TS_genes = length(unique(as.vector(input_df$OG_ID)))
-    
+    #Isolate bilaterian "gains" in that tissue
+    # if (category == "gains") {
+    #   bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+    #   input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+    # } else { #is the category is "losses", use the vector created in the previous iteration
+    #   input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+    # }
     #Count TS gains
     ts_gains_counts_df = as.data.frame(table(input_df$TS_gain))
     colnames(ts_gains_counts_df) = c("Node", "TS_gains")
     ts_gains_counts_df$Node = as.vector(ts_gains_counts_df$Node)
     ts_gains_counts_df$Node[ts_gains_counts_df$Node == "BmA"] = "Bmo"
-    #ts_gains_counts_df$TS_gains_log = log2(ts_gains_counts_df$TS_gains+1)
-    #ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains_log/sum(ts_gains_counts_df$TS_gains_log),3)*100
-    ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains/sum(ts_gains_counts_df$TS_gains),3)*100
-    ts_gains_counts_df$TS_gains_percent = log2(ts_gains_counts_df$TS_gains_percent+1)
-    ts_gains_counts_df$TS_gains_scaled_percent = ts_gains_counts_df$TS_gains_percent/max(ts_gains_counts_df$TS_gains_percent)
     
     ### Add Labels
     ts_gains_counts_df$Tissue = rep(tissue, nrow(ts_gains_counts_df))
     ts_gains_counts_df$Inference_type = rep(category, nrow(ts_gains_counts_df))
     ts_gains_counts_df$Tissue_inference = paste0(ts_gains_counts_df$Tissue, "_", ts_gains_counts_df$Inference_type)
     
-    all_scaled_percent_df = rbind(all_scaled_percent_df, ts_gains_counts_df)
+    all_stats_df = rbind(all_stats_df, ts_gains_counts_df)
   }
 }
 
-all_nodes_gains_losses_heatmaps_list = list()
+#Sum gains/losses across tissues
+all_collapsed_stats_df = all_stats_df %>%
+  group_by(Node, Inference_type) %>%
+  summarize(TS_stats = sum(TS_gains)) %>%
+  mutate(y_coord = 1)
+  
+
+all_nodes_gains_losses_plots_list = list()
 i = 1
-ordered_nodes = unique(as.vector(all_scaled_percent_df$Node))
+ordered_nodes = unique(as.vector(all_collapsed_stats_df$Node))
+
 for (my_node in ordered_nodes) {
-  subsetted_scaled_percent_df = subset(all_scaled_percent_df, Node==my_node)
-  coordinates_df = data.frame(x=rep(c(0,0,1,0,1,1,1,1,2,1,2,2,2,2,3,2,3,3,
-                                  3,3,4,3,4,4), 2), 
-                              y=c(rep(c(1,2,2,1,1,2,1,2,2,1,1,2),2),
-                                  rep(c(0,1,1,0,0,1,0,1,1,0,0,1),2)), 
-                              group=c(rep("A", 3), rep("B", 3), rep("C", 3), rep("D",3),
-                                      rep("E", 3), rep("F", 3), rep("G", 3), rep("H",3),
-                                      rep("I", 3), rep("J", 3), rep("K", 3), rep("L",3),
-                                      rep("M", 3), rep("N", 3), rep("O", 3), rep("P",3)
-                                      ))
+  node_collapsed_stats_df = all_collapsed_stats_df %>% filter(Node == my_node)
   
-  ### Generate a dictionary with the group/Tissue correspondence
-  Tissue_inference_type_levels = rep(ordered_tissues, each=2)
-  Tissue_inference_type_levels[seq(1,length(Tissue_inference_type_levels)-1,2)] = paste0(ordered_tissues, "_gains")
-  Tissue_inference_type_levels[seq(2,length(Tissue_inference_type_levels),2)] = paste0(ordered_tissues, "_losses")
+  ####Generate plots with stats
+  node_stats_plot = ggplotGrob(ggplot(data=node_collapsed_stats_df, 
+                                      aes(x=1, y=y_coord)) +
+                                 geom_point(shape=22, alpha = 0.7, color="black", aes(size=TS_stats, fill=Inference_type)) +
+                                 
+                                 geom_text(data=subset(node_collapsed_stats_df, Inference_type == "gains"), 
+                                           aes(x=y_coord, y=y_coord, label=TS_stats, color=Inference_type), size=3, color="#443A83FF", hjust = 2, vjust = -0.7) +
+                                 
+                                 geom_text(data=subset(node_collapsed_stats_df, Inference_type == "losses"),
+                                            aes(x=y_coord, y=y_coord, label=TS_stats, color=Inference_type), size=3, color="#75D054FF", hjust = 2, vjust = 0.7) +
+                                 
+                                 scale_fill_manual(values=c("gains"="#443A83FF", "losses"="#75D054FF")) +
+                                 scale_color_manual(values=c("gains"="#443A83FF", "losses"="#75D054FF")) +
+                                 scale_size_continuous(limits=c(0, max(all_collapsed_stats_df$TS_stats)),
+                                                       range = c(1,15)) +
+                                 theme_void() +
+                                 #theme(panel.background = element_rect(fill = "white", color="white")) +
+                                 guides(color=FALSE, size=FALSE, fill=FALSE))
   
-  group_tissue_dict = hashmap(c("A","B","C","D","E","F","G","H",
-                                "I","J","K","L","M","N","O","P"),
-                              Tissue_inference_type_levels)
-  
-  
-  ### Generate a dictionary with the tissue - value correspondence. This has to be done for each node:
-  Tissue_percentage_dict = hashmap(as.vector(subsetted_scaled_percent_df$Tissue_inference),
-                                   as.vector(subsetted_scaled_percent_df$TS_gains_scaled_percent))
-  
-  ### Add information to the dataframe
-  coordinates_df$Tissue_inference = group_tissue_dict$find(coordinates_df$group)
-  coordinates_df$Scaled_percent = Tissue_percentage_dict$find(coordinates_df$Tissue_inference)
-  #Replace NA with 0
-  coordinates_df$Scaled_percent[is.na(coordinates_df$Scaled_percent)] = 0
-  
-  #Add tissue info for color
-  coordinates_df$Tissue = sub("_.*", "", coordinates_df$Tissue_inference)
-  
-  ####Generate the triangular structure
-  node_gains_losses_heatmap = ggplotGrob(ggplot(data=coordinates_df) +
-    geom_polygon(aes(x=x, y=y, group=group, fill=Scaled_percent), alpha=0.7, color="black", size=0.2) +
-    scale_fill_viridis(direction=-1, limits=c(0,1)) +
-    #scale_alpha_identity() +
-    theme_void() +
-    theme(panel.background = element_rect(fill = "white", color="white")) +
-    guides(fill=FALSE))
-  
-  #print(node_gains_losses_heatmap)
-  all_nodes_gains_losses_heatmaps_list[[i]] = node_gains_losses_heatmap
+  all_nodes_gains_losses_plots_list[[i]] = node_stats_plot
   i = i+1
 }
 
 #### 
-node_gains_losses_heatmap_grob = tibble(xmin=node_x_position_dict$find(ordered_nodes)-0.75,
+node_gains_losses_stats_grob = tibble(xmin=node_x_position_dict$find(ordered_nodes)-0.75,
                                         xmax=node_x_position_dict$find(ordered_nodes)+0.75,
                                         ymin=node_y_position_dict$find(ordered_nodes)-0.5,
                                         ymax=node_y_position_dict$find(ordered_nodes)+0.5,
-                                        grob=all_nodes_gains_losses_heatmaps_list)
+                                        grob=all_nodes_gains_losses_plots_list)
 
 super_tree_test = plot_tree_structure_v1(node_x_position, node_y_position, node_x_labels) + #plot the tree structure
-  purrr::pmap(node_gains_losses_heatmap_grob, function(grob, xmin, xmax, ymin, ymax) annotation_custom(grob = grob, xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax))
+  purrr::pmap(node_gains_losses_stats_grob, function(grob, xmin, xmax, ymin, ymax) annotation_custom(grob = grob, xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax))
 
 print(super_tree_test)
 panel_A = super_tree_test
 
-#pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5/Fig5_panelA.pdf", width=11, height=6)
-#print(panel_A)
-#dev.off()
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/Fig4_panelA-v2.pdf", width=11, height=6)
+print(panel_A)
+dev.off()
 ```
 
 <!-- Panel B: gains and losses proportions across tissue and ancestors -->
@@ -689,6 +674,14 @@ all_counts_df = vector()
 for (tissue in ordered_tissues) {
   for (category in c("gains", "losses")) {
     input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", category, ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+    #### Remove the bilaterian gains
+    # if (category == "gains") {
+    #   bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+    #   input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+    # } else { #is the category is "losses", use the vector created in the previous iteration
+    #   input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+    # }
+    
     tot_TS_genes = length(unique(as.vector(input_df$OG_ID)))
     
     #Count TS gains
@@ -696,8 +689,6 @@ for (tissue in ordered_tissues) {
     colnames(ts_gains_counts_df) = c("Node", "TS_gains")
     ts_gains_counts_df$Node = as.vector(ts_gains_counts_df$Node)
     ts_gains_counts_df$Node[ts_gains_counts_df$Node == "BmA"] = "Bmo"
-    #ts_gains_counts_df$TS_gains_percent = round(ts_gains_counts_df$TS_gains/sum(ts_gains_counts_df$TS_gains),3)*100
-    #ts_gains_counts_df$TS_gains_scaled_percent = ts_gains_counts_df$TS_gains_percent/max(ts_gains_counts_df$TS_gains_percent)
     
     ### Add Labels
     ts_gains_counts_df$Tissue = rep(tissue, nrow(ts_gains_counts_df))
@@ -763,9 +754,10 @@ combined_proportion_plots = plot_grid(gains_losses_proportions_deut_plot, gains_
 print(combined_proportion_plots)
 panel_B = combined_proportion_plots
 
-#pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5/Fig5_panelB.pdf", width=5, height=6)
-#print(panel_B)
-#dev.off()
+#save to file
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/Fig4_panelB-v1.pdf", width=5, height=6)
+print(panel_B)
+dev.off()
 
 #### Compute proportion of losses on the total of inferences for all nodes
 joint_df = rbind(deut_counts_df, prot_counts_df)
@@ -791,6 +783,14 @@ all_counts_df = vector()
 for (tissue in ordered_tissues) {
   for (category in c("gains", "losses")) {
     input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_", category, ".tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+    #### Remove the bilaterian gains
+    # if (category == "gains") {
+    #   bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+    #   input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+    # } else { #is the category is "losses", use the vector created in the previous iteration
+    #   input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+    # }
+    
     tot_TS_genes = length(unique(as.vector(input_df$OG_ID)))
     
     #Count TS gains
@@ -856,6 +856,9 @@ geneID_OGID_dict = hashmap(as.vector(orthogroups_df$GeneID), as.vector(orthogrou
 tissue_gains_df = vector()
 for (tissue in ordered_tissues) {
   input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  #bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+  #input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+  #Add tissues
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_gains_df = rbind(tissue_gains_df, input_df)
 }
@@ -900,7 +903,8 @@ onholog_proportion_dict = hashmap(as.vector(final_tissue_gains_df$TS_gains), as.
 all_summed_gains_losses_df$Onholog_proportion = onholog_proportion_dict$find(all_summed_gains_losses_df$Node)
 all_summed_gains_losses_df$Branch = factor(all_summed_gains_losses_df$Branch, levels=c("Protostoma", "Deuterostoma","Bilateria"))
 
-gains_losses_nodes_plot = ggplot(all_summed_gains_losses_df, 
+#Do not plot Bilateria for now
+gains_losses_nodes_plot = ggplot(subset(all_summed_gains_losses_df, Node!="Bilateria"), 
                                  aes(x=Node_level, y=inferences_sum, 
                                      group=Branch, 
                                      shape=Inference_type,
@@ -925,12 +929,10 @@ gains_losses_nodes_plot = ggplot(all_summed_gains_losses_df,
 
 print(gains_losses_nodes_plot)
 
-#panel_C = gains_losses_nodes_plot
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelC.pdf", width=6, height=6)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/Fig4_panelC-v1.pdf", width=6, height=6)
 print(gains_losses_nodes_plot)
 dev.off()
 ```
-
 
 <!-- Panel D: Ratio between duplication status of TS species and non-TS species -->
 ```{r duplication_barplot_with_background_nodes, warning=FALSE, message=FALSE, echo=FALSE, dependson=c("setup", "functions"), fig.width=8, fig.height=4, eval=FALSE}
@@ -1050,8 +1052,10 @@ foreground_df$Branch_Dup_status = factor(foreground_df$Branch_Dup_status, levels
 dup_background_df = subset(background_df, Dup_status=="Dup")
 
 ancestral_gains_duplication_status = ggplot() +
-  geom_bar(data=foreground_df, aes(x=Node, y=freq_proportion, fill=Branch_Dup_status), stat="identity", position="fill", color="black", alpha=0.75) +
-  geom_errorbar(data=dup_background_df, aes(x=Node, ymin=freq_proportion, ymax=freq_proportion), color="black", linetype="dashed") +
+  geom_bar(data=subset(foreground_df, Node!="Bilateria"), 
+           aes(x=Node, y=freq_proportion, fill=Branch_Dup_status), stat="identity", position="fill", color="black", alpha=0.75) +
+  geom_errorbar(data=subset(dup_background_df, Node!="Bilateria"), 
+                            aes(x=Node, ymin=freq_proportion, ymax=freq_proportion), color="black", linetype="dashed") +
   #scale_fill_manual(values=c("Dup"="firebrick1", "Non_Dup"="dimgray")) +
   scale_fill_manual(values=c("Deuterostoma_Dup"="darkolivegreen4", "Protostoma_Dup"="tan3", "Bilateria_Dup"="firebrick1", "Deuterostoma_NO_Dup"="white", "Protostoma_NO_Dup"="white", "Bilateria_NO_Dup"="white")) +
   ggtitle("Proportion of TS gains orthogroups with duplications") +
@@ -1063,11 +1067,10 @@ ancestral_gains_duplication_status = ggplot() +
         plot.title = element_text(color="black", hjust=0.5, face="bold")) #+
   #guides(fill="none")
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelD.pdf", width=7, height=4)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/Fig4_panelD-v1.pdf", width=7, height=4)
 print(ancestral_gains_duplication_status)
 dev.off()
 ```
-
 
 <!-- SECOND ROW -->
 <!-- Panel E: Tissue specific gains for one Eutheria and one Holometabola category to show the expression differences between TS and non-TS genes -->
@@ -1091,7 +1094,10 @@ for (species in ordered_species) {
 #### Upload gains info
 tissue_gains_df = vector()
 for (tissue in ordered_tissues) {
-  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), 
+                        header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+  input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_gains_df = rbind(tissue_gains_df, input_df)
 }
@@ -1100,6 +1106,12 @@ for (tissue in ordered_tissues) {
 tissue_losses_df = vector()
 for (tissue in ordered_tissues) {
   input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  ### Remove the relative bilaterian gains
+  relative_gains_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), 
+                                 header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  bilaterian_OGs = as.vector(subset(relative_gains_df, TS_gains=="Bilateria")$OG_ID)
+  #### Remove from the lossess df
+  input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_losses_df = rbind(tissue_losses_df, input_df)
 }
@@ -1186,11 +1198,10 @@ for (ancestor in c("Eutheria")) {
   print(final_clade_expr_plot)
 }
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelE.pdf", width=12, height=7)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/Fig4_panelE.pdf", width=12, height=7)
 print(final_clade_expr_plot)
 dev.off()
 ```
-
 
 <!-- Panel F: Number of tissues with reduced expression in non TS vs TS, plus results from 100 randomizations -->
 <!-- NB: this also generates the plots for the relative EDF. But I will repeat the code there -->
@@ -1215,6 +1226,10 @@ for (species in ordered_species) {
 tissue_gains_df = vector()
 for (tissue in ordered_tissues) {
   input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  #### Remove the bilaterian gains
+  bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+  input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+  #### Add tissues
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_gains_df = rbind(tissue_gains_df, input_df)
 }
@@ -1223,6 +1238,12 @@ for (tissue in ordered_tissues) {
 tissue_losses_df = vector()
 for (tissue in ordered_tissues) {
   input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  ### Remove the relative bilaterian gains
+  relative_gains_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), 
+                                 header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  bilaterian_OGs = as.vector(subset(relative_gains_df, TS_gains=="Bilateria")$OG_ID)
+  #### Remove from the lossess df
+  input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_losses_df = rbind(tissue_losses_df, input_df)
 }
@@ -1479,16 +1500,19 @@ specialization_hyp_plot = ggplot(data=all_stacked_plots_df, aes(y=Node, fill=Spe
   labs(fill="Spec\nTis") +
   guides(color=FALSE)
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/Fig5_panelG.pdf", width=6, height=8)
+
+#### Save to pdf
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Data_raw/figS9_panelD-v1.pdf", width=6, height=8)
 print(specialization_hyp_plot)
 dev.off()
 
 #### Save the dataframes to different variables AND to file:
 ancestor_stacked_plots_df = all_stacked_plots_df
 ancestor_final_density_plots = final_density_plots_df
-write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/ancestor_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
-write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/ancestor_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Data_raw/ancestor_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+write.table(ancestor_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Data_raw/ancestor_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
 ```
+
 
 ```{r test_specialization_expression_single_species, echo=FALSE, message=FALSE, warning=FALSE, dependson=c("setutp", "functions"), fig.width=6, fig.height=8, eval=FALSE}
 reference_OG = c("GF_013551", "GF_013830")
@@ -1523,6 +1547,10 @@ for (species in ordered_species) {
 tissue_gains_df = vector()
 for (tissue in ordered_tissues) {
   input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  #### Remove the bilaterian gains
+  bilaterian_OGs = as.vector(subset(input_df, TS_gains=="Bilateria")$OG_ID)
+  input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
+  #### Add tissues
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_gains_df = rbind(tissue_gains_df, input_df)
 }
@@ -1531,6 +1559,12 @@ for (tissue in ordered_tissues) {
 tissue_losses_df = vector()
 for (tissue in ordered_tissues) {
   input_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_losses.tab"), header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_losses", "Category"))
+  ### Remove the relative bilaterian gains
+  relative_gains_df = read.delim(paste0(ts_gains_losses_dir, my_version, "/inferences/Bilateria_conserved_orthogroups-All_genes-", tissue, "_inferred_gains.tab"), 
+                                 header=TRUE, stringsAsFactors = FALSE, col.names = c("OG_ID", "TS_gains", "Category"))
+  bilaterian_OGs = as.vector(subset(relative_gains_df, TS_gains=="Bilateria")$OG_ID)
+  #### Remove from the lossess df
+  input_df = subset(input_df, !(OG_ID %in% bilaterian_OGs))
   input_df$Tissue = rep(tissue, nrow(input_df))
   tissue_losses_df = rbind(tissue_losses_df, input_df)
 }
@@ -1742,16 +1776,15 @@ specialization_hyp_plot = ggplot(data=all_stacked_plots_df, aes(y=Node, fill=Spe
 
 
 print(specialization_hyp_plot)
-# panel_B = specialization_hyp_plot
-# 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_sup/SupFig9-panel_E.pdf", width=6, height=8)
+
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Data_raw/figS9_panelE.pdf", width=6, height=8)
 print(specialization_hyp_plot)
 dev.off()
 
 species_stacked_plots_df = all_stacked_plots_df
 species_final_density_plots = final_density_plots_df
-write.table(species_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/species_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
-write.table(species_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_fig5_v1/panel_G_tmp/species_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+write.table(species_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Data_raw/species_stacked_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
+write.table(species_stacked_plots_df, "/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Data_raw/species_final_density_plots_df.tab", quote=FALSE, row.names = FALSE, col.names=TRUE, sep="\t")
 ```
 
 ```{r nodes_and_species_collapsed_specialization, echo=FALSE, warning=FALSE, message=FALSE, dependson=c("setup", "functions"), fig.width=6, fig.height=4}
@@ -1805,7 +1838,7 @@ combined_specialization_hyp_plot = ggplot(data=combined_stacked_plots_df, aes(y=
 
 print(combined_specialization_hyp_plot)
 
-pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/new_Fig5_v1/collapsed_specialization_plot.pdf", width=6, height=4)
+pdf("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Science_submission/Figures_raw/Fig4_panelF.pdf", width=6, height=4)
 print(combined_specialization_hyp_plot)
 dev.off()
 ```
