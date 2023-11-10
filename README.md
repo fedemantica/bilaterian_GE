@@ -160,7 +160,7 @@ Figures
 #### Figure 2  
 
 <figure>
-  <img align="middle" src="./docs/Fig2.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig2.png" width=600 height=500 />
   <figcaption>Fig2</figcaption>
 <figure>
 
@@ -174,7 +174,7 @@ Figures
 #### Figure 4  
 
 <figure>
-  <img align="middle" src="./docs/Fig4.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig4.png" width=600 height=600 />
   <figcaption>Fig4</figcaption>
 <figure>
 
@@ -192,70 +192,70 @@ Figures
 
 <figure>
   <img align="middle" src="./docs/EDF1.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>EDF1</figcaption>
 <figure>
 
 #### Extended Data Figure 2  
 
 <figure>
   <img align="middle" src="./docs/EDF2.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>EDF2</figcaption>
 <figure>
 
 #### Extended Data Figure 3   
 
 <figure>
   <img align="middle" src="./docs/EDF3.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>EDF3</figcaption>
 <figure>
 
 #### Extended Data Figure 4   
 
 <figure>
   <img align="middle" src="./docs/EDF4.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>EDF4</figcaption>
 <figure>
 
 #### Extended Data Figure 5   
 
 <figure>
   <img align="middle" src="./docs/EDF5.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>EDF5</figcaption>
 <figure>
 
 #### Extended Data Figure 6   
 
 <figure>
-  <img align="middle" src="./docs/EDF6.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <img align="middle" src="./docs/EDF6.png" width=600 height=700 />
+  <figcaption>EDF6</figcaption>
 <figure>
 
 #### Extended Data Figure 7   
 
 <figure>
-  <img align="middle" src="./docs/EDF7.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <img align="middle" src="./docs/EDF7.png" width=600 height=700 />
+  <figcaption>EDF7</figcaption>
 <figure>
 
 #### Extended Data Figure 8   
 
 <figure>
-  <img align="middle" src="./docs/EDF8.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <img align="middle" src="./docs/EDF8.png" width=600 height=700 />
+  <figcaption>EDF8</figcaption>
 <figure>
 
 #### Extended Data Figure 9   
 
 <figure>
   <img align="middle" src="./docs/EDF9.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>EDF9</figcaption>
 <figure>
 
 #### Extended Data Figure 10   
 
 <figure>
-  <img align="middle" src="./docs/EDF10.png" width=600 height=400 />
-  <figcaption>Fig5</figcaption>
+  <img align="middle" src="./docs/EDF10.png" width=600 height=600 />
+  <figcaption>EDF10</figcaption>
 <figure>
 
 ### Supplementary Figures    
@@ -264,26 +264,26 @@ Figures
 
 <figure>
   <img align="middle" src="./docs/SupFig1.png" width=600 height=700 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>SupFig1</figcaption>
 <figure>
 
 #### Supplementary Figure 2  
 
 <figure>
   <img align="middle" src="./docs/SupFig2.png" width=600 height=500 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>SupFig2</figcaption>
 <figure>
 
 #### Supplementary Figure 3  
 
 <figure>
   <img align="middle" src="./docs/SupFig3.png" width=600 height=700 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>SupFig3</figcaption>
 <figure>
 
 #### Supplementary Figure 4  
 
 <figure>
   <img align="middle" src="./docs/SupFig4.png" width=600 height=500 />
-  <figcaption>Fig5</figcaption>
+  <figcaption>SupFig4</figcaption>
 <figure>
