@@ -263,27 +263,27 @@ Figures
 #### Supplementary Figure 1  
 
 <figure>
-  <img align="middle" src="./docs/SupFig1.png" width=600 height=400 />
+  <img align="middle" src="./docs/SupFig1.png" width=600 height=700 />
   <figcaption>Fig5</figcaption>
 <figure>
 
 #### Supplementary Figure 2  
 
 <figure>
-  <img align="middle" src="./docs/SupFig2.png" width=600 height=400 />
+  <img align="middle" src="./docs/SupFig2.png" width=600 height=500 />
   <figcaption>Fig5</figcaption>
 <figure>
 
 #### Supplementary Figure 3  
 
 <figure>
-  <img align="middle" src="./docs/SupFig3.png" width=600 height=400 />
+  <img align="middle" src="./docs/SupFig3.png" width=600 height=700 />
   <figcaption>Fig5</figcaption>
 <figure>
 
 #### Supplementary Figure 4  
 
 <figure>
-  <img align="middle" src="./docs/SupFig4.png" width=600 height=400 />
+  <img align="middle" src="./docs/SupFig4.png" width=600 height=500 />
   <figcaption>Fig5</figcaption>
 <figure>
