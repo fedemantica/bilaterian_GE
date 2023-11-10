@@ -174,7 +174,7 @@ Figures
 #### Figure 4  
 
 <figure>
-  <img align="middle" src="./docs/Fig4.png" width=600 height=600 />
+  <img align="middle" src="./docs/Fig4.png" width=600 height=400 />
   <figcaption>Fig4</figcaption>
 <figure>
 
