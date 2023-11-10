@@ -10,7 +10,7 @@ output:
 # Evolution of tissue-specific expression of ancestral genes across vertebrates and insects
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/blob/Fig1.png" width=400 height=400 />
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig1.png" width=400 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
