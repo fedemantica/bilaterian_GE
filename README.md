@@ -160,7 +160,7 @@ Figures
 #### Figure 2  
 
 <figure>
-  <img align="middle" src="./docs/Fig2.png" width=600 height=500 />
+  <img align="middle" src="./docs/Fig2.png" width=600 height=450 />
   <figcaption>Fig2</figcaption>
 <figure>
 
