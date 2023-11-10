@@ -153,7 +153,7 @@ Figures
 #### Figure 1  
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig1.png" width=600 height=400 />
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig1.png" width=60 height=40 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
