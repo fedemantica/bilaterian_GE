@@ -212,7 +212,7 @@ Figures
 #### Extended Data Figure 4   
 
 <figure>
-  <img align="middle" src="./docs/EDF4.png" width=600 height=400 />
+  <img align="middle" src="./docs/EDF4.png" width=600 height=600 />
   <figcaption>EDF4</figcaption>
 <figure>
 
