@@ -154,35 +154,35 @@ Figures
 
 <figure>
   <img align="middle" src="./docs/Fig1.png" width=800 height=400 />
-  <figcaption>Dataset used for the analysis</figcaption>
+  <figcaption>Fig1</figcaption>
 <figure>
 
 #### Figure 2  
 
 <figure>
   <img align="middle" src="./docs/Fig2.png" width=600 height=400 />
-  <figcaption>Dataset used for the analysis</figcaption>
+  <figcaption>Fig2</figcaption>
 <figure>
 
 #### Figure 3  
 
 <figure>
   <img align="middle" src="./docs/Fig3.png" width=600 height=400 />
-  <figcaption>Dataset used for the analysis</figcaption>
+  <figcaption>Fig3</figcaption>
 <figure>
 
 #### Figure 4  
 
 <figure>
   <img align="middle" src="./docs/Fig4.png" width=600 height=400 />
-  <figcaption>Dataset used for the analysis</figcaption>
+  <figcaption>Fig4</figcaption>
 <figure>
 
 #### Figure 5  
 
 <figure>
   <img align="middle" src="./docs/Fig5.png" width=600 height=400 />
-  <figcaption>Dataset used for the analysis</figcaption>
+  <figcaption>Fig5</figcaption>
 <figure>
 
 
