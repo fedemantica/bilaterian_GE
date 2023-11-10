@@ -151,10 +151,40 @@ Figures
 ### Main Figures  
 
 #### Figure 1  
+
+<figure>
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig1.png" width=600 height=400 />
+  <figcaption>Dataset used for the analysis</figcaption>
+<figure>
+
 #### Figure 2  
+
+<figure>
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig2.png" width=600 height=400 />
+  <figcaption>Dataset used for the analysis</figcaption>
+<figure>
+
 #### Figure 3  
+
+<figure>
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig3.png" width=600 height=400 />
+  <figcaption>Dataset used for the analysis</figcaption>
+<figure>
+
 #### Figure 4  
+
+<figure>
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig4.png" width=600 height=400 />
+  <figcaption>Dataset used for the analysis</figcaption>
+<figure>
+
 #### Figure 5  
+
+<figure>
+  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig5.png" width=600 height=400 />
+  <figcaption>Dataset used for the analysis</figcaption>
+<figure>
+
 
 ### Extended Data Figures  
 
