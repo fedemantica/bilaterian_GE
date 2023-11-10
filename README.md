@@ -10,7 +10,7 @@ output:
 # Evolution of tissue-specific expression of ancestral genes across vertebrates and insects
 
 <figure>
-  <img align="middle" src="./docs/Fig1.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig1.png" width=700 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
@@ -153,35 +153,35 @@ Figures
 #### Figure 1  
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig1.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig1.png" width=600 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
 #### Figure 2  
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig2.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig2.png" width=600 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
 #### Figure 3  
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig3.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig3.png" width=600 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
 #### Figure 4  
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig4.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig4.png" width=600 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
 #### Figure 5  
 
 <figure>
-  <img align="middle" src="https://github.com/fedemantica/bilaterian_GE/tree/main/docs/Fig5.png" width=600 height=400 />
+  <img align="middle" src="./docs/Fig5.png" width=600 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
