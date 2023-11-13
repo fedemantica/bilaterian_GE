@@ -1,0 +1,1218 @@
+########## config file #########
+configfile: "config.yaml"
+
+########## paths ###############
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+DATABASE = config["paths"]["database"]
+BROCCOLI_REVISION = config["paths"]["broccoli_revision"]
+METASAMPLES_QUANT_DIR = config["paths"]["metasamples_quant_dir"] 
+TISSUES_QUANT_DIR = config["paths"]["tissues_quant_dir"]
+PREPROCESSING_DIR = config["paths"]["preprocessing_dir"]
+QUANTIFICATION = config["paths"]["quantification"]
+METADATA = config["paths"]["metadata"]
+PFAM_RAW_FILES = config["paths"]["pfam_raw_files"]
+PFAM_TRANSFERS_DIR = config["paths"]["pfam_transfers"]
+TS_GAINS_LOSSES_DIR = config["paths"]["ts_gains_losses_dir"]
+GO_RAW_FILES = config["paths"]["GO_raw_files"]
+GO_TRANSFERS = config["paths"]["GO_transfers"]
+TS_CALL_DIR = config["paths"]["ts_call_dir"]
+TAU_REVISION = config["paths"]["tau_revision"]
+TS_GAINS_LOSSES_REVISION_DIR = config["paths"]["ts_gains_losses_revision_dir"]
+
+########## tools ###############
+BROCCOLI_MAIN = config["tools"]["broccoli_main"] #We are using v1.2 of Broccoli 
+FILTER_ORTHOGROUPS = config["tools"]["filter_orthogroups"]
+QUANTILE_NORMALIZE = config["tools"]["quantile_normalize"]
+COMPUTE_ZSCORE_BY_SPECIES = config["tools"]["compute_zscore_by_species"]
+CONVERT_STK_TO_TAB = config["tools"]["convert_stk_to_tab"]
+TRANSFER_GO = config["tools"]["transfer_go"]
+TRANSFER_CLADE_SPECIFIC_GO = config["tools"]["transfer_clade_specific_go"]
+GET_GTM_FILES = config["tools"]["get_gtm_files"]
+RUN_GPROFILER2 = config["tools"]["run_gprofiler2"]
+AVERAGE_ALL_SAMPLES_EXPR_BY_TISSUE = config["tools"]["average_all_samples_expr_by_tissue"]
+AVERAGE_METASAMPLE_EXPR_BY_TISSUE = config["tools"]["average_metasample_expr_by_tissue"]
+MEDIAN_SAMPLE_EXPR_BY_METASAMPLE = config["tools"]["median_sample_expr_by_metasample"]
+COMPUTE_TAU = config["tools"]["compute_tau"]
+INFER_TS_GAINS = config["tools"]["infer_ts_gains"]
+INFER_TS_LOSSES = config["tools"]["infer_ts_losses"]
+
+########## variables ###########
+ALL_SPECIES = config["variables"]["all_species"]
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+SPECIES_CLADES = config["variables"]["species_clades"]
+MAX_GENES = config["variables"]["max_genes"]
+MAX_PROPORTION = config["variables"]["max_proportion"]
+CLADE_SPECIES_DICT = config["variables"]["clade_species_dict"]
+EXPR_TYPES = config["variables"]["expr_types"]
+VERTEBRATA_NODES = config["variables"]["vertebrata_nodes"]
+INSECTA_NODES = config["variables"]["insecta_nodes"]
+INFERENCE_TYPES = config["variables"]["inference_types"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+ANNOTATION_SPECIES = config["variables"]["annotation_species"]
+ANNOTATION_SPECIES_DICT = config["variables"]["annotation_species_dict"]
+MIN_OGS_CLADE_SPECIFIC_TRANSFERS = config["variables"]["min_OGs_clade_specific_transfers"]
+TAU_CATEGORIES = config["variables"]["tau_categories"]
+TAU_UP_CUTOFF = config["variables"]["tau_up_cutoff"]
+TAU_LOW_CUTOFF = config["variables"]["tau_low_cutoff"]
+TAU_LOW_CUTOFF_LOSSES = config["variables"]["tau_low_cutoff_losses"]
+TISSUE_DIFF_CUTOFF = config["variables"]["tissue_diff_cutoff"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+ANCESTRAL_CLADES = config["variables"]["ancestral_clades"]
+DEUTEROSTOME_NODES = config["variables"]["deuterostome_nodes"]
+PROTOSTOME_NODES = config["variables"]["protostome_nodes"]
+NODE_NAME_DICT = config["variables"]["node_name_dict"]
+NODE_SPECIES_DICT = config["variables"]["node_species_dict"]
+
+### Create dictionaries to get all mapping stats
+import pandas as pd
+PE_SRA_dict = {}
+SE_SRA_dict = {}
+downloaded_samples_PE_dict = {}
+downloaded_samples_SE_dict = {}
+in_house_samples_PE_dict = {}
+in_house_samples_SE_dict = {}
+for species in ALL_SPECIES:
+  species_df = pd.read_table(METADATA+"/"+species+"_samples_info.tab", sep="\t", index_col=False, header=0) #upload dataframe with metadata
+  #isolate SRAs 
+  PE_SRA_list = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="PE")]["SRA"])
+  SE_SRA_list = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="SE")]["SRA"])
+  #add to dictionary using species as key
+  PE_SRA_dict[species] = PE_SRA_list
+  SE_SRA_dict[species] = SE_SRA_list
+  #isolate samples
+  downloaded_samples_PE = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="PE")]["Sample"])
+  downloaded_samples_SE = list(species_df.loc[(species_df["SRA"]!="in_house") & (species_df["SE_PE"]=="SE")]["Sample"])
+  in_house_samples_PE = list(species_df.loc[(species_df["SRA"]=="in_house") & (species_df["SE_PE"]=="PE")]["Sample"])
+  in_house_samples_SE = list(species_df.loc[(species_df["SRA"]=="in_house") & (species_df["SE_PE"]=="SE")]["Sample"])
+  #add to dictionary using species as key
+  downloaded_samples_PE_dict[species] = downloaded_samples_PE
+  downloaded_samples_SE_dict[species] = downloaded_samples_SE
+  in_house_samples_PE_dict[species] = in_house_samples_PE
+  in_house_samples_SE_dict[species] = in_house_samples_SE
+
+
+########## targets #############
+BROCCOLI_SUBCLADES = expand("{path}/{clade}/dir_step3/orthologous_groups.txt", path=BROCCOLI_REVISION, clade=SPECIES_CLADES)
+PARSED_ORTHOGROUPS = expand("{path}/{clade}/parsed_orthogroups.txt", path=BROCCOLI_REVISION, clade=SPECIES_CLADES)
+CONSERVED_ORTHOGROUPS = expand("{path}/{clade}/parsed_orthogroups-filtered-{clade}_conserved.txt", path=BROCCOLI_REVISION, clade=SPECIES_CLADES)
+SPLITTED_ORTHOGROUPS_BY_COPY = expand("{path}/{clade}/parsed_orthogroups-filtered-{clade}_conserved-single_copies.txt", path=BROCCOLI_REVISION, clade=SPECIES_CLADES)
+QUANT_NORM_TABLES = expand("{path}/{clade}/expression_tables/{clade}_conserved-{expr_type}-{sva_log_quant_value}-{gene_type}-NORM.tab", path=BROCCOLI_REVISION, clade="bilateria", expr_type=EXPR_TYPES[0], sva_log_quant_value="NOSVA-log2-TPMs", gene_type="paralogs_summed")
+MAPPING_STATS = "/no_backup/mirimia/fmantica/bilaterian_GE_fastq/mapping_stats/all_species-mapping_stats.txt"
+PARALOG_CHOSEN_EXPR = expand("{path}/bilateria/expression_tables/bilateria_conserved-metasamples_median_expr-{sva_log_quant_value}-paralogs_summed.tab", path=BROCCOLI_REVISION, clade="bilateria", sva_log_quant_value="NOSVA-log2-TPMs")
+ZSCORE_PARALOG_CHOSEN_EXPR = expand("{path}/bilateria/expression_tables/bilateria_conserved-{expr_type}-{sva_log_quant_value}-{gene_type}-NORM-species_zscore.tab", path=BROCCOLI_REVISION, expr_type=EXPR_TYPES, sva_log_quant_value="NOSVA-log2-TPMs", gene_type="paralogs_summed")
+EXTRA_METADATA = expand("{path}/extra_metadata/{species}-extra_samples_info.tab", path=METADATA, species=ALL_SPECIES)
+TRANSFERRED_PFAM_CLANS = expand("{path}/revision/PFAM_annot/orthogroups_to_PFAMClan-transferred_from_{transfer_species}-filtered_min{minOGs}OGs.txt", path=PFAM_TRANSFERS_DIR, transfer_species=["Hs2", "Dme"], minOGs=20)
+MULTI_TS_ORTHOGROUPS = expand("{path}/revision/Bilateria_conserved_orthogroups-{OG_category}_classification-{inference_type}.tab", path=PFAM_TRANSFERS_DIR, inference_type=INFERENCE_TYPES, OG_category=["All", "multiTS"])
+FORMATTED_GO_ANNOTS = expand("{path}/{species}_GO_annotations-formatted.txt", path=GO_RAW_FILES, species=ANNOTATION_SPECIES)
+CLADE_SPECIFIC_GO_ANNOTS = GO_TRANSFERS+"/revision/vertebrata_specific_GOs.txt"
+CLADE_SPECIFIC_GO_TRANSFERS = expand("{path}/revision/Bilaterian_conserved_orthogroups-{clade}_specific_GOs-transferred.tab", path=GO_TRANSFERS, clade=SPECIES_CLADES)
+FILTERED_CLADE_SPECIFIC_GO_TRANSFERS = expand("{path}/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.tab", path=GO_TRANSFERS, clade=SPECIES_CLADES, min_OGs=[MIN_OGS_CLADE_SPECIFIC_TRANSFERS,0])
+GMT_ANNOT_FILES = expand("{path}/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.gmt", path=GO_TRANSFERS, clade=SPECIES_CLADES, min_OGs=MIN_OGS_CLADE_SPECIFIC_TRANSFERS)
+
+###### Generate targets for enrichments of TS gains/losses using the respective vertebrate/insect annotation
+import os
+import re
+
+## VERTEBRATA
+VERTEBRATA_SPECIFIC_GO_ENRICHMENTS_INPUTS = expand("{path}/inferences/GO_enrichments/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_{inference_category}-{node}-OG_IDs.tab", path=TS_GAINS_LOSSES_DIR, tissue=ALL_TISSUES, inference_category="losses", node=VERTEBRATA_NODES+VERTEBRATA)
+EXISTING_INFERENCES_INPUT = [os.path.join(TS_GAINS_LOSSES_DIR+"/inferences/GO_enrichments/", file) for file in os.listdir(TS_GAINS_LOSSES_DIR+"/inferences/GO_enrichments/")]
+EXISTING_INFERENCES_INPUT = [element for element in EXISTING_INFERENCES_INPUT if "-OG_IDs.tab" in element]
+VERTEBRATA_SPECIFIC_GO_ENRICHMENTS_INPUTS = [element for element in VERTEBRATA_SPECIFIC_GO_ENRICHMENTS_INPUTS if element in EXISTING_INFERENCES_INPUT]
+VERTEBRATA_SPECIFIC_GO_ENRICHMENTS = expand("{path}/{base}-vertebrata_specific_transfers-min_{min_OGs}_OGs-GO_res.tab", path=GO_TRANSFERS+"/revision/GO_enrichments", base=[re.sub("-OG_IDs.tab", "", os.path.basename(element)) for element in VERTEBRATA_SPECIFIC_GO_ENRICHMENTS_INPUTS], min_OGs=MIN_OGS_CLADE_SPECIFIC_TRANSFERS)
+
+## INSECTA
+INSECTA_SPECIFIC_GO_ENRICHMENTS_INPUTS = expand("{path}/inferences/GO_enrichments/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_{inference_category}-{node}-OG_IDs.tab", path=TS_GAINS_LOSSES_DIR, tissue=ALL_TISSUES, inference_category="losses", node=INSECTA_NODES+INSECTA)
+EXISTING_INFERENCES_INPUT = [os.path.join(TS_GAINS_LOSSES_DIR+"/inferences/GO_enrichments/", file) for file in os.listdir(TS_GAINS_LOSSES_DIR+"/inferences/GO_enrichments/")]
+EXISTING_INFERENCES_INPUT = [element for element in EXISTING_INFERENCES_INPUT if "-OG_IDs.tab" in element]
+INSECTA_SPECIFIC_GO_ENRICHMENTS_INPUTS = [element for element in INSECTA_SPECIFIC_GO_ENRICHMENTS_INPUTS if element in EXISTING_INFERENCES_INPUT]
+INSECTA_SPECIFIC_GO_ENRICHMENTS = expand("{path}/{base}-insecta_specific_transfers-min_{min_OGs}_OGs-GO_res.tab", path=GO_TRANSFERS+"/revision/GO_enrichments", base=[re.sub("-OG_IDs.tab", "", os.path.basename(element)) for element in INSECTA_SPECIFIC_GO_ENRICHMENTS_INPUTS], min_OGs=MIN_OGS_CLADE_SPECIFIC_TRANSFERS)
+
+######## Generate targets for control tau computations
+TAU_CONTROLS = expand("{path}/{tau_category}/taus/{species}-protein_coding_taus.tab", path=TAU_REVISION, tau_category=TAU_CATEGORIES, species=ALL_SPECIES)
+TAU_ORIGINALS = expand("{path}/original/taus/{species}-protein_coding_taus.tab", path=TAU_REVISION, species=ALL_SPECIES) 
+TAU_AMONG_DATASETS = expand("{path}/{tau_category}/taus/{species}-protein_coding_taus.tab", path=TAU_REVISION, tau_category=["dataset_1", "dataset_2"], species=["Bt2","Mdo","Dre","Cmi"])
+
+####### Generate targets for randomized ts inferences
+RANDOMIZED_TS_INFERENCES = expand("{path}/{randomization}/inferences/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_gains.tab", path=TS_GAINS_LOSSES_REVISION_DIR, randomization=["randomization_"+str(element) for element in list(range(1,11))], tissue=ALL_TISSUES)
+
+########## rules ###############
+
+rule all:
+	input:
+		RANDOMIZED_TS_INFERENCES
+		#TAU_ORIGINALS,
+		#TAU_CONTROLS,
+		#TAU_AMONG_DATASETS,
+		#VERTEBRATA_SPECIFIC_GO_ENRICHMENTS,
+		#INSECTA_SPECIFIC_GO_ENRICHMENTS,
+		#CLADE_SPECIFIC_GO_ANNOTS,
+		#FORMATTED_GO_ANNOTS,
+		#CLADE_SPECIFIC_GO_TRANSFERS,
+		#FILTERED_CLADE_SPECIFIC_GO_TRANSFERS,
+		#GMT_ANNOT_FILES,
+		#TRANSFERRED_PFAM_CLANS,
+		#MULTI_TS_ORTHOGROUPS
+		#BROCCOLI_SUBCLADES,
+		#PARSED_ORTHOGROUPS,
+		#CONSERVED_ORTHOGROUPS,
+		#SPLITTED_ORTHOGROUPS_BY_COPY,
+		#QUANT_NORM_TABLES,
+		#MAPPING_STATS,
+		#PARALOG_CHOSEN_EXPR,
+		#ZSCORE_PARALOG_CHOSEN_EXPR,
+		#EXTRA_METADATA
+
+############################################################################
+################ MAPPING STATS AND METADATA ################################
+############################################################################
+
+rule all_mapping_stats:
+	input:
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-downloaded_renamed/{sample}/run_info.json", path=QUANTIFICATION, sample = downloaded_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/SE/fastq-in_house/{sample}/run_info.json", path=QUANTIFICATION, sample = in_house_samples_SE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-downloaded_renamed/{sample}/run_info.json", path=QUANTIFICATION, sample = downloaded_samples_PE_dict[wildcards.species]),
+		lambda wildcards: expand("{path}/{{species}}/PE/fastq-in_house/{sample}/run_info.json", path=QUANTIFICATION, sample = in_house_samples_PE_dict[wildcards.species])
+	output:
+		"/no_backup/mirimia/fmantica/bilaterian_GE_fastq/mapping_stats/{species}-mapping_stats.txt"
+	shell:
+		"""
+		echo -e "Sample\tTOT_reads\tTOT_pseudoaligned_reads\tPERC_pseudoaligned_reads\tTOT_unique_reads\tPERC_unique_reads" > {output}
+		for file in {input}; do \
+			sample=$(basename $(dirname $file)); \
+			type=$(basename $(dirname $(dirname $file))); \
+			paste <(echo $sample) \
+			<(cat $file | grep "n_processed" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "n_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "p_pseudoaligned" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "n_unique" | sed 's/ /\t/; s/,//' | cut -f3) \
+			<(cat $file | grep "p_unique" | sed 's/ /\t/; s/,//' | cut -f3); \
+		done >> {output}	
+		"""
+
+rule combine_mapping_stats:
+	input:
+		expand("/no_backup/mirimia/fmantica/bilaterian_GE_fastq/mapping_stats/{species}-mapping_stats.txt", species=ALL_SPECIES)
+	output:
+		"/no_backup/mirimia/fmantica/bilaterian_GE_fastq/mapping_stats/all_species-mapping_stats.txt"
+	shell:
+		"""
+		echo -e "Species\tSample\tTOT_reads\tTOT_pseudoaligned_reads\tPERC_pseudoaligned_reads\tTOT_unique_reads\tPERC_unique_reads" > {output}
+		for file in {input}; do \
+			species=$(basename $file | sed 's/-mapping_stats.txt//'); \
+			cat $file | tail -n+2 | awk -v OFS="\t" -v sp=$species '{{print sp,$0}}'; \
+		done >> {output}
+		"""
+
+## sort | uniq is necessary because somehow some of the SRA get downloaded more than once
+rule download_extra_metadata:
+	input:
+		METADATA+"/{species}_samples_info.tab"
+	output:
+		METADATA+"/extra_metadata/{species}-extra_samples_info.tab"
+	shell:
+		"""
+		echo -e "Run\tPlatform\tModel\tBioProject\tProjectID" > {output}; \
+		for SRA in $(cat {input} | cut -f5 | grep -v in_house | tail -n+2); do \
+			esearch -db sra -query ${{SRA}} | efetch -format runinfo | cut -f1,22,24,19,20 -d, | tail -n+2 | tr "," "\t" | sed 's/ /_/g'; \
+		done | sort | uniq >> {output}
+		"""
+
+
+############################################################################
+################ VERTEBRATES VS INSECTS ####################################
+############################################################################
+
+#######################################
+##### ORTHOLOGIES #####################
+#######################################
+
+#here I change the number of threads depending on the run I need to perform.
+rule run_broccoli:
+	input:
+		BROCCOLI_REVISION+"/{clade}/fastas"
+	output:
+		BROCCOLI_REVISION+"/{clade}/dir_step4/orthologous_pairs.txt",
+		BROCCOLI_REVISION+"/{clade}/dir_step3/orthologous_groups.txt"
+	params:
+		working_dir = BROCCOLI_REVISION+"/{clade}"
+	conda:
+		CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:		
+		"""
+		cd {params.working_dir}; \
+		python {BROCCOLI_MAIN} -dir {input} -threads 1
+		"""
+
+####### Generate a file with the correspondence geneID species
+#the file suffix has to match *_ref_exint.fasta
+rule geneID_species_file:
+	output:
+		BROCCOLI_REVISION+"/{clade}/geneID_species_dict.tab"
+	params:
+		input_dir = BROCCOLI_REVISION+"/{clade}/fastas"
+	shell:
+		"""
+		for file in $(ls {params.input_dir}/*); do \
+			my_species=$(basename $file | sed 's/_ref_exint.fasta//'); \
+			cat $file | grep ">" | sed 's/>//; s/.*|//' \
+			| awk -v OFS="\t" -v sp=$my_species '{{print $1,sp}}'; \
+		done > {output}
+		"""
+
+###### format the orthogroup file
+rule parse_orthogroups:
+	input:
+		orthogroups = BROCCOLI_REVISION+"/{clade}/dir_step3/orthologous_groups.txt", 
+		gene_names = expand("{path}/gene_names/{species}.ID.names.txt", path=DATABASE, species=ALL_SPECIES),
+		gene_species_dict = BROCCOLI_REVISION+"/{clade}/geneID_species_dict.tab"
+	output:
+		BROCCOLI_REVISION+"/{clade}/parsed_orthogroups.txt"
+	run:
+		import pandas as pd
+		import re
+		import ntpath
+
+		gene_ID_gene_name_dict = {} #build dictionary with {gene_ID : gene_name} for all species
+		#build a dictionary with {gene_id : species} for all species
+		gene_ID_species_df = pd.read_table(str(input.gene_species_dict), sep="\t", header=None, names=["GeneID", "Species"])
+		gene_ID_species_dict = pd.Series(gene_ID_species_df.Species.values, index=gene_ID_species_df.GeneID).to_dict()
+		for my_file in input.gene_names:
+		  my_species = re.sub(".ID.names.txt", "", ntpath.basename(my_file))
+		  gene_names_df = pd.read_table(str(my_file), header=None, sep="\t", names=["GeneID", "GeneName"])
+		  gene_ID_gene_name_dict.update(pd.Series(gene_names_df.GeneName.values, index=gene_names_df.GeneID).to_dict())
+		
+		#read df with orthogroups
+		my_df = pd.read_table(str(input.orthogroups), sep="\t", header=0)
+		my_df["ClusterID"] = [re.sub(".*_", "GF_"+str("0"*(9-len(element))), element) for element in list(my_df["#OG_name"])]
+		grouped_df = my_df.groupby("ClusterID")
+		final_df = pd.DataFrame(columns=["ClusterID", "GeneID"])
+
+		for name, group in grouped_df:
+		  genes_list = [re.sub(".*\|", "", element) for element in list(group["protein_names"])[0].split(" ")]
+		  my_group_df = pd.DataFrame({"ClusterID" : name, "GeneID" : genes_list})
+		  final_df = pd.concat([final_df, my_group_df])
+
+		final_df["Species"] = final_df["GeneID"].map(gene_ID_species_dict) #add species
+		final_df["GeneName"] = final_df["GeneID"].map(gene_ID_gene_name_dict) #add gene name
+		final_df = final_df[["ClusterID", "Species", "GeneID", "GeneName"]]#reorder columns
+		final_df.to_csv(str(output), sep="\t", header=False, index=False, na_rep="NA")
+
+###### Filter out orthogroups that are too abundant
+rule filter_orthogroups:
+	input:
+		BROCCOLI_REVISION+"/{my_version}/parsed_orthogroups.txt"
+	output:
+		BROCCOLI_REVISION+"/{my_version}/parsed_orthogroups-filtered.txt"
+	shell:
+		"""
+		python {FILTER_ORTHOGROUPS} 	--input {input} \
+						--max_genes {MAX_GENES} \
+						--max_proportion {MAX_PROPORTION} \
+						--output {output}
+		"""
+
+
+###### Select vertebrate and insect conserved orthogroups (I require them to be conserved in all species)
+#So they need to have a count of 8 species in both
+rule evo_classification:
+	input:
+		BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered.txt"
+	output:
+		BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved.txt"
+	run:
+		import pandas as pd
+		import collections
+		
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		grouped_orthogroup_df = orthogroups_df.groupby("OG_ID")
+		final_df = pd.DataFrame()
+		for OG_ID, group in grouped_orthogroup_df:
+		  species_list = list(set(list(group["Species"])))
+		  #Require conservation in all 8 species in that clade
+		  if len(species_list) == 8:
+		    final_df = pd.concat([final_df, group])
+		#Write to output file
+		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+###### Separate 1:1 orthogroups from thoes for which to compute best-hits
+rule split_orthogroups_by_copy_number:
+	input:
+		BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved.txt"
+	output:
+		single_copy = BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved-single_copies.txt",
+		multiple_copy = BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved-multiple_copies.txt"
+	run:
+		import pandas as pd
+		import collections
+
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		grouped_orthogroup_df = orthogroups_df.groupby("OG_ID")
+		#Initialize final dataframes
+		single_copies_df = pd.DataFrame()
+		multiple_copies_df = pd.DataFrame()	
+		#Cycle on all orthogroups
+		for OG_ID, group in grouped_orthogroup_df:
+		  gene_number = len(list(group["Species"]))
+		  if gene_number == 8:
+		    single_copies_df = pd.concat([single_copies_df, group])
+		  else:
+		    multiple_copies_df = pd.concat([multiple_copies_df, group])
+		#Save to output file
+		single_copies_df.to_csv(str(output.single_copy), sep="\t", index=False, header=False, na_rep="NA")
+		multiple_copies_df.to_csv(str(output.multiple_copy), sep="\t", index=False, header=False, na_rep="NA")
+
+#######################################
+##### BILATERIA INPUT #################
+#######################################
+
+#generate the single copy ortholog input for the bilaterian conserved.
+#Select only those that are conserved in all 20 species
+rule generate_bilateria_input:
+	input:
+		"/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt"
+	output:
+		BROCCOLI_REVISION+"/bilateria/parsed_orthogroups-filtered-bilateria_conserved-single_copies.txt"
+	shell:
+		"""
+		cat {input} | filter_1col -v 1 <(cat {input} | cut -f1,2 | sort | uniq -d | cut -f1) \
+		| filter_1col 1 <(cat {input} | cut -f1 | sort | uniq -c | sed 's/^[ \t]*//; s/ /\t/' | awk '$1==20 {{print $2}}') \
+		| sed 's/BmA/Bmo/' > {output}
+		"""
+
+#######################################
+##### EXPRESSION TABLES ###############
+#######################################
+
+###### Transform gene orthogroups from the long format to the wide format.
+rule generate_SC_wide_table:
+	input:
+		BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved-single_copies.txt"
+	output:
+		BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved-single_copies.tab"
+	run:
+		import pandas as pd
+		orthogroups_long_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		orthogroups_wide_df = orthogroups_long_df.pivot(index="OG_ID", columns="Species", values="GeneID")
+		orthogroups_wide_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+rule generate_SC_metasamples_expr_table:
+	input:
+		gene_orthogroups = BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved-single_copies.tab",
+		samples_expression = expand("{path}/{species}-metasamples_median_expr-{{sva_log_quant_value}}.tab", path=METASAMPLES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-metasamples_median_expr-{sva_log_quant_value}-single_copies.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		samples_expr_dir = METASAMPLES_QUANT_DIR,
+		samples_expr_suffix = lambda wildcards : "-metasamples_median_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		for species in params.clade_species:
+		  #Defining the metasample expression file for each species
+		  expr_file = params.samples_expr_dir+"/" + species + params.samples_expr_suffix
+		  #Reading in the metasample expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_samples_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_sample in species_samples_list:
+		    sample = species_sample.split("_", 1)[1]
+		    sample_expr_dict = pd.Series(expr_df[sample], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_sample] = orthologs_expr_df[species].map(sample_expr_dict)  #for each sample replace with the sample_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+rule generate_CS_tissue_expr_table:
+	input:
+		gene_orthogroups = BROCCOLI_REVISION+"/{clade}/parsed_orthogroups-filtered-{clade}_conserved-single_copies.tab",
+		tissue_expression = expand("{path}/{species}-tissue_average_expr-{{sva_log_quant_value}}.tab", path=TISSUES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-tissue_average_expr-{sva_log_quant_value}-single_copies.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		tissue_expr_dir = TISSUES_QUANT_DIR,
+		tissue_expr_suffix = lambda wildcards : "-tissue_average_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		for species in params.clade_species:
+		  #Defining the tissue expression file for each species
+		  expr_file = params.tissue_expr_dir+"/" + species + params.tissue_expr_suffix
+		  #Reading in the tissue expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_tissue_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_tissue in species_tissue_list:
+		    tissue = species_tissue.split("_", 1)[1]
+		    tissue_expr_dict = pd.Series(expr_df[tissue], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_tissue] = orthologs_expr_df[species].map(tissue_expr_dict)  #for each tissue replace with the tissue_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+#######################################
+##### AVERAGE PARALOGS ################
+#######################################
+#This can be either average or summed
+#rule paralog_measure_metasamples_expr_table:
+#	input:
+#		gene_orthogroups = "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt",
+#		samples_expression = expand("{path}/{species}-metasamples_median_expr-{{sva_log_quant_value}}.tab", path=METASAMPLES_QUANT_DIR, species=ALL_SPECIES)
+#	output:
+#		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-metasamples_median_expr-{sva_log_quant_value}-paralogs_{paralog_measure}.tab"
+#	params:
+#		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+#		samples_expr_dir = METASAMPLES_QUANT_DIR,
+#		samples_expr_suffix = lambda wildcards : "-metasamples_median_expr-" + wildcards.sva_log_quant_value + ".tab"
+#	run:
+#
+#		import pandas as pd
+#
+#		#upload input file
+#		orthogroups_df = pd.read_table(str(input.gene_orthogroups), sep="\t", header=None, names=["OG_ID", "Species", "GeneID"])
+#		orthogroups_df["Species"] = [species if species != "BmA" else "Bmo" for species in list(orthogroups_df["Species"])]
+#		final_orthogroups_long_df = pd.DataFrame()
+#
+#		#Cycle on all species
+#		for species in params.clade_species:
+#		  #Subset the original orthogroups_df to only the entries for a given species
+#		  species_orthogroups_df = orthogroups_df[orthogroups_df["Species"]==species].copy()
+#		  #Defining the metasample expression file for each species
+#		  expr_file = params.samples_expr_dir+"/" + species + params.samples_expr_suffix
+#		  #Reading in the metasample expression file for each species
+#		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+#		  #Getting a list of all metasamples for that species
+#		  species_samples_list = [species+"_"+element for element in list(expr_df.columns.values)]
+#		  #Cycle on all samples
+#		  for species_sample in species_samples_list:
+#		    sample = species_sample.split("_", 1)[1]
+#		    gene_sample_expr_dict = pd.Series(expr_df[sample], index=list(expr_df.index.values)).to_dict()
+# 		    species_orthogroups_df[species_sample] = species_orthogroups_df["GeneID"].map(gene_sample_expr_dict)
+#		  #Group by orthogroup ID and expression measure across paralogs of the same species
+#		  if wildcards.paralog_measure == "average":
+#		    species_orthogroups_paralog_measure_df = species_orthogroups_df.groupby("OG_ID")[species_samples_list].mean().reset_index() #This should automatically ignore NA entries
+#		  elif wildcards.paralog_measure == "summed":
+#		    species_orthogroups_paralog_measure_df = species_orthogroups_df.groupby("OG_ID")[species_samples_list].sum().reset_index() #This should automatically ignore NA entries
+#		  else:
+#		    raise Exception("Invalid paralog measure: it has to be either average or summed")
+#		  #common code from here
+#		  species_orthogroups_long = pd.wide_to_long(species_orthogroups_paralog_measure_df, stubnames=[species+"_"], i="OG_ID", j="Sample", suffix="\\w+").reset_index()
+#		  #Add species and rename column
+#		  species_orthogroups_long["Species"] = species
+#		  species_orthogroups_long = species_orthogroups_long.rename(columns = {species+"_" : "Expr"})
+#		  species_orthogroups_long["Species_sample"] = species_orthogroups_long["Species"] + "_" + species_orthogroups_long["Sample"]
+#		  final_orthogroups_long_df = pd.concat([final_orthogroups_long_df, species_orthogroups_long])
+#
+#		#Transform from long format to wide format (index=OG_ID, header=Species_sample, value=paralog_expr_chosen_measure)
+#		final_orthogroups_wide_df = final_orthogroups_long_df.pivot(index="OG_ID", columns="Species_sample", values="Expr")
+#		#Save to output file
+#		final_orthogroups_wide_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")	
+
+
+rule average_paralog_tissue_expr_table:
+	input:
+		gene_orthogroups = "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt",
+		tissue_expression = expand("{path}/{species}-tissue_average_expr-{{sva_log_quant_value}}.tab", path=TISSUES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-tissue_average_expr-{sva_log_quant_value}-paralogs_{paralog_measure}.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		tissue_expr_dir = TISSUES_QUANT_DIR,
+		tissue_expr_suffix = lambda wildcards : "-tissue_average_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+
+		import pandas as pd
+
+		#upload input file
+		orthogroups_df = pd.read_table(str(input.gene_orthogroups), sep="\t", header=None, names=["OG_ID", "Species", "GeneID"])
+		orthogroups_df["Species"] = [species if species != "BmA" else "Bmo" for species in list(orthogroups_df["Species"])]
+		final_orthogroups_long_df = pd.DataFrame()
+
+		#Cycle on all species
+		for species in params.clade_species:
+		  #Subset the original orthogroups_df to only the entries for a given species
+		  species_orthogroups_df = orthogroups_df[orthogroups_df["Species"]==species].copy()
+		  #Defining the tissue expression file for each species
+		  expr_file = params.tissue_expr_dir+"/" + species + params.tissue_expr_suffix
+		  #Reading in the tissue expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  #Getting a list of all tissues for that species
+		  species_tissues_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  #Cycle on all tissues
+		  for species_tissue in species_tissues_list:
+		    tissue = species_tissue.split("_", 1)[1]
+		    gene_tissue_expr_dict = pd.Series(expr_df[tissue], index=list(expr_df.index.values)).to_dict()
+ 		    species_orthogroups_df[species_tissue] = species_orthogroups_df["GeneID"].map(gene_tissue_expr_dict)
+		  #Group by orthogroup ID and expression measure across paralogs of the same species
+		  if wildcards.paralog_measure == "average":
+		    species_orthogroups_paralog_measure_df = species_orthogroups_df.groupby("OG_ID")[species_samples_list].mean().reset_index() #This should automatically ignore NA entries
+		  elif wildcards.paralog_measure == "summed":
+		    species_orthogroups_paralog_measure_df = species_orthogroups_df.groupby("OG_ID")[species_samples_list].sum().reset_index() #This should automatically ignore NA entries
+		  else:
+		    raise Exception("Invalid paralog measure: it has to be either average or summed")
+		  #common code from here
+		  species_orthogroups_long = pd.wide_to_long(species_orthogroups_paralog_measure_df, stubnames=[species+"_"], i="OG_ID", j="Sample", suffix="\\w+").reset_index()
+		  #Add species and rename column
+		  species_orthogroups_long["Species"] = species
+		  species_orthogroups_long = species_orthogroups_long.rename(columns = {species+"_" : "Expr"})
+		  species_orthogroups_long["Species_tissue"] = species_orthogroups_long["Species"] + "_" + species_orthogroups_long["Sample"]
+		  final_orthogroups_long_df = pd.concat([final_orthogroups_long_df, species_orthogroups_long])
+
+		#Transform from long format to wide format (index=OG_ID, header=Species_tissue, value=paralog_expr_chosen_measure)
+		final_orthogroups_wide_df = final_orthogroups_long_df.pivot(index="OG_ID", columns="Species_tissue", values="Expr")
+		#Save to output file
+		final_orthogroups_wide_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+#######################################
+###### APPLY QUANTILE NORMALIZATION ###
+#######################################
+
+#limma is required for this rule to run
+#I use the module load for R3.6
+rule generate_quantile_normalized_table:
+	input:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-{expr_type}-{sva_log_quant_value}-{gene_type}.tab"
+	output:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-{expr_type}-{sva_log_quant_value}-{gene_type}-NORM.tab"
+	#conda:
+	#	CONDA_ENVS+"/broccoli_1.2.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output}; \
+		"""
+
+#######################################
+###### COMPUTE ZSCORE BY SPECIES ######
+#######################################
+
+rule compute_zscore_by_species:
+	input:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-{expr_type}-{sva_log_quant_value}-{gene_type}-NORM.tab"
+	output:
+		BROCCOLI_REVISION+"/{clade}/expression_tables/{clade}_conserved-{expr_type}-{sva_log_quant_value}-{gene_type}-NORM-species_zscore.tab"
+	#conda:
+	#	CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {COMPUTE_ZSCORE_BY_SPECIES} {input} {output}
+		"""
+
+############################################################################
+############################################################################
+############################################################################
+
+############################################################################
+################ GAINS AND LOSSES ACROSS GENE FAMILIES #####################
+############################################################################
+
+########################################
+######  DEFINE GENE FAMILIES ###########
+########################################
+
+#### I am using the clans from PFAM to define gene families
+# This rule is used to get the correspondence between the clan and the single domains ID
+rule convert_stsockholm_to_tab:
+	input:
+		PFAM_RAW_FILES+"/Pfam-Clans.stk"
+	output:
+		PFAM_RAW_FILES+"/Pfam-Clans.tab"
+	shell:
+		"""
+		python {CONVERT_STK_TO_TAB} {input} {output}
+		"""
+
+
+#This rule is to add the clan to the annotation I already have
+rule format_human_annot_PFAM:
+	input:
+		"/users/mirimia/mirimia/XPIPE/DISORDER/DOMAINS/PFAM/PfamScan/OUT/Hs2_prot_annot-v136-pfam-parsed.tab"
+	output:
+		PFAM_RAW_FILES+"/Hs2_PFAM_annot-formatted.txt"
+	shell:
+		"""
+		cat {input} | tail -n+2 | cut -f1,5,6 > {output}
+		"""
+
+rule format_fly_PFAM:
+	input:
+		"/users/mirimia/mirimia/XPIPE/DISORDER/DOMAINS/PFAM/PfamScan/OUT/Dme_prot_annot-v66-pfam-parsed.tab"
+	output:
+		PFAM_RAW_FILES+"/Dme_PFAM_annot-formatted.txt"
+	shell:
+		"""
+		cat {input} | tail -n+2 | cut -f1,5,6 > {output}
+		"""
+
+
+#The extension of the domain ID is unique to each ID, so it can be removed
+#RGM	PF00094
+#Tropomyosin-lke	PF00094
+#I am adding separately the domains that do not belong to any gene family
+#When the domain belongs to a clan, I am replacing the domainID with the clanID.
+#If the domain does not belong to a clan, I am keeping it as is.
+rule add_PFAM_clan_info:
+	input:
+		pfam = PFAM_RAW_FILES+"/{species}_PFAM_annot-formatted.txt",
+		pfam_clan = PFAM_RAW_FILES+"/Pfam-Clans.tab"
+	output:
+		PFAM_TRANSFERS_DIR+"/revision/PFAM_annot/{species}_PFAMClan_annot-formatted.txt"
+	run:
+		import pandas as pd
+		import re
+
+		### Upload dataframes
+		#gene-domain
+		gene_domain_df = pd.read_table(str(input.pfam), sep="\t", index_col=False, header=None, names=["GeneID", "DomainID", "Domain_Name"])
+		gene_domain_df["DomainID"] = [re.sub("\..*", "", element) for element in list(gene_domain_df["DomainID"])] #Remove extension
+		#domain-clan
+		domain_clan_df = pd.read_table(str(input.pfam_clan), sep="\t", index_col=False, header=None, names=["DomainID", "ClanID", "Clan_Name"])
+		domain_clan_df["ClanID"] = [re.sub("\..*", "", element) for element in list(domain_clan_df["ClanID"])] #Remove extension
+		### Create dictionaries
+		domainID_clanID_dict = pd.Series(domain_clan_df.ClanID.values, index=domain_clan_df.DomainID).to_dict()
+		domainID_clanName_dict = pd.Series(domain_clan_df.Clan_Name.values, index=domain_clan_df.DomainID).to_dict()
+		### For the domains that are in the PFAM Clan, replace with PFAM info
+		domains_in_pfam_clans = list(domain_clan_df["DomainID"])
+		pfam_clans_df = gene_domain_df.loc[gene_domain_df["DomainID"].isin(domains_in_pfam_clans)].copy()
+		pfam_clans_df["ClanID"] = pfam_clans_df["DomainID"].map(domainID_clanID_dict)
+		pfam_clans_df["Clan_Name"] = pfam_clans_df["DomainID"].map(domainID_clanName_dict)
+		pfam_clans_df = pfam_clans_df.drop(columns=["DomainID", "Domain_Name"])
+		### For the domains that are NOT in the PFAM Clan, just change the name
+		no_pfam_clans_df = gene_domain_df.loc[~gene_domain_df["DomainID"].isin(domains_in_pfam_clans)].copy()
+		no_pfam_clans_df = no_pfam_clans_df.rename(columns={"DomainID" : "ClanID", "Domain_Name" : "Clan_Name"})
+		### Combine and save to output
+		final_df = pd.concat([pfam_clans_df, no_pfam_clans_df])
+		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")		
+
+
+########################################
+######  TRANSFER PFAM CLANS TO OGS #####
+########################################
+
+## Transfer pfam starting from the Bilaterian conserved
+## I am using the same approach as for the GO transfer
+rule transfer_PFAM:
+	input:
+		gene_orthogroups = "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt", 
+		PFAM_file = PFAM_TRANSFERS_DIR+"/revision/PFAM_annot/{transfer_species}_PFAMClan_annot-formatted.txt"
+	output:
+		PFAM_TRANSFERS_DIR+"/revision/PFAM_annot/Bilateria_conserved_orthogroups-transferred_PFAMClan_from_{transfer_species}.txt"
+	shell:
+		"""
+		python {TRANSFER_GO} 	-o {input.gene_orthogroups} \
+					--GO_file {input.PFAM_file} \
+					--species_query {wildcards.transfer_species} \
+					--cutoff 4 \
+					--output_file {output}
+		"""
+
+#Filter annotation to only those PFAMClans that are present in at least n orthogroups
+rule format_and_filter_PFAM_annot:
+	input:
+		PFAM_TRANSFERS_DIR+"/revision/PFAM_annot/Bilateria_conserved_orthogroups-transferred_PFAMClan_from_{transfer_species}.txt"
+	output:
+		PFAM_TRANSFERS_DIR+"/revision/PFAM_annot/orthogroups_to_PFAMClan-transferred_from_{transfer_species}-filtered_min{minOGs}OGs.txt"
+	run:
+		import pandas as pd
+
+		transferred_df = pd.read_table(str(input), sep="\t", index_col=False, header=0, names=["OGID", "Species", "GeneID", "ClanID", "ClanName", "Support"])
+		#### Filter only for entries that have a PFAM annot
+		filtered_transferred_df = transferred_df.loc[~transferred_df.Support.isnull()].copy()
+		#### Select only the PFAMClans that are represented in at least 10 OGs
+		orthogroup_annot_df = filtered_transferred_df[["OGID", "ClanID", "ClanName"]].drop_duplicates()
+		filtered_orthogroup_annot_df = orthogroup_annot_df.groupby("ClanID").filter(lambda x: len(x) >= int(wildcards.minOGs))
+		#### Save to output file
+		filtered_orthogroup_annot_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+
+######################################
+### OGs WITH MULTI-TS GAINS/LOSSES ###
+######################################
+
+#The classification here is based on the combinations of ancestors/species that show a certain inference type.
+#Vertebrata/Insects means that all the multiTS gains are in Vertebrate/Insect ancestors or species
+#Others indicates all other combinations
+#Here the OG category can be either multiTS or All
+rule get_evo_classification:
+	input:
+		ts_events = expand("{path}/inferences/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_{{inference_type}}.tab", path=TS_GAINS_LOSSES_DIR, tissue=ALL_TISSUES)
+	output:
+		PFAM_TRANSFERS_DIR+"/revision/Bilateria_conserved_orthogroups-{OG_category}_classification-{inference_type}.tab"
+	params:
+		tissues = ALL_TISSUES,
+		input_prefix = TS_GAINS_LOSSES_DIR+"/inferences/Bilateria_conserved_orthogroups-All_genes-", 
+		input_suffix = "_inferred_{inference_type}.tab",
+		vertebrate_categories = VERTEBRATA + VERTEBRATA_NODES,
+		insect_categories = INSECTA + INSECTA_NODES 
+	run:
+		import pandas as pd
+
+		### Generate df with OG_ID, Inference, Inference_type, Tissue
+		all_tissues_inferences_df = pd.DataFrame()
+		for tissue in params.tissues:
+		  input_file = params.input_prefix + tissue + params.input_suffix
+		  input_df = pd.read_table(input_file, sep="\t", index_col=False, header=0, names=["OGID", "Inference", "Category"])
+		  input_df["Tissue"] = tissue
+		  # Join to final dataframe
+		  all_tissues_inferences_df = pd.concat([all_tissues_inferences_df, input_df])
+
+		if str(wildcards.OG_category) == "multiTS":
+		  ### Create list of orthogroups with at least two gains in different tissues
+		  selected_OGs_list = all_tissues_inferences_df[["OGID", "Tissue"]].drop_duplicates().groupby("OGID").filter(lambda x: len(x) >= 2)["OGID"].drop_duplicates().to_list()
+		elif str(wildcards.OG_category) == "All":
+		  ### Use all orthogroups with at least one gain
+		  selected_OGs_list = list(set(list(all_tissues_inferences_df["OGID"])))
+		else:
+		  raise Exception("OG category: it has to be either multiTS or All")
+		### Create a dataframe with col1=selected_OG and value=Classification
+		selected_OGs_classification_df = pd.DataFrame()
+		selected_OGs_grouped_df = all_tissues_inferences_df.loc[all_tissues_inferences_df["OGID"].isin(selected_OGs_list)].copy().groupby("OGID")
+		for OG_ID, group in selected_OGs_grouped_df:
+		  if set(list(group["Inference"])).issubset(params.vertebrate_categories):
+		    OG_classification = "Vertebrata_only"
+		  elif set(list(group["Inference"])).issubset(params.insect_categories):
+		    OG_classification = "Insecta_only"
+		  else:
+		    OG_classification = "Others"
+		  #Add to final dataframe
+		  selected_OGs_classification_df = pd.concat([selected_OGs_classification_df, pd.DataFrame({"OGID" : [OG_ID], "Classification" : [OG_classification]})])
+
+		### Save to output
+		selected_OGs_classification_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+
+############################################################################
+################ VERT/INSECT SPECIFIC GO TERMS #############################
+############################################################################
+
+rule format_GO_annot:
+	input:
+		GO_RAW_FILES+"/{species}_GO_annotations.txt"
+	output:
+		GO_RAW_FILES+"/{species}_GO_annotations-formatted.txt"
+	shell:
+		"""
+		cat {input} | tail -n+2 | sed 's/ /_/g' | sed 's/;/_/g' | awk '$2!="" && $3!=""' | sort | uniq > {output}
+		"""
+
+#This rule is to isolate the GOs that are present only in one of the clades:
+rule get_clade_specific_GOs:
+	input:
+		expand("{path}/{species}_GO_annotations-formatted.txt", path=GO_RAW_FILES, species=ANNOTATION_SPECIES)
+	output:
+		vertebrate_specific = GO_TRANSFERS+"/revision/vertebrata_specific_GOs.txt",
+		insecta_specific = GO_TRANSFERS+"/revision/insecta_specific_GOs.txt"
+	params:
+		vertebrata = [species for species in VERTEBRATA if species in ANNOTATION_SPECIES],
+		insecta = [species for species in INSECTA if species in ANNOTATION_SPECIES],
+		input_prefix = GO_RAW_FILES,
+		input_suffix = "_GO_annotations-formatted.txt"
+	run:
+		import pandas as pd
+
+		#### Build dataframes with all the GOs in each clade
+		all_vertebrata_GOs_df = pd.DataFrame()
+		all_insecta_GOs_df = pd.DataFrame()
+		for species in params.vertebrata + params.insecta:
+		  species_file = params.input_prefix + "/" + species + params.input_suffix
+		  species_df = pd.read_table(species_file, sep="\t", index_col=False, header=None, names=["GeneID", "GO_ID", "GO_name"])
+		  species_df = species_df.drop(columns=["GeneID"]).drop_duplicates()
+		  if species in params.vertebrata:
+		    all_vertebrata_GOs_df = pd.concat([all_vertebrata_GOs_df, species_df]).drop_duplicates()
+		  else:
+		    all_insecta_GOs_df = pd.concat([all_insecta_GOs_df, species_df]).drop_duplicates()
+		#### Filter for the GOs that are specific
+		vertebrata_specific_GOs_df = all_vertebrata_GOs_df.loc[~all_vertebrata_GOs_df["GO_ID"].isin(list(all_insecta_GOs_df["GO_ID"]))].copy()
+		insecta_specific_GOs_df = all_insecta_GOs_df.loc[~all_insecta_GOs_df["GO_ID"].isin(list(all_vertebrata_GOs_df["GO_ID"]))].copy()
+		#### Save to output files
+		vertebrata_specific_GOs_df.to_csv(str(output.vertebrate_specific), sep="\t", index=False, header=False, na_rep="NA")
+		insecta_specific_GOs_df.to_csv(str(output.insecta_specific), sep="\t", index=False, header=False, na_rep="NA")
+
+
+rule transfer_clade_specific_GOs:
+	input:
+		gene_orthogroups = "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets/All_version2/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt",
+		clade_specific_GOs = GO_TRANSFERS+"/revision/{clade}_specific_GOs.txt",
+		species_GOs = lambda wildcards: expand("{path}/{species}_GO_annotations-formatted.txt", path=GO_RAW_FILES, species=ANNOTATION_SPECIES_DICT[wildcards.clade])
+	output:
+		GO_TRANSFERS+"/revision/Bilaterian_conserved_orthogroups-{clade}_specific_GOs-transferred.tab"
+	shell:
+		"""
+		python {TRANSFER_CLADE_SPECIFIC_GO} 	--orthogroups {input.gene_orthogroups} \
+							--clade_specific_GO_file {input.clade_specific_GOs} \
+							--GO_file {input.species_GOs} \
+							--cutoff 4 \
+							--output_file {output}
+		"""
+
+
+rule format_and_filter_transferred_GO:
+	input:
+		GO_TRANSFERS+"/revision/Bilaterian_conserved_orthogroups-{clade}_specific_GOs-transferred.tab"
+	output:
+		#all_GOs = GO_TRANSFERS+"/revision/OG_IDs-{clade}_specific_GOs-transferred.tab",
+		#filtered_GOs = GO_TRANSFERS+"/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.tab"
+		GO_TRANSFERS+"/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.tab"
+	run:
+		import pandas as pd
+		from collections import Counter
+
+		transfers_df = pd.read_table(str(input), sep="\t", index_col=False, header=0, names=["OG_ID", "Species", "GeneID", "GO_ID", "GO_name", "Support"])
+		### Generate total annotations
+		total_transferred_annot_df = transfers_df.copy().dropna()[["OG_ID", "GO_ID", "GO_name"]].drop_duplicates()
+		### Count how many orthogroups are annotated in each of the GO categories
+		tot_OG_in_GO_dict = dict(Counter(list(total_transferred_annot_df["GO_ID"])))
+		### Select only GO categories with at least min_OGs annotated
+		filtered_GO = [key for key in list(tot_OG_in_GO_dict.keys()) if tot_OG_in_GO_dict[key] >= int(wildcards.min_OGs)]
+		### Filter annotation
+		filtered_transferred_annot_df = total_transferred_annot_df.loc[total_transferred_annot_df["GO_ID"].isin(filtered_GO)].copy()
+		### Save to output files
+		#total_transferred_annot_df.to_csv(str(output.all_GOs), sep="\t", index_col=False, header=False, na_rep="NA")
+		filtered_transferred_annot_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+
+rule generate_gmt_files:
+	input:
+		GO_TRANSFERS+"/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.tab"
+	output:
+		GO_TRANSFERS+"/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.gmt"
+	shell:
+		"""
+		python {GET_GTM_FILES} -GO {input} -o {output}
+		"""
+
+## Run GO enrichments for TS gains and losses in the relative nodes
+rule run_GO_enrichments:
+	input:
+		gene_set = TS_GAINS_LOSSES_DIR+"/inferences/GO_enrichments/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_{inference_category}-{node}-OG_IDs.tab",
+		background = GO_TRANSFERS+"/All_version2/GO_backgrounds/orthogroups-GO_background.txt",
+		annot = GO_TRANSFERS+"/revision/OG_IDs-min_{min_OGs}_OGs-{clade}_specific_GOs-transferred.gmt"
+	output:
+		GO_TRANSFERS+"/revision/GO_enrichments/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_{inference_category}-{node}-{clade}_specific_transfers-min_{min_OGs}_OGs-GO_res.tab"
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {RUN_GPROFILER2}	{input.gene_set} \
+						{input.background} \
+						{input.annot}	\
+						{output}
+		"""
+
+
+
+############################################################################
+############################################################################
+############################################################################
+
+############################################################################
+################ TAUS WITH DIFFERENT SAMPLES COMBINATIONS ##################
+############################################################################
+
+########################################
+###### ORIGINAL TAUS ###################
+########################################
+
+rule links_to_original_taus:
+	input:
+		TS_CALL_DIR+"/species_QN_5_TPM_taus/All_version2/{species}-protein_coding_taus.tab"
+	output:
+		 TAU_REVISION+"/original/taus/{species}-protein_coding_taus.tab"	
+	shell:
+		"""
+		ln -s {input} {output}
+		"""
+
+
+########################################
+###### TAUS FROM ALL SAMPLES AVERAGE ###
+########################################
+
+rule generate_metadata_all_samples_average:
+	input:
+		METASAMPLES_QUANT_DIR+"/{species}-metasamples_metadata-NOSVA-log2-TPMs.txt"	
+	output:
+		TAU_REVISION+"/metadata/all_samples_average/{species}-metasamples_metadata.txt"
+	shell:
+		"""
+		ln -s {input} {output}
+		"""
+
+rule average_all_samples_epr_by_tissue:
+	input:
+		expr_table = PREPROCESSING_DIR+"/norm_counts_quant/{species}/all_samples_gene_log2-TPMs-normcounts.tab",
+		metadata = TAU_REVISION+"/metadata/all_samples_average/{species}-metasamples_metadata.txt"
+	output:
+		TAU_REVISION+"/all_samples_average/{species}-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	shell:
+		"""
+		python {AVERAGE_ALL_SAMPLES_EXPR_BY_TISSUE}	--expr {input.expr_table} \
+								--metadata {input.metadata} \
+								--measure average \
+								--output {output}
+		"""
+
+########################################
+###### TAUS FROM RANDOM METASAMPLES ####
+########################################
+
+rule metadata_random_metasamples:
+	input:
+		METASAMPLES_QUANT_DIR+"/{species}-metasamples_metadata-NOSVA-log2-TPMs.txt"
+	output:
+		TAU_REVISION+"/metadata/random_metasamples_average/{species}-metasamples_metadata.txt"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		metadata_df = pd.read_table(str(input), sep="\t", index_col=False, header=0)
+		metadata_df["Sample"] = metadata_df.groupby("Tissue")["Sample"].transform(np.random.permutation)
+		metadata_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+
+
+rule metasample_median_random_metasamples:
+	input:
+		expr_table = PREPROCESSING_DIR+"/norm_counts_quant/{species}/all_samples_gene_log2-TPMs-normcounts.tab",
+		metadata = TAU_REVISION+"/metadata/random_metasamples_average/{species}-metasamples_metadata.txt"
+	output:
+		TAU_REVISION+"/random_metasamples_average/{species}-metasamples_median_expr-NOSVA-log2-TPMs.tab"
+	shell:
+		"""
+		python {MEDIAN_SAMPLE_EXPR_BY_METASAMPLE}	--expr {input.expr_table} \
+                                                		--metadata {input.metadata} \
+                                                		--measure median \
+                                                		--output {output}
+		"""
+
+rule tissue_average_random_metasamples:
+	input:
+		expr_table = TAU_REVISION+"/random_metasamples_average/{species}-metasamples_median_expr-NOSVA-log2-TPMs.tab",
+		metadata = TAU_REVISION+"/metadata/random_metasamples_average/{species}-metasamples_metadata.txt"
+	output:
+		TAU_REVISION+"/random_metasamples_average/{species}-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	shell:
+		"""
+		python {AVERAGE_METASAMPLE_EXPR_BY_TISSUE}	--expr {input.expr_table} \
+								--metadata {input.metadata} \
+								--measure average \
+								--output {output}
+		"""
+
+
+########################################
+###### TAUS WITHIN STUDIES #############
+########################################
+
+rule metasample_median_datasets_comparison:
+	input:
+		expr_table = PREPROCESSING_DIR+"/norm_counts_quant/{species}/all_samples_gene_log2-TPMs-normcounts.tab",
+		metadata = TAU_REVISION+"/metadata/dataset_{dataset_number}/{species}-metasamples_metadata.txt"
+	output:
+		TAU_REVISION+"/dataset_{dataset_number}/{species}-metasamples_median_expr-NOSVA-log2-TPMs.tab"
+	shell:
+		"""
+		python {MEDIAN_SAMPLE_EXPR_BY_METASAMPLE}	--expr {input.expr_table} \
+                                                		--metadata {input.metadata} \
+                                                		--measure median \
+                                                		--output {output}
+		"""
+
+rule tissue_average_datasets_comparison:
+	input:
+		expr_table = TAU_REVISION+"/dataset_{dataset_number}/{species}-metasamples_median_expr-NOSVA-log2-TPMs.tab",
+		metadata = TAU_REVISION+"/metadata/dataset_{dataset_number}/{species}-metasamples_metadata.txt"
+	output:
+		TAU_REVISION+"/dataset_{dataset_number}/{species}-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	shell:
+		"""
+		python {AVERAGE_METASAMPLE_EXPR_BY_TISSUE}	--expr {input.expr_table} \
+								--metadata {input.metadata} \
+								--measure average \
+								--output {output}
+		"""
+
+
+
+########################################
+###### COMPUTE TISSUE EXPRESSIONS ######
+########################################
+
+rule filter_expr_by_protein_coding:
+	input:
+		expr_table = TAU_REVISION+"/{tau_category}/{species}-tissue_average_expr-NOSVA-log2-TPMs.tab",
+		protein_coding = TS_CALL_DIR+"/species_QN_5_TPM_taus/All_version2/{species}-protein_coding_genes.txt"
+	output:
+		TAU_REVISION+"/{tau_category}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	run:
+		import pandas as pd
+
+		expr_df = pd.read_table(str(input.expr_table), index_col=0, header=0, sep="\t")
+		protein_coding = list(pd.read_table(str(input.protein_coding), index_col=False, header=None, names=["protein_coding"])["protein_coding"])
+		final_df = expr_df.loc[expr_df.index.intersection(protein_coding)]
+		final_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+rule quantile_normalize_by_species:
+	input:
+		TAU_REVISION+"/{tau_category}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs.tab"
+	output:
+		TAU_REVISION+"/{tau_category}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab"
+	conda:
+		CONDA_ENVS+"/R3.6_env.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output}
+		"""
+
+##################################################
+####### COMPUTE TAU BY SPECIES ###################
+##################################################
+
+rule compute_tau:
+	input:
+		TAU_REVISION+"/{tau_category}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab"
+	output:
+		TAU_REVISION+"/{tau_category}/taus/{species}-protein_coding_taus.tab"
+	shell:
+		"""
+		python {COMPUTE_TAU} 	--input {input} \
+					--output {output}
+		"""
+
+############################################################################
+############################################################################
+############################################################################
+
+############################################################################
+######### EFFECT OF DUPLICATIONS ON TS INFERENCES ##########################
+############################################################################
+
+rule generate_randomized_orthogroups:
+	input:
+		TS_GAINS_LOSSES_DIR+"/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"
+	output:
+		TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_Tissue", "Expr_cutoff"])
+		#### Shuffle OG_ID among genes of the same species
+		orthogroups_df["OG_ID"] = orthogroups_df.groupby("Species")["OG_ID"].transform(np.random.permutation)
+		#### Save to final file
+		orthogroups_df.to_csv(str(output), sep="\t", header=False, index=False, na_rep="NA")
+	
+
+##################################################
+######### FILTER_BY_TISSUE #######################
+##################################################
+rule filter_all_OGs_by_tissue_association:
+	input:
+		TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab"
+	output:
+		TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/Bilateria_conserved_orthogroups-All_genes-{tissue}_specific_OGs.tab"
+	run:
+		import pandas as pd
+		import numpy as np
+
+		orthogroups_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID", "Tau", "Tissue", "Paralog_Tissue", "Expr_cutoff"])
+		tissue_specific_OGs = list(orthogroups_df.loc[(orthogroups_df["Tau"] >= TAU_UP_CUTOFF) & (orthogroups_df["Tissue"].str.contains(str(wildcards.tissue))) & (orthogroups_df["Expr_cutoff"]=="YES_EXPR")]["OG_ID"])
+		tissue_orthogroups_df = orthogroups_df.loc[orthogroups_df["OG_ID"].isin(tissue_specific_OGs)]
+		grouped_tissue_orthogroups_df = tissue_orthogroups_df.groupby("OG_ID")
+		#Initialise final dataframe
+		final_df = pd.DataFrame()
+		#Cycle on all the orthogroups
+		for OG_ID, group in grouped_tissue_orthogroups_df:
+		  for species in list(set(list(group["Species"]))):
+		    species_group = group.loc[group["Species"]==species]
+		    species_query_tissue = [element for element in list(species_group["Paralog_Tissue"]) if str(wildcards.tissue) in element]
+		    if len(species_query_tissue) > 0:
+		      #Select the species entry associated to tissue and with the highest tau
+		      ordered_species_tissue_group = species_group.loc[species_group["Paralog_Tissue"].str.contains(wildcards.tissue)].sort_values(by="Tau", ascending=False)
+		      #If there are YES_EXPR entries, give precedence to those.
+		      #NB: this automatically gives precedence to TS-genes.
+		      expr_ordered_species_tissue_group = ordered_species_tissue_group.loc[ordered_species_tissue_group["Expr_cutoff"]=="YES_EXPR"]
+		      if expr_ordered_species_tissue_group.shape[0] > 0:
+		        OG_species_final_entry = pd.DataFrame(expr_ordered_species_tissue_group.iloc[0,:]).transpose()
+		      else: #If NO_EXPR entries, just select the highest Tau in that tissue
+		        OG_species_final_entry = pd.DataFrame(ordered_species_tissue_group.iloc[0,:]).transpose()
+		    else:
+                      #Just select the species entry with the highest tau
+                      OG_species_final_entry = pd.DataFrame(species_group.sort_values(by="Tau", ascending=False).iloc[0,:]).transpose()
+		    final_df = pd.concat([final_df, OG_species_final_entry])
+		#If there are still some taus == -Inf, replace with nan
+		final_df["Tau"] = [tau if ~np.isneginf(tau) else np.nan for tau in list(final_df["Tau"])]
+		#Remove the paralog Tissue entry
+		final_df = final_df.drop(columns=["Paralog_Tissue"])
+		#Save to file
+		final_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")		    
+
+
+
+##################################################
+####### INFER TS GAINS ###########################
+##################################################
+
+rule infer_TS_gains:
+	input:
+		orthogroups = TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/Bilateria_conserved_orthogroups-All_genes-{tissue}_specific_OGs.tab"
+	output:
+		TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/inferences/preliminary_gains/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_gains_preliminary.tab"
+	params:
+		deut_species = ",".join(DEUTEROSTOMA),
+		prot_species = ",".join(PROTOSTOMA),
+		ancestral_clades = ",".join(ANCESTRAL_CLADES),
+		node_name_dict = NODE_NAME_DICT
+	shell:
+		"""
+		python {INFER_TS_GAINS}		--input {input.orthogroups} \
+						--up_tau_cutoff {TAU_UP_CUTOFF} \
+						--low_tau_cutoff {TAU_LOW_CUTOFF} \
+						--deut_species {params.deut_species} \
+						--prot_species {params.prot_species} \
+						--ancestral_clades {params.ancestral_clades} \
+						--output {output} \
+						--query_tissue {wildcards.tissue} \
+						--node_name_dict \'{params.node_name_dict}\'
+		"""
+
+##################################################
+####### INFER TS LOSSES ##########################
+##################################################
+rule infer_TS_losses:
+	input:
+		orthogroups = TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/Bilateria_conserved_orthogroups-All_genes-{tissue}_specific_OGs.tab",
+		all_orthogroups = TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/Bilateria_conserved_orthogroups-All_genes-associated_tissues.tab", 
+		TS_gains = TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/inferences/preliminary_gains/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_gains_preliminary.tab",
+		tissue_differences = expand("{path}/{species}-third_tissue_relative_expr_diff.tab", path=TS_GAINS_LOSSES_DIR, species=ALL_SPECIES)
+	output:
+		losses = TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/inferences/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_losses.tab",
+		gains = TS_GAINS_LOSSES_REVISION_DIR+"/{randomization}/inferences/Bilateria_conserved_orthogroups-All_genes-{tissue}_inferred_gains.tab"
+	params:
+		deut_species = ",".join(DEUTEROSTOMA),
+		prot_species = ",".join(PROTOSTOMA),
+		deut_nodes = ",".join(DEUTEROSTOME_NODES),
+		prot_nodes = ",".join(PROTOSTOME_NODES),
+		node_species_dict = NODE_SPECIES_DICT,
+		node_name_dict = NODE_NAME_DICT,
+		tissue_diff_cutoff = TISSUE_DIFF_CUTOFF
+	shell:
+		"""
+		python {INFER_TS_LOSSES}	--input {input.orthogroups} \
+						--all_orthogroups_input {input.all_orthogroups} \
+						--ts_gains_input {input.TS_gains} \
+						--tissue_differences_input {input.tissue_differences} \
+						--up_tau_cutoff {TAU_UP_CUTOFF} \
+						--low_tau_cutoff {TAU_LOW_CUTOFF_LOSSES} \
+						--deut_species {params.deut_species} \
+						--prot_species {params.prot_species} \
+						--deut_nodes {params.deut_nodes} \
+						--prot_nodes {params.prot_nodes} \
+						--tissue_diff_cutoff {params.tissue_diff_cutoff} \
+						--output {output.losses} \
+						--output_gains {output.gains} \
+						--query_tissue {wildcards.tissue} \
+						--node_species_dict \'{params.node_species_dict}\' \
+						--node_name_dict \'{params.node_name_dict}\'
+		"""
