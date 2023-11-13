@@ -1,0 +1,137 @@
+---
+title: "SupFig1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#update library path
+#.libPaths(c("/Users/federica/mnt/software/R/3.5", "/Users/federica/mnt/software/R", .libPaths()))
+#set Knitr option
+knitr::opts_chunk$set(echo = TRUE)
+
+#Upload libraries
+library(ggplot2)
+library(gridExtra)
+library(cowplot)
+library(reshape2)
+library(hashmap)
+library(dplyr)
+library(ggpubr)
+library(RColorBrewer)
+
+#Set paths for input/output directories
+home = "/Users/federica/mnt/"
+metadata_dir = paste0(home, "projects/bilaterian_GE/data/samples_metadata/")
+evo_distances_dir = paste0(home, "projects/bilaterian_GE/data/evo_distances/")
+pca_dir = paste0(home, "projects/bilaterian_GE/data/pca_analysis_all_norms/")
+metasample_dir = paste0(home, "projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant/metasamples_quantification/")
+version = "All_version2"
+category = "STRICT"
+clade = "Bilateria"
+evo_type = "conserved"
+
+#Generate variables
+original_species = c("Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+all_species = c("Hsa", "Mmu", "Bta", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Spu", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi")
+ordered_species = all_species
+Bilateria = all_species
+Vertebrata = c("Hsa", "Mmu", "Bta", "Mdo", "Gga", "Xtr", "Dre", "Cmi")
+Insecta = c("Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi")
+Outgroups = c("Bla", "Spu", "Sma", "Obi")
+all_tissues=c("Adipose", "DigestiveTract", "Kidney", "Epithelial", "Muscle", "Neural", "Ovary", "Testis")
+ordered_tissues = c("Neural", "Testis", "Ovary", "Muscle", "Kidney", "Epithelial", "DigestiveTract", "Adipose")
+
+
+#Set aestetics vectors
+tissue_colors = c("Adipose"="firebrick1", "Neural"="mediumblue", 
+                  "Muscle"="springgreen3", "Ovary"="darkorchid", 
+                  "Kidney"="gold", "Testis"="violet", 
+                  "DigestiveTract"="chocolate1", "Epithelial"="steelblue1")
+
+tissue_letters = c("Neural" = utf8ToInt("N"), "Testis"=utf8ToInt("T"),
+                   "Ovary" = utf8ToInt("N"), "Muscle"=utf8ToInt("M"), 
+                   "Kidney" = utf8ToInt("K"), "Epithelial"=utf8ToInt("E"),
+                   "DigestiveTract"=utf8ToInt("D"), "Adipose"=utf8ToInt("A"))
+
+species_colors = c("Hsa"="#00BFFF", "Mmu"="#159DFF", "Bta"="#1873CD", "Mdo"="#174B8B", "Gga"="#3F3F8B", "Xtr"="#64398B",
+                 "Dre"="#82359D", "Cmi"="#9932CC", "Bla"="#2E8B57", "Spu"="#96B12B", rev(c("Obi"="#FFFF00",
+                 "Sma"="#FFCC33", "Cdi"="goldenrod", "Bge"="burlywood2", "Ame"="#FF9966", "Tca"="#FF6600",
+                 "Bmo"="#CC6600", "Aae"="#993300", "Eba"="firebrick3", "Dme"="red")))
+
+species_shapes = c("Hsa"=0, "Mmu"=1, "Bta"=2, "Mdo"=3, "Gga"=4, "Xtr"=5, 
+                   "Dre"=6, "Cmi"=7, "Bla"=9, "Spu"=8, "Dme"=15, "Eba"=18, "Aae"= 23, 
+                   "Bmo"=25, "Tca"=17, "Bge"=10, "Ame"=16, "Cdi"=13, "Sma"=14, "Obi"=11)
+species_alphas = c("Hs2"=1, "Mm2"=1, "Bt2"=1, "Mdo"=1, "Gga"=1, "Xtr"=1, "Dre"=1, 
+                   "Cmi"=1, "Bla"=0.5, "Sp2"=0.5, "Sma"=0.5, "Ame"=0.5, "Dme"=0.5, "Cdi"=0.5, 
+                   "Obi"=0.5, "Bge"=0.5, "BmA"=0.5, "Tca"=0.5)
+clade_colors = c("Vertebrata"= "mediumorchid", "Deuterostoma"="olivedrab3", 
+                 "Insecta"="tan3", "Protostoma"="yellow", "Bilateria"="firebrick1", 
+                 "Outgroups"="dimgray")
+
+scientific_names_vector = c("Hsa"="Homo sapiens (Hsa)", "Mmu"="Mus musculus (Mmu)", "Bta"="Bos taurus (Bta)", "Mdo"="Monodelphis domestica (Mdo)", 
+                            "Gga"="Gallus gallus (Gga)", "Xtr"="Xenopus tropicalis (Xtr)", "Dre"="Danio rerio (Dre)", "Cmi"="Callorhinchus milii (Cmi)", 
+                            "Bla"="Branchiostoma lanceolatum (Bla)", "Spu"="Strongylocentrotus purpuratus (Spu)", "Dme"="Drosophila melanogaster (Dme)",
+                            "Eba"="Episyrphus balteatus (Eba)", "Aae"="Aaedes aegypti (Aae)", "Bmo"="Bombyx mori (Bmo)", "Tca"="Tribolium castaneum (Tca)",
+                            "Ame"="Apis mellifera (Ame)", "Bge"="Blattella germanica (Bge)", "Cdi"="Cloeon dipterum (Cdi)",
+                            "Sma"="Strigamia marittima (Sma)", "Obi"="Octopus bimaculoides (Obi)")
+```
+
+```{r functions, echo=FALSE, message=FALSE, warning=FALSE, dependson="setup"}
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+```
+
+<!--Getting all heatmaps in the same page -->
+```{r metasample_heatmaps, echo=FALSE, message=FALSE, warning=FALSE, dependson="setup", fig.width=16, fig.height=24, eval=TRUE}
+metasample_folder = paste0(home, "projects/bilaterian_GE/data/preprocessing_all/metasamples/")
+breaksList = seq(-0.5, 1, by = 0.05)
+palette_brewer = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(length(breaksList))
+
+plot_list = list()
+i = 1
+for (species in original_species) {
+  #Read input
+  input_table = read.delim(paste0(metasample_dir, species, "-metasamples_median_expr-NOSVA-log2-TPMs.tab"), header=TRUE, row=1)
+  annotation_df = read.delim(paste0(metasample_dir, species, "-metasamples_metadata-NOSVA-log2-TPMs.txt"), header=TRUE) #Get table with metadata
+  annotation_df$Sample = NULL; annotation_df = unique(annotation_df)
+  rownames(annotation_df) = annotation_df$Metasample; annotation_df$Metasample = NULL
+  colnames(annotation_df) = "Tissue" #This is to uniform with the other metadata table
+  fontsize = 11
+    
+  #Select only the most variable genes
+  CV_vector = apply(input_table, 1, function(x) {var(x)/mean(x)})
+  #Filter based on coefficient of variation
+  my_genes = names(CV_vector[order(CV_vector, decreasing = TRUE)])[1:2500]
+  #Filter the table for the chosen genes
+  input_table = input_table[my_genes,]
+  #Compute correlations (pearson)
+  input_cor_matrix = cor(input_table, use="complete.obs", method="pearson")
+  input_cor_df = as.data.frame(input_cor_matrix)
+
+  metasamples_expr_heatmap = pheatmap(input_cor_df, 
+                                      color = palette_brewer, 
+                                      main = species,
+                                      #cluster_rows = FALSE, cluster_cols = FALSE,
+                                      show_rownames = FALSE, 
+                                      show_colnames = FALSE,
+                                      annotation_col = annotation_df, 
+                                      annotation_row = annotation_df, 
+                                      annotation_colors = list(Tissue=my_color_vector),
+                                      annotation_legend = FALSE, 
+                                      fontsize_row = fontsize, fontsize_col = fontsize, border_color = NA,
+                                      silent = TRUE,
+                                      breaks = breaksList,
+                                      #legend=FALSE,
+                                      treeheight_row = 25,
+                                      treeheight_col = 25,
+                                      annotation_names_row = FALSE
+                                      )
+    plot_list[[i]] = metasamples_expr_heatmap$gtable
+    i = i + 1
+}
+
+
+all_metasamples_expr_heatmaps = do.call("grid.arrange", c(plot_list, ncol=4))
+ggsave("/Users/federica/Documents/CRG_PhD/bilaterian_GE/Images/Images_from_R/SupFig2-with_legend.pdf", all_metasamples_expr_heatmaps, device="pdf", height=20, width=16)
+#species_plot = plot_grid(plot_list[[1]], plot_list[[2]], plot_list[[3]], labels=c("A", "B", "C"), ncol=3)
+#print(species_plot)
+```
