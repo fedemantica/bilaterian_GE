@@ -87,7 +87,6 @@ CHIMERIC_PROT_SIM_SCORES = expand("{path}/{my_version}/chimeric_proteins/sim_sco
 LONGEST_FRAGMENT = expand("{path}/{my_version}/chimeric_proteins/Longest_aln_chimeric_prots.tab", path=BROCCOLI, my_version=MY_VERSION)
 COMBINED_EX_POS_INFO = expand("{path}/{my_version}/chimeric_proteins/Combines_exons_pos_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 CHIMERIC_OG = expand("{path}/{my_version}/chimeric_proteins/chimeric_orthogroups.tab", path=BROCCOLI, my_version=MY_VERSION)
-#MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/{chimeric_gene}-multiple_aln", path=BROCCOLI, my_version=MY_VERSION, chimeric_gene=CHIMERIC_GENES)
 MULTIPLE_ALN = expand("{path}/{my_version}/chimeric_proteins/multiple_aln/batch_{batch_index}.log", path=BROCCOLI, my_version=MY_VERSION, batch_index=CHIMERIC_GENES_BATCHES)
 ALIGNED_FRAGMENT_INFO = expand("{path}/{my_version}/chimeric_proteins/aligned_fragments_info.tab", path=BROCCOLI, my_version=MY_VERSION)
 CLASSIFIED_CHIMERIC_GENES = expand("{path}/{my_version}/chimeric_proteins/classified_chimeric_genes.tab", path=BROCCOLI, my_version=MY_VERSION)
@@ -108,22 +107,7 @@ BUSCO_RUNS = expand("{path}/{my_version}/BUSCO/{fasta_type}/{species}/run_{linea
 
 rule all:
 	input:
-		#RUN_BROCCOLI,
-		#PARSED_ORTHOGROUPS, 
-		#SELECTED_BROKEN_GENES,
-		#CHIMERIC_OG,
-		#MULTIPLE_ALN,
-		#ALIGNED_FRAGMENT_INFO,
-		#CLASSIFIED_CHIMERIC_GENES,
-		#NEW_GENE_IDS,
-		#BROCHI_CORRECTED_GTF,
-		#CORRECTED_MASTER_GTF,
-		#JOINT_FILES,
-		#CORRECTED_OG,
-		#CORRECTED_FASTAS,
-		#FORMATTED_ORTHOPAIRS,
-		BUSCO_RUNS
-
+	
 ###############################################
 ######## GET REF_PROTEINS FASTA  ##############
 ###############################################
