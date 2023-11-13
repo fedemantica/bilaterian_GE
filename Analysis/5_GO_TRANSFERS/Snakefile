@@ -1,0 +1,268 @@
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+GO_RAW_FILES = config["paths"]["GO_raw_files"]
+GO_TRANSFERS = config["paths"]["GO_transfers"]
+ORTHOGROUPS_DIR = config["paths"]["orthogroups_dir"]
+CLUEGO_DIR = config["paths"]["clueGO_dir"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+PFAM_RAW_FILES = config["paths"]["pfam_raw_files"]
+PFAM_TRANSFERS = config["paths"]["pfam_transfers"]
+
+######## tools ############
+RETRIEVE_ENSEMBL_IDS = config["tools"]["retrieve_ensembl_IDs"]
+GET_CLUEGO_ANNOT = config["tools"]["get_cluego_annot"]
+TRANSFER_GO = config["tools"]["transfer_GO"]
+GET_GTM_FILES = config["tools"]["get_gtm_files"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+CLUEGO_CAT = config["variables"]["cluego_cat"]
+ALL_SPECIES = config["variables"]["all_species"]
+HIGHER_GO_CUTOFF_DICT = config["variables"]["higher_GO_cutoff_dict"]
+LOWER_GO_CUTOFF_DICT = config["variables"]["lower_GO_cutoff_dict"]
+ 
+###### targets ##########
+TRANSFERRED_GO = expand("{path}/{my_version}/GO_annot/{transfer_species}_transfers/corrected_orthogroups-transferred_GO_from_{transfer_species}.txt", path=GO_TRANSFERS, my_version=MY_VERSION, transfer_species=["Hs2","Dme"])
+TRANSFERRED_GO_BY_SPECIES = expand("{path}/{my_version}/GO_annot/{transfer_species}_transfers/{species}-transferred_GO.txt", path=GO_TRANSFERS, my_version=MY_VERSION, transfer_species=["Hs2","Dme"], species=ALL_SPECIES)
+TRANSFERRED_GO_BY_ORTHOGROUP = expand("{path}/{my_version}/GO_annot/{transfer_species}_transfers/orthogroups_from_{transfer_species}-transferred_GO.txt", path=GO_TRANSFERS, my_version=MY_VERSION, transfer_species=["Hs2","Dme"])
+GMT_FILES_REDUCED_BY_SPECIES = expand("{path}/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO-reduced.gmt", path=GO_TRANSFERS, my_version=MY_VERSION, transfer_species=["Hs2","Dme"], category=ALL_SPECIES)
+GMT_FILES_REDUCED_BY_ORTHOGROUPS = expand("{path}/{my_version}/GO_annot/{transfer_species}_transfers/orthogroups_from_{transfer_species}-transferred_GO-reduced.gmt", path=GO_TRANSFERS, my_version=MY_VERSION, transfer_species=["Hs2","Dme"]) 
+BACKGROUND_SPECIES = expand("{path}/{my_version}/GO_backgrounds/{background_type}-GO_background.txt", path=GO_TRANSFERS, my_version=MY_VERSION, background_type=["Hs2", "Dme"])
+BACKGROUND_ORTHOGROUPS = expand("{path}/{my_version}/GO_backgrounds/orthogroups-GO_background.txt", path=GO_TRANSFERS, my_version=MY_VERSION)
+FILTERED_GO_TRANSFERS = expand("{path}/{my_version}/GO_annot/{transfer_species}_transfers/orthogroups_from_{transfer_species}-transferred_GO-Bilateria_conserved.txt", path=GO_TRANSFERS, my_version=MY_VERSION, transfer_species=["Hs2","Dme"])
+
+####### rules ############
+
+rule all:
+	input:
+
+####################################
+###### CLUEGO ANNOTATION ###########
+####################################
+rule generate_ClueGO_transfer_inputs:
+	input:
+		annot = CLUEGO_DIR+"/Homo_Sapiens_GO_{clueGO_cat}-EBI-UniProt-GOA_27.02.2019_00h00.txt.gz",
+		key = CLUEGO_DIR+"/Homo_Sapiens.gene2ensembl_2019.02.27.txt.gz"
+	output:
+		joint = CLUEGO_DIR+"/hg38_{clueGO_cat}_out-joint.tab",
+		leveled = CLUEGO_DIR+"/hg38_{clueGO_cat}_out-leveled.tab"
+	shell:
+		"""
+		python {GET_CLUEGO_ANNOT} -i {input.annot} -k {input.key} -o {output.joint} -ol {output.leveled}
+		"""
+
+rule join_ClueGO_transfer_input:
+	input:
+		expand("{path}/hg38_{clueGO_cat}_out-{{clueGO_type}}.tab", path=CLUEGO_DIR, clueGO_cat=CLUEGO_CAT)
+	output:
+		CLUEGO_DIR+"/hg38_GO_annotations-ClueGO-{clueGO_type}.txt"
+	shell:
+		"""
+		cat {input} > {output}
+		"""
+
+rule filter_ClueGO_transfer_input_by_level:
+	input:
+		expand("{path}/hg38_{clueGO_cat}_out-leveled.tab", path=CLUEGO_DIR, clueGO_cat=CLUEGO_CAT)
+	output:
+		CLUEGO_DIR+"/hg38_GO_annotations-ClueGO-leveled-level{level}.txt"
+	shell:
+		"""
+		cat {input} | awk '$NF=="{wildcards.level}"' | cut -f1,2,3 > {output}
+		"""
+
+####################################
+######  JOIN ANNOTATIONS ###########
+####################################
+
+#Join Ensembl and ClueGO annotations
+#I am changing the species identifier in order to match the one I am using in this project
+rule join_Ensembl_ClueGO_annotations:
+	input:
+		clueGO = CLUEGO_DIR+"/hg38_GO_annotations-ClueGO-leveled-level{level}.txt",
+		ensembl = GO_RAW_FILES+"/Hs2_GO_annotations-Ensembl106.txt"
+	output:
+		GO_TRANSFERS+"/Hs2_GO_annotations-Ensembl106_clueGOLevel{level}.tab"
+	shell:
+		"""
+		cat {input.clueGO} {input.ensembl} | sed 's/ /_/g' | sed 's/;/_/g' | sort | uniq > {output}
+		"""
+#cat hg38_GO_annotations-ClueGO-leveled-level5.txt hg38_GO_annotations-Ensembl102.txt | sort | uniq > hg38_GO_annotations-Ensembl102_clueGOLevel5.tab
+
+####################################
+###### ANNOT INPUT #################
+####################################
+rule format_human_annot:
+	input:
+		GO_TRANSFERS+"/Hs2_GO_annotations-Ensembl106_clueGOLevel5.tab"
+	output:
+		GO_RAW_FILES+"/Hs2_GO_annotations-Ensembl106-formatted.txt"
+	shell:
+		"""
+		cat {input} | sed 's/ /_/g' | sed 's/;/_/g' | awk '$2!=""' | sort | uniq > {output}
+		"""
+
+rule format_fly_annot:
+	input:
+		GO_RAW_FILES+"/Dme_GO_annotations-Ensembl106.txt"
+	output:
+		GO_RAW_FILES+"/Dme_GO_annotations-Ensembl106-formatted.txt"
+	shell:
+		"""
+		cat {input} | sed 's/ /_/g' | sed 's/;/_/g' | awk '$2!=""' | sort | uniq > {output}
+		"""
+
+
+####################################
+######  TRANSFER GOS ###############
+####################################
+
+rule transfer_GOs:
+	input:
+		gene_orthogroups = ORTHOGROUPS_DIR+"/{my_version}/corrected_orthogroups-filtered.txt",
+		GO_file = GO_RAW_FILES+"/{transfer_species}_GO_annotations-Ensembl106-formatted.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/corrected_orthogroups-transferred_GO_from_{transfer_species}.txt"
+	shell:
+		"""
+		python {TRANSFER_GO} 	-o {input.gene_orthogroups} \
+					--GO_file {input.GO_file} \
+					--species_query {wildcards.transfer_species} \
+					--cutoff 4 \
+					--output_file {output}
+		"""
+
+
+####################################
+######  FORMAT TRANSFERRED GO ######
+####################################
+#Get annotation by orthogroups
+rule Hs2_GO_annot_by_OGs:
+	input:
+		GO_TRANSFERS+"/{my_version}/GO_annot/Hs2_transfers/corrected_orthogroups-transferred_GO_from_Hs2.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/Hs2_transfers/orthogroups_from_Hs2-transferred_GO.txt"
+	shell:
+		"""
+		cat {input} | awk -v OFS="\t" '$4!="NA" {{print $1,$4,$5}}' | sort | uniq > {output}
+		"""
+
+rule Dme_GO_annot_by_OGs:
+	input:
+		GO_TRANSFERS+"/{my_version}/GO_annot/Dme_transfers/corrected_orthogroups-transferred_GO_from_Dme.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/Dme_transfers/orthogroups_from_Dme-transferred_GO.txt"
+	shell:
+		"""
+		cat {input} | awk -v OFS="\t" '$4!="NA" {{print $1,$4,$5}}' | sort | uniq > {output}
+		"""
+
+#Get annotation by species
+rule GO_annot_by_species:
+	input:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/corrected_orthogroups-transferred_GO_from_{transfer_species}.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{species}-transferred_GO.txt"
+	wildcard_constraints:
+		species="^(!?orthogroup).+"
+	shell:
+		"""
+		cat {input} | awk -v OFS="\t" '$2=="{wildcards.species}" && $4!="NA" {{print $3,$4,$5}}' > {output}
+		"""
+
+#Generate reduced annotations to avoid testing categories with a crazy number of genes
+#That just increases the number of tests and kills all my pvalues.
+#First, get the number of genes in each species annotated as belonging the each GO (following the transfer)
+rule count_genes_in_GOs:
+	input:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-genes_in_GO_counts.txt"
+	run:
+		import pandas as pd
+		input_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["geneID", "GOterm", "GOdef"])
+		grouped_df = input_df.groupby("GOterm")
+		final_df = pd.DataFrame()
+		for term, group in grouped_df:
+		  count = group.shape[0]
+		  final_df = pd.concat([final_df, pd.DataFrame({"GO" : [term], "count" : [count]})])
+		final_df.to_csv(str(output), sep="\t", index=False, header=True, na_rep="NA")
+
+rule reduce_species_GO_annot:
+	input:
+		annot = GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO.txt",
+		GO_counts = GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-genes_in_GO_counts.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO-reduced.txt"
+	params:
+		higher_GO_cutoff = lambda wildcards: HIGHER_GO_CUTOFF_DICT[wildcards.transfer_species],
+		lower_GO_cutoff = lambda wildcards: LOWER_GO_CUTOFF_DICT[wildcards.transfer_species]
+	shell:
+		"""
+		cat {input.annot} | filter_1col 2 <(cat {input.GO_counts} \
+		| awk '$2<={params.higher_GO_cutoff} && $2>={params.lower_GO_cutoff} {{print $1}}') > {output}
+		"""
+#Get gmt files
+rule generate_gmt_files:
+	input:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO.gmt"
+	shell:
+		"""
+		python {GET_GTM_FILES} -GO {input} -o {output}
+		"""
+
+rule generate_gmt_files_reduced:
+	input:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO-reduced.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/{category}-transferred_GO-reduced.gmt"
+	shell:
+		"""
+		python {GET_GTM_FILES} -GO {input} -o {output}
+		"""
+
+####################################
+###### GENERATE_BACKGROUNDS ########
+####################################
+#Generating the backgrounds both with the human/fly genes and with the orthogroups
+rule get_species_background:
+	input:
+		GENE_SETS_DIR+"/{my_version}/STRICT/Bilateria/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_backgrounds/{species}-GO_background.txt"
+	wildcard_constraints:
+		species=ALL_SPECIES
+	shell:
+		"""
+		cat {input} | grep {wildcards.species} | cut -f3 > {output}
+		"""
+
+rule get_orthogroups_background:
+	input:
+		GENE_SETS_DIR+"/{my_version}/STRICT/Bilateria/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_backgrounds/orthogroups-GO_background.txt"
+	shell:
+		"""
+		cat {input} | cut -f1 | sort | uniq > {output}
+		"""
+
+####################################
+####### FILTER GO TRANSFERS ########
+####################################
+rule filter_GO_transfer:
+	input:
+		go_transfers = GO_TRANSFERS+"/{my_version}/GO_annot/orthogroups-transferred_GO.txt",
+		bilaterian_conserved = GO_TRANSFERS+"/{my_version}/GO_backgrounds/orthogroups-GO_background.txt"
+	output:
+		GO_TRANSFERS+"/{my_version}/GO_annot/{transfer_species}_transfers/orthogroups_from_{transfer_species}-transferred_GO-Bilateria_conserved.txt"
+	shell:
+		"""
+		cat {input.go_transfers} | filter_1col 1 {input.bilaterian_conserved} > {output}
+		"""

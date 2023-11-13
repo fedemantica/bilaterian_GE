@@ -1,0 +1,436 @@
+###### config ##############
+configfile: "config.yaml"
+
+###### paths ###############
+DATA = config["general_paths"]["data"]
+SRC = config["general_paths"]["src"]
+CONDA_ENVS = config["general_paths"]["conda_envs"]
+DATABASE = config["general_paths"]["database"]
+METADATA = config["paths"]["metadata"]
+PREPROCESSING_DIR = config["paths"]["preprocessing_dir"]
+GENE_SETS_DIR = config["paths"]["gene_sets_dir"]
+PCA_ANALYSIS_DIR = config["paths"]["pca_analysis"]
+NORM_COUNTS_DIR = config["paths"]["norm_counts_dir"]
+METASAMPLES_QUANT_DIR = config["paths"]["metasamples_quant_dir"] 
+TISSUES_QUANT_DIR = config["paths"]["tissues_quant_dir"]
+SVA_CORRECTION = config["paths"]["sva_correction_dir"]
+CORRELATIONS_DIR = config["paths"]["correlations_dir"]
+BRANCHES_LENGTH_DIR = config["paths"]["branches_length_dir"]
+EXPRESSION_TREES_DIR = config["paths"]["expression_trees_dir"]
+
+######## tools ############
+QUANTILE_NORMALIZE = config["tools"]["quantile_normalize"]
+GENERATE_METASAMPLES = config["tools"]["generate_metasamples"]
+GET_QUANT_FROM_NORM_COUNTS = config["tools"]["get_quant_from_norm_counts"]
+APPLY_SVA_CORRECTION = config["tools"]["apply_sva_correction"]
+AVERAGE_EXPR_BY_TISSUE = config["tools"]["average_expr_by_tissue"]
+COMPUTE_ZSCORE_BY_SPECIES = config["tools"]["compute_zscore_by_species"]
+PLOT_PCA = config["tools"]["plot_pca"]
+PLOT_CORRELATIONS = config["tools"]["plot_correlations"]
+PLOT_BRANCHES_LENGTH = config["tools"]["plot_branches_length"]
+PLOT_EXPRESSION_TREES = config["tools"]["plot_expression_trees"]
+
+###### variables ###########
+MY_VERSION = config["variables"]["my_version"]
+ALL_SPECIES = config["variables"]["all_species"]
+BILATERIA = ALL_SPECIES
+VERTEBRATA = config["variables"]["vertebrata"]
+INSECTA = config["variables"]["insecta"]
+DEUTEROSTOMA = config["variables"]["deuterostoma"]
+PROTOSTOMA = config["variables"]["protostoma"]
+CLADES = config["variables"]["clades"]
+HUMAN_ID = config["variables"]["human_id"]
+QUERY_SPECIES_DICT = config["variables"]["query_species_dict"]
+ALL_TISSUES = config["variables"]["all_tissues"]
+
+CLADE_SPECIES_DICT = {}
+CLADE_SPECIES_DICT["Vertebrata"] = VERTEBRATA
+CLADE_SPECIES_DICT["Insecta"] = INSECTA
+CLADE_SPECIES_DICT["Bilateria"] = BILATERIA
+
+CATEGORIES = config["variables"]["categories"]
+EVO_TYPES = config["variables"]["evo_types"]
+EXPR_TYPES = config["variables"]["expr_types"]
+GENE_TYPES = config["variables"]["gene_types"]
+
+SVA_LOG_QUANT_VALUES = config["variables"]["sva_log_quant_values"]
+SVA_LOG_QUANT_NORM_VALUES = config["variables"]["sva_log_quant_norm_values"]
+
+###### targets ##########
+QUANTILE_NORM_TABLES_METASAMPLES = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-NORM-BH_genes.tab", path=PCA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type="conserved", sva_log_quant_value=SVA_LOG_QUANT_VALUES, norm_value=["NORM", "noNORM"])
+QUANTILE_NORM_TABLES_TISSUES = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-NORM-BH_genes.tab", path=PCA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type="conserved", sva_log_quant_value=SVA_LOG_QUANT_VALUES)
+ZSCORED_TABLES_BY_SPECIES = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-{sva_log_quant_value}-{norm_value}-species_zscore-BH_genes.tab", path=PCA_ANALYSIS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type="conserved", expr_type=["metasamples_median_expr","tissue_average_expr"], sva_log_quant_value="NOSVA-log2-TPMs", norm_value=["NORM", "noNORM"])
+
+####### rules ############
+rule all:	
+	input:
+		QUANTILE_NORM_TABLES_METASAMPLES,
+		QUANTILE_NORM_TABLES_TISSUES,
+		ZSCORED_TABLES_BY_SPECIES
+
+
+###############################################################
+############## SUBSET AND RESCALE TPMs  #######################
+###############################################################
+
+#Here I am isolating the bilaterian conserved genes from each species, and removing the ones coming from the mithochondrial genome.
+#rule get_genes_to_subset:
+#	input:
+#		clade_conserved = PCA_ANALYSIS_DIR+"/"+MY_VERSION+"/STRICT/Vertebrata/conserved/Vertebrata_conserved-reclustered_orthogroups-BH_genes.tab",
+#		GO_file = "/users/mirimia/fmantica/projects/ludo_analysis/data/GO_enrichments/hg38_GO_annotations-Ensembl102_clueGOLevel5-BP.tab"
+#	output:
+#		NORM_COUNTS_DIR+"/{species}/genes_to_subset.txt"
+#	params:
+#		human_id = HUMAN_ID #Still need to find a good way to call this.
+#	run:
+#		import pandas as pd
+#
+#		orthogroups_df = pd.read_table(str(input.clade_conserved), sep="\t", index_col=False, header=0)
+#		GO_df = pd.read_table(str(input.GO_file), sep="\t", index_col=False, header=None, names=["GeneID", "GOterm", "GOdescr", "support"])
+#		human_mithochondria_genes = list(GO_df.loc[GO_df["GOdescr"].str.contains(pat="mitochondr")]["GeneID"].drop_duplicates()) 
+#		orthogroups_with_mith_df = orthogroups_df.loc[~orthogroups_df["Hs2"].isin(human_mithochondria_genes)]
+#		#Subset to the species of interest
+#		species_genes_to_subset_df = orthogroups_with_mith_df[wildcards.species].dropna()
+#		species_genes_to_subset_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+
+#I can't find the fly mitochondrial genes in the gtf
+#rule get_human_mithochondria_genes:
+#	input:
+#		human_gtf = DATABASE+"/gtf/master/Hs2_annot.gtf"
+#	output:
+#		DATABASE+"/mithochondrial_genes/Hs2_mithochondrial_genes.txt",
+#	shell:
+#		"""
+#		cat {input.human_gtf} | awk '$1=="chrMT"' | cut -f9 | awk '{{print $2}}' | sed 's/"//g; s/;//' | sort | uniq > {output}
+#		"""
+#
+#rule get_genes_to_subset_by_species:
+#	input:
+#		clade_conserved = PCA_ANALYSIS_DIR+"/"+MY_VERSION+"/STRICT/Bilateria/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.tab",
+#		human_mithochondria = DATABASE+"/mithochondrial_genes/Hs2_mithochondrial_genes.txt"
+#	output:
+#		NORM_COUNTS_DIR+"/{species}/genes_to_subset.txt"
+#	run:
+#		import pandas as pd
+#
+#		orthogroups_df = pd.read_table(str(input.clade_conserved), sep="\t", index_col=False, header=0)
+#		human_mitochondria_genes = list(pd.read_table(str(input.human_mithochondria), sep="\t", index_col=False, header=None, names=["GeneID"])["GeneID"])
+#		orthogroups_with_mith_df = orthogroups_df.loc[~orthogroups_df["Hs2"].isin(human_mitochondria_genes)]
+#		#Subset to the species of interest
+#		species_genes_to_subset_df = orthogroups_with_mith_df[wildcards.species].dropna()
+#		species_genes_to_subset_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
+#
+#rule subset_and_rescale_tpms:
+#	input:
+#		tpm_expr = NORM_COUNTS_DIR+"/{species}/all_samples_gene_TPMs-normcounts.tab",
+#		genes_to_subset = NORM_COUNTS_DIR+"/{species}/genes_to_subset.txt"
+#	output:
+#		nolog_out = NORM_COUNTS_DIR+"/{species}/all_samples_gene_scaledTPMs-normcounts.tab",
+#		log_out = NORM_COUNTS_DIR+"/{species}/all_samples_gene_log2-scaledTPMs-normcounts.tab"
+#	run:
+#		import pandas as pd
+#		import numpy as np
+#		
+#		tpm_expr_df = pd.read_table(str(input.tpm_expr), sep="\t", index_col=0, header=0)
+#		genes_to_subset_list = list(pd.read_table(str(input.genes_to_subset), sep="\t", index_col=False, header=None, names=["GeneID"])["GeneID"])
+#		#Subset to only bilaterian genes which do not include the mitochondrial ones
+#		#subsetted_tpm_expr_df = tpm_expr_df.loc[genes_to_subset_list]
+#		subsetted_tpm_expr_df = tpm_expr_df.loc[tpm_expr_df.index.intersection(genes_to_subset_list)]
+#		#rescale to 1M
+#		rescaled_tpm_expr_df = (subsetted_tpm_expr_df * (10**6))/subsetted_tpm_expr_df.sum()
+#		#save to output
+#		rescaled_tpm_expr_df.to_csv(str(output.nolog_out), sep="\t", index=True, header=True, na_rep="NA")
+#		#compute the log2 and save to output
+#		log_rescaled_tpm_expr_df = rescaled_tpm_expr_df.apply(lambda x: np.log2(x + 1))
+#		log_rescaled_tpm_expr_df.to_csv(str(output.log_out), sep="\t", index=True, header=True, na_rep="NA")
+
+
+###############################################################
+############## GENERATE NO-LOG INPUTS  ########################
+###############################################################
+
+rule generate_noLog_input:
+	input:
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_{quant_value}-normcounts.tab"
+	output:
+		NORM_COUNTS_DIR+"/{species}/all_samples_gene_NOlog2-{quant_value}-normcounts.tab"
+	shell:
+		"""
+		ln -s {input} {output}
+		"""
+
+###############################################################
+################## COMPUTE SVA CORRECTION  ####################
+###############################################################
+
+#log_quant_value can be: log2-TPMs, NOlog2-TPMs, log2-RPMKs, NOlog2-RPKMs, log2-scaledTPMs, NOlog2-scaledTPMs
+rule apply_sva_correction:
+	input:
+		input_data = NORM_COUNTS_DIR+"/{species}/all_samples_gene_{log_quant_value}-normcounts.tab",
+		metadata = METADATA+"/sva_metadata/{species}_samples_info.tab"
+	output:
+		sva_corrected = SVA_CORRECTION+"/{species}-selected_samples_gene_SVA-{log_quant_value}.tab",
+		NOsva_corrected = SVA_CORRECTION+"/{species}-selected_samples_gene_NOSVA-{log_quant_value}.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	params:
+		out_dir = SVA_CORRECTION+"/{species}",
+		out_file = SVA_CORRECTION+"/{species}/{species}.tc.tsv" 
+	shell:
+		"""
+		Rscript {APPLY_SVA_CORRECTION} 	{input.input_data} \
+						{input.metadata} \
+						{params.out_dir} \
+						pearson \
+						0.2 0 1 \
+						"Neural|Muscle|Testis|Ovary|Kidney|Epithelial|DigestiveTract|Adipose"; \
+		cp {params.out_file} {output.sva_corrected}; \
+		ln -s {input.input_data} {output.NOsva_corrected};
+		"""
+
+########## METASAMPLES ######
+#sva_log_quant_value can be:
+#SVA-log2-TPMs, NOSVA-log2-TPMs, 
+#SVA-NOlog2-TPMs, NOSVA-NOlog2-TPMs, 
+#SVA-log2-RPMKs, NOSVA-log2-RPMKs, 
+#SVA-NOlog2-RPKMs, NOSVA-NOlog2-RPKMs, 
+#SVA-log2-scaledTPMs, NOSVA-log2-scaledTPMs
+
+rule generate_VastDB_metasamples:
+	input:
+		expr_table = SVA_CORRECTION+"/{species}-selected_samples_gene_{sva_log_quant_value}.tab",
+		metadata = METADATA+"/{species}_samples_info.tab"
+	output:
+		expr_table = METASAMPLES_QUANT_DIR+"/{species}-metasamples_median_expr-{sva_log_quant_value}.tab",
+		metadata = METASAMPLES_QUANT_DIR+"/{species}-metasamples_metadata-{sva_log_quant_value}.txt"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {GENERATE_METASAMPLES} {input.expr_table} {input.metadata} {output.expr_table} {output.metadata}
+		"""
+
+########## TISSUES ##########
+rule average_expression_by_tissue:
+	input:
+		expr_table = METASAMPLES_QUANT_DIR+"/{species}-metasamples_median_expr-{sva_log_quant_value}.tab",
+		metadata = METASAMPLES_QUANT_DIR+"/{species}-metasamples_metadata-{sva_log_quant_value}.txt"
+	output:
+		TISSUES_QUANT_DIR+"/{species}-tissue_average_expr-{sva_log_quant_value}.tab"
+	shell:
+		"""
+		python {AVERAGE_EXPR_BY_TISSUE}	--expr {input.expr_table} \
+						--metadata {input.metadata} \
+						--measure average \
+						--output {output}
+		"""
+
+###########################################
+###### GENERATE PCA INPUT TABLES ##########
+###########################################
+#This table has one row per gene orthogroups and one column per metasample.
+#The values correspond to the expression of best hit genes selected for that species in that particular orthogroup.
+rule generate_BH_metasamples_expr_table:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab",
+		samples_expression = expand("{path}/{species}-metasamples_median_expr-{{sva_log_quant_value}}.tab", path=METASAMPLES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-BH_genes.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		samples_expr_dir = METASAMPLES_QUANT_DIR,
+		samples_expr_suffix = lambda wildcards : "-metasamples_median_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		for species in params.clade_species:
+		  #Defining the metasample expression file for each species
+		  expr_file = params.samples_expr_dir+"/" + species + params.samples_expr_suffix
+		  #Reading in the metasample expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_samples_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_sample in species_samples_list:
+		    sample = species_sample.split("_", 1)[1]
+		    sample_expr_dict = pd.Series(expr_df[sample], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_sample] = orthologs_expr_df[species].map(sample_expr_dict)  #for each sample replace with the sample_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+rule generate_BH_tissue_expr_table:
+	input:
+		gene_orthogroups = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab",
+		tissue_expression = expand("{path}/{species}-tissue_average_expr-{{sva_log_quant_value}}.tab", path=TISSUES_QUANT_DIR, species=ALL_SPECIES)
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-BH_genes.tab"
+	params:
+		clade_species = lambda wildcards: CLADE_SPECIES_DICT[wildcards.clade],
+		tissue_expr_dir = TISSUES_QUANT_DIR,
+		tissue_expr_suffix = lambda wildcards : "-tissue_average_expr-" + wildcards.sva_log_quant_value + ".tab"
+	run:
+		import pandas as pd
+		orthologs_expr_df = pd.read_table(str(input.gene_orthogroups), sep="\t", index_col=0, header=0)
+		for species in params.clade_species:
+		  #Defining the tissue expression file for each species
+		  expr_file = params.tissue_expr_dir+"/" + species + params.tissue_expr_suffix
+		  #Reading in the tissue expression file for each species
+		  expr_df = pd.read_table(expr_file, sep="\t", index_col=0, header=0)
+		  species_tissue_list = [species+"_"+element for element in list(expr_df.columns.values)]
+		  for species_tissue in species_tissue_list:
+		    tissue = species_tissue.split("_", 1)[1]
+		    tissue_expr_dict = pd.Series(expr_df[tissue], index=list(expr_df.index.values)).to_dict()
+		    orthologs_expr_df[species_tissue] = orthologs_expr_df[species].map(tissue_expr_dict)  #for each tissue replace with the tissue_species annotation
+		  del orthologs_expr_df[species]
+		#Write to file
+		orthologs_expr_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")
+
+
+#######################################
+###### APPLY QUANTILE NORMALIZATION ###
+#######################################
+
+rule generate_metasamples_quantile_normalized_table:
+	input:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-BH_genes.tab"
+	output:
+		QN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-NORM-BH_genes.tab",
+		NoQN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_value}-noNORM-BH_genes.tab" 
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output.QN_out}; \
+		ln -s {input} {output.NoQN_out}
+		"""
+
+rule generate_tissue_quantile_normalized_table:
+	input:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-BH_genes.tab"
+	output:
+		QN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-NORM-BH_genes.tab",
+		NoQN_out = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_value}-noNORM-BH_genes.tab" 
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {QUANTILE_NORMALIZE} {input} {output.QN_out}; \
+		ln -s {input} {output.NoQN_out}
+		"""
+
+
+#######################################
+###### ZSCORES BY SPECIES #############
+#######################################
+
+rule compute_zscore_by_species:
+	input:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-{sva_log_quant_value}-{norm_value}-BH_genes.tab"
+	output:
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-{expr_type}-{sva_log_quant_value}-{norm_value}-species_zscore-BH_genes.tab"
+	conda:
+		CONDA_ENVS+"/r_env.yml"
+	shell:
+		"""
+		Rscript {COMPUTE_ZSCORE_BY_SPECIES} {input} {output}
+		"""
+
+
+#######################################
+###### PLOT PCA RESULTS  ##############
+#######################################
+
+#rule plot_pca_results:
+#	input:
+#		expr = PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_norm_value}-BH_genes.tab",
+#		metadata = expand("{path}/{species}_samples_info.tab", path=METADATA, species=ALL_SPECIES) 
+#	output:
+#		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-metasamples_median_expr-{sva_log_quant_norm_value}-BH_genes-PCA_res.pdf"
+#	params:
+#		all_species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade]),
+#		metadata_dir = METADATA+"/",
+#		metadata_suffix = "_samples_info.tab" #this needs to be changed according to the metadata files
+#	conda:
+#		CONDA_ENVS+"/r_env.yml"
+#	shell:
+#		"""
+#		Rscript {PLOT_PCA}	{input.expr} \
+#					{wildcards.clade} \
+#					{params.all_species} \
+#					{params.metadata_dir} \
+#					{params.metadata_suffix} \
+#					{wildcards.sva_log_quant_norm_value} \
+#					{output} 
+#		"""
+#
+########################################
+####### PLOT CORRELATIONS  #############
+########################################
+#
+##Here I am using the mean expression across tissues
+#rule plot_correlations:
+#	input:
+#		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-BH_genes.tab"
+#	output:
+#		CORRELATIONS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-correlations.pdf"	
+#	params:
+#		query_species = lambda wildcards: QUERY_SPECIES_DICT[wildcards.clade], #Hs2 for Vertebrate, Dme for Insects.
+#		tissues = ",".join(ALL_TISSUES),
+#		species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade])
+#	conda:
+#		 CONDA_ENVS+"/r_env.yml"
+#	shell:
+#		"""
+#		Rscript {PLOT_CORRELATIONS}	{input} \
+#						{params.query_species} \
+#						{params.tissues} \
+#						{params.species} \
+#						{output}
+#		"""
+#
+########################################
+####### PLOT BRANCHES LENGHTS  #########
+########################################
+#
+#rule plot_branches_lenght:
+#	input:
+#		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-BH_genes.tab"
+#	output:
+#		branches_lenght = BRANCHES_LENGTH_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-total_tree_lengths_bytissue.txt",
+#		plot = BRANCHES_LENGTH_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-branches_length.pdf"
+#	params:
+#		tissues = ",".join(ALL_TISSUES),
+#		species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade])
+#	conda:
+#		 CONDA_ENVS+"/r_env.yml"
+#	shell:
+#		"""
+#		Rscript {PLOT_BRANCHES_LENGTH}	{input} \
+#						{wildcards.clade} \
+#						{params.tissues} \
+#						{params.species} \
+#						{output.branches_lenght} \
+#						{output.plot}
+#		"""
+#
+########################################
+####### PLOT EXPRESSION TREES  #########
+########################################
+#
+#rule plot_expression_trees:
+#	input:
+#		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-BH_genes.tab"
+#	output:
+#		EXPRESSION_TREES_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-tissue_average_expr-{sva_log_quant_norm_value}-expr_cor_trees.pdf"
+#	params:
+#		tissues = ",".join(ALL_TISSUES),
+#		species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade])
+#	conda:
+#		CONDA_ENVS+"/r_env.yml"
+#	shell:
+#		"""
+#		Rscript {PLOT_EXPRESSION_TREES} {input} \
+#						{wildcards.clade} \
+#						{params.tissues} \
+#						{params.species} \
+#						{output}
+#		"""

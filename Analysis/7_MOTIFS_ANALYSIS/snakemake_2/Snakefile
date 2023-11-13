@@ -1,0 +1,149 @@
+#! /usr/bin/env python
+
+configfile: "config.yaml"
+
+metadata = [r.strip('\n').split('\t') for r in open(config['run_table'], 'r')]
+header = metadata.pop(0)
+Test={r[header.index('Test')] for r in metadata}
+Tissues=["Adipose","DigestiveTract","Epithelial","Kidney","Muscle","Neural","Ovary","Testis"]
+Species={r[header.index('Species')] for r in metadata}
+Background={r[header.index('BGName')] for r in metadata}
+
+
+localrules: all, check, allSize
+
+rule all:
+    input:
+        "everythingok"
+
+rule check:
+    input:
+        expand("Scan/gimmeClusters/{spe}/{bg}_matrix_scan_output.tab.gz", spe=Species,bg=Background)
+    output:
+        "everythingok"
+    shell:
+        "touch {output}"
+
+rule reference_upstream:
+    input:
+        gtf= config['directories']['gtf']+"{spe}"+config['endNames']['gtf']
+    output:
+        us = "Ref/{spe}/annot_upstream.gtf",
+        ds = "Ref/{spe}/annot_downstream.gtf"
+    params:
+        dir= "Ref/{spe}/"
+    conda:
+        "envs/rsat.yaml"
+    shell:
+        " grep -P '\tgene\t' {input.gtf} |  sort -k1,1 -k4,4n > {params.dir}sorted.gtf && "
+        " bedtools closest -id -D 'ref' -t first -io -d -a {params.dir}sorted.gtf -k 1 -b {params.dir}sorted.gtf -mdb all | cut -f 1-9,19 > {output.us} && "
+        " bedtools closest -iu -D 'ref' -t first -io -d -a {params.dir}sorted.gtf -k 1 -b {params.dir}sorted.gtf -mdb all | cut -f 1-9,19 > {output.ds} && "
+        " rm {params.dir}sorted.gtf "
+
+rule reference_realupstream:
+      input:
+        us = "Ref/{spe}/annot_upstream.gtf",
+        ds = "Ref/{spe}/annot_downstream.gtf"
+      output:
+        rus = "Ref/{spe}/{bg}_annot_realupstream.gtf",
+        rds = "Ref/{spe}/{bg}_annot_realdownstream.gtf"
+      params:
+        bggenes = lambda x: config['directories'][x.bg]+x.spe+config['endNames'][x.bg]
+      shell:
+        "grep -f {params.bggenes} {input.us} | awk 'BEGIN {{ FS = \"\t\" }};{{if($7==\"+\")print $0}}' >{output.rus} && "
+        "grep -f {params.bggenes} {input.ds} | awk 'BEGIN {{ FS = \"\t\" }};{{if($7==\"-\")print $0}}' >>{output.rus} && "
+        "grep -f {params.bggenes} {input.us} | awk 'BEGIN {{ FS = \"\t\" }};{{if($7==\"+\")print $0}}' >{output.rds} && "
+        "grep -f {params.bggenes} {input.ds} | awk 'BEGIN {{ FS = \"\t\" }};{{if($7==\"-\")print $0}}' >>{output.rds} "
+
+rule reference_getfasta:
+    input:
+        rus = "Ref/{spe}/{bg}_annot_realupstream.gtf",
+        rds = "Ref/{spe}/{bg}_annot_realdownstream.gtf",
+        reffa= config['directories']['fasta']+"{spe}"+config['endNames']['fasta']
+    output:
+        fa = "Ref/{spe}/{bg}_annot_realupstream.fasta"
+    conda:
+        "envs/rsat.yaml"
+    shell:
+        "sort -k1,1 -k4,4n {input.rus} | awk 'BEGIN {{ FS = \"\t\" }}; "
+        "{{split($9,a,\"\\\"\"); if($7==\"+\"){{ if($10 > -3000){{len=$10;}}else{{len= -3000;}} "
+        "ini=$4+len+1;fin=$4-1;}}else{{if($10 < 3000){{len=$10;}}else{{len= 3000;}} "
+        "ini=$5+1;fin=$5+len-1}};ctr=fin-ini;if(ctr>0) "
+        "{{print $1,ini,fin,a[2],$7;}}}}' OFS=\"\t\" | "
+        " bedtools getfasta -bed stdin -nameOnly -fo {output.fa} -fi {input.reffa} &&"
+        "rm {input.rus} {input.rds} "
+
+rule reference_fastaSize:
+    input:
+        fa= "Ref/{spe}/{bg}_annot_realupstream.fasta"
+    output:
+        sizes="Ref/{spe}/{bg}_annot_realupstream.size.tab"
+    params:
+        especie = lambda x: x.spe
+    conda:
+        "envs/bioawk.yaml"
+    shell:
+        " bioawk -c fastx '{{ print $name, length($seq); }}' OFS=\"\t\" < {input.fa} | awk '{{ print $0,\"{params.especie}\";}}' OFS=\"\t\" > {output.sizes} "
+
+rule allSize:
+    input:
+        expand("Ref/{spe}/{bg}_annot_realupstream.size.tab", spe=Species,bg=Background)
+
+
+rule reference_oligoanalysis:
+    input:
+        fa = "Ref/{spe}/{bg}_annot_realupstream.fasta"
+    output:
+        k2 = "Ref/{spe}/{bg}_2nt_upstream-noorf_noov-2str.freq"
+    conda:
+        "envs/rsat.yaml"
+    shell:
+        "rsat oligo-analysis -quick -v 1 -2str -i {input.fa} -format fasta -seqtype dna -noov -l 2 "
+        "-type dna -return freq,occ -o {output.k2} "
+
+rule matrix_scan:
+    input:
+        motifs = config['motifs']['gimmeClusters'],
+        k2 = "Ref/{spe}/{bg}_2nt_upstream-noorf_noov-2str.freq",
+        fa = "Ref/{spe}/{bg}_annot_realupstream.fasta"
+    output:
+        matscan= "Scan/gimmeClusters/{spe}/{bg}_matrix_scan_output.tab"
+    conda:
+        "envs/rsat.yaml"
+    shell:
+        "rsat matrix-scan -v 1 -quick -matrix_format cluster-buster -m {input.motifs} "
+        " -pseudo 1 -decimals 1 -2str -origin end -bgfile {input.k2} "
+        " -bg_pseudo 0.01 -return limits -return pval -uth pval 0.01 "
+        " -i {input.fa} -seq_format fasta -n score > {output.matscan}"
+
+rule parse_mat_scan:
+    input:
+        matscan= "Scan/gimmeClusters/{spe}/{bg}_matrix_scan_output.tab"
+    output:
+        m4= "Scan/gimmeClusters/{spe}/{bg}_e-04.tab"
+    params:
+        outpath="Scan/gimmeClusters/{spe}/{bg}"
+    shell:
+        "awk '{{if($2 ~/site/)print $0;}}' {input.matscan} |perl -ne '{{ "
+        "         @vec=split(\"\t\",$_); "
+        "         @exp=split(\"-\",$vec[8]); "
+        "         if($exp[1]> 4){{$h4{{$vec[0]}}{{$vec[2]}}++;}} "
+        "         END{{ "
+        "         open(H4,\">{params.outpath}_e-04.tab\"); "
+        "         foreach $gene(keys %h2){{ "
+        "            foreach $tf(keys %{{$h2{{$gene}}}}){{ "
+        "              if($h4{{$gene}}{{$tf}} >0) {{print H4 \"$gene\t$tf\t$h4{{$gene}}{{$tf}}\n\";}} "
+        "            }} "
+        "         }} "
+        "         close (H4); "
+        "      }}"
+        "}}'"
+
+rule compress_output:
+    input:
+        matscan= "Scan/gimmeClusters/{spe}/{bg}_matrix_scan_output.tab",
+        m4= "Scan/gimmeClusters/{spe}/{bg}_e-04.tab"
+    output:
+        compressed= "Scan/gimmeClusters/{spe}/{bg}_matrix_scan_output.tab.gz"
+    shell:
+        "gzip -c {input.matscan} > {output.compressed}"

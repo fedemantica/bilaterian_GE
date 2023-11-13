@@ -1,0 +1,39 @@
+general_paths:
+  data: "/users/mirimia/fmantica/projects/bilaterian_GE/data"
+  src: "/users/mirimia/fmantica/projects/bilaterian_GE/src"
+  conda_envs: "/users/mirimia/fmantica/projects/bilaterian_GE/src/conda_envs"
+
+paths:
+  metadata: "/users/mirimia/fmantica/projects/bilaterian_GE/data/samples_metadata"
+  database: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB"
+  metasamples_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/metasamples" 
+  average_expr_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/average_expr_by_tissue"
+  gene_sets_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/gene_sets"
+  splsda_analysis: "/users/mirimia/fmantica/projects/bilaterian_GE/data/splsda_analysis"
+  go_transfers: "/users/mirimia/fmantica/projects/bilaterian_GE/data/GO_transfers"
+  motif_analysis_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/motif_analysis"
+  ts_gains_and_losses_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/ts_gains_losses"
+
+tools:
+  rscript: "/software/as/el7.2/EasyBuild/CRG/software/R/4.0.0-foss-2020a/bin/Rscript"
+
+variables:
+  my_version: "All_version2"
+  my_category: "species_QN_5_TPM_v6"
+  all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  all_species_gains: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  vertebrata: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi"]
+  insecta: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi"]
+  deuterostoma: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2"]
+  protostoma: ["Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
+  outgroups: ["Bla", "Sp2", "Sma", "Obi"]
+  clades: ["Bilateria"]
+  evo_types: ["conserved"]
+  categories: ["STRICT"]
+  expr_types: ["metasamples_median_expr", "tissue_average_expr"]
+  all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"]
+  all_nodes: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "Bmo", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi", "Euarchontoglires", "Eutheria", "Mammalia", "Amniota", "Tetrapoda", "Euteleostomi", "Vertebrata", "Chordata", "Deuterostoma", "Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta", "Arthropoda", "Protostoma", "Bilateria"]
+  motif_categories: ["Bilateria_ancestral", "Vertebrata_specific", "Insecta_specific"]
+  node_species_dict: {"Euarchontoglires":["Hs2","Mm2"], "Eutheria":["Hs2","Mm2","Bt2"], "Mammalia":["Hs2","Mm2","Bt2","Mdo"], "Amniota":["Hs2","Mm2","Bt2","Mdo","Gga"], "Tetrapoda":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr"], "Euteleostomi":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre"], "Vertebrata":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi"], "Chordata":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi","Bla"], "Deuterostoma":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi","Bla","Sp2"], "Cyclorrapha":["Dme","Eba"], "Diptera":["Dme","Eba","Aae"], "Panorpidae":["Dme","Eba","Aae","Bmo"], "Oligoneoptera":["Dme","Eba","Aae","Bmo","Tca"], "Holometabola":["Dme","Eba","Aae","Bmo","Tca","Ame"], "Neoptera":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge"], "Insecta":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi"], "Arthropoda":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi","Sma"], "Protostoma":["Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi","Sma","Obi"], "Bilateria":["Hs2","Mm2","Bt2","Mdo","Gga","Xtr","Dre","Cmi","Bla","Sp2","Dme","Eba","Aae","Bmo","Tca","Ame","Bge","Cdi","Sma","Obi"], "Hs2":["Hs2"], "Mm2":["Mm2"], "Bt2":["Bt2"], "Mdo":["Mdo"], "Gga":["Gga"], "Xtr":["Xtr"], "Dre":["Dre"], "Cmi":["Cmi"], "Bla":["Bla"], "Sp2":["Sp2"], "Dme":["Dme"], "Eba":["Eba"], "Aae":["Aae"], "Bmo":["Bmo"], "Tca":["Tca"], "Ame":["Ame"], "Bge":["Bge"], "Cdi":["Cdi"], "Sma":["Sma"], "Obi":["Obi"]}
+  node_subnodes_dict: {"Vertebrata" : ["Vertebrata", "Euteleostomi", "Tetrapoda", "Amniota", "Mammalia", "Eutheria", "Euarchontoglires"], "Insecta" : ["Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta"]}
+  species_subclades_dict: {"Hs2" : ["Vertebrata", "Euteleostomi", "Tetrapoda", "Amniota", "Mammalia", "Eutheria", "Euarchontoglires"], "Mm2" : ["Vertebrata", "Euteleostomi", "Tetrapoda", "Amniota", "Mammalia", "Eutheria", "Euarchontoglires"], "Bt2" : ["Vertebrata", "Euteleostomi", "Tetrapoda", "Amniota", "Mammalia", "Eutheria"], "Mdo" : ["Vertebrata", "Euteleostomi", "Tetrapoda", "Amniota", "Mammalia"], "Gga" : ["Vertebrata", "Euteleostomi", "Tetrapoda", "Amniota"], "Xtr" : ["Vertebrata", "Euteleostomi", "Tetrapoda"], "Dre" : ["Vertebrata", "Euteleostomi"], "Cmi" : ["Vertebrata"], "Dme" : ["Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta"], "Eba" : ["Cyclorrapha", "Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta"], "Aae" : ["Diptera", "Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta"], "Bmo" : ["Panorpidae", "Oligoneoptera", "Holometabola", "Neoptera", "Insecta"], "Tca" : ["Oligoneoptera", "Holometabola", "Neoptera", "Insecta"], "Ame" : ["Holometabola", "Neoptera", "Insecta"], "Bge" : ["Neoptera", "Insecta"], "Cdi" : ["Insecta"]}

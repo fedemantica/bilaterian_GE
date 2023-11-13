@@ -1,0 +1,16 @@
+run_table: "samples.txt"
+
+directories:
+  fasta: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/genomes/"
+  gtf: "/users/mirimia/fmantica/projects/bilaterian_GE/data/DB/corrected_gtf/All_version2/ref_gene_entries/"
+  BilaConserved: "/users/mirimia/fmantica/projects/bilaterian_GE/data/motif_analysis/All_version2/backgrounds/"
+  Bilateria_ancestral: "/users/mirimia/fmantica/projects/bilaterian_GE/data/motif_analysis/All_version2/gene_sets_inputs/Bilateria_ancestral/"
+
+endNames:
+  BilaConserved: "-all_bilaterian_conserved_BH_genes.txt"
+  Bilateria_ancestral: "-Bilateria_ancestral_geneIDs.txt"
+  gtf: "_annot-B-brochi.gtf"
+  fasta: "_gDNA.fasta"
+
+motifs:
+  gimmeClusters: "clustered_motifs_filtered_size4.pfm"

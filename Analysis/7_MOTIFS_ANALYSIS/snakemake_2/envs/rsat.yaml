@@ -1,0 +1,7 @@
+name: runutils
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - rsat-core == 2020.02.29
