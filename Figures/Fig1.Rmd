@@ -1,5 +1,5 @@
 ---
-title: "Fig1"
+title: "Fig 1: Dataset overview and global patterns of gene expression across bilaterian tissues."
 output: html_document
 ---
 
@@ -183,7 +183,6 @@ plot_PCA = function(expr_df, features_table, species_set, cluster_number) {
   
   res = list()
   res[[1]] = p
-  res[[2]] = p
   
   my_plots = plot_grid(p, p, rel_widths=c(1,1), align="h", ncol=2)
   return(list("plots" = my_plots, "results"=res))

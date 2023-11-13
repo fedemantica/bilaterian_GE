@@ -1,5 +1,5 @@
 ---
-title: "Fig2"
+title: "Fig. 2: Reconstruction of ancestral bilaterian tissue-specific expression modules."
 output: html_document
 ---
 

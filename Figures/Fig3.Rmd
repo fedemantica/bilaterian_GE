@@ -1,5 +1,5 @@
 ---
-title: "Fig3"
+title: "Fig. 3: Tissue-specificity patterns across species reveal low conservation of tissue-specific expression profiles."
 output: html_document
 ---
 

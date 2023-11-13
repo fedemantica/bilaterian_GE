@@ -1,5 +1,5 @@
 ---
-title: "Fig4"
+title: "Fig. 4: Tissue-specificity gains are associated with gene duplication and specialization."
 output: html_document
 ---
 
