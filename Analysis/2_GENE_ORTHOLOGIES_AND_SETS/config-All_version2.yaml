@@ -11,14 +11,12 @@ paths:
   expr_tables_dir: "/users/mirimia/fmantica/projects/bilaterian_GE/data/preprocessing_all/norm_counts_quant/tissues_average_quantification"
 
 tools:
+  filter_orthogroups: "bin/filter_orthogroups.py"
   filter_by_min_expr: "bin/filter_by_min_expr-v1.py"
-  recluster_orthogroups: "bin/recluster_gene_orthogroups.py"
   compute_seq_similarity: "bin/compute_seq_similarity.py"
   mafft: "/users/mirimia/fmantica/software/src/MAFFT_V2.0/mafft.bat"
-  filter_orthogroups: "bin/filter_orthogroups.py"
   compute_expr_cor: "bin/compute_expr_cor.py"
   select_best_hits: "bin/select_best_hits.py"
-  compute_expr_cor_spearman: "bin/compute_expr_cor_spearman.py"
 
 variables:
   all_species: ["Hs2", "Mm2", "Bt2", "Mdo", "Gga", "Xtr", "Dre", "Cmi", "Bla", "Sp2", "Dme", "Eba", "Aae", "BmA", "Tca", "Ame", "Bge", "Cdi", "Sma", "Obi"]
@@ -34,6 +32,6 @@ variables:
   max_genes: 80
   max_proportion: 0.2
   all_tissues: ["Neural", "Muscle", "Testis", "Ovary", "Epithelial", "Kidney", "DigestiveTract", "Adipose"]
-  expr_file_suffix: "-tissue_average_expr-NOSVA-NOlog2-TPMs.tab"
-  expr_file_suffix_cor: "-tissue_average_expr-NOSVA-log2-TPMs.tab"
-  min_expr: 1 #TPM
+  #expr_file_suffix: "-tissue_average_expr-NOSVA-NOlog2-TPMs.tab"
+  #expr_file_suffix_cor: "-tissue_average_expr-NOSVA-log2-TPMs.tab"
+  #min_expr: 1 #TPM

@@ -40,44 +40,21 @@ EXPR_FILE_SUFFIX_COR = config["variables"]["expr_file_suffix_cor"]
 MIN_EXPR = config["variables"]["min_expr"]
 
 ######### tools ################
+FILTER_ORTHOGROUPS = config["tools"]["filter_orthogroups"]
 FILTER_BY_MIN_EXPR = config["tools"]["filter_by_min_expr"]
-RECLUSTER_ORTHOGROUPS = config["tools"]["recluster_orthogroups"]
 COMPUTE_SEQ_SIMILARITY = config["tools"]["compute_seq_similarity"]
 MAFFT = config["tools"]["mafft"] 
-FILTER_ORTHOGROUPS = config["tools"]["filter_orthogroups"]
 COMPUTE_EXPR_COR = config["tools"]["compute_expr_cor"]
-GET_AVG_EXPR_COR = config["tools"]["get_avg_expr_cor"]
 SELECT_BEST_HITS = config["tools"]["select_best_hits"]
-COMPUTE_EXPR_COR_SPEARMAN = config["tools"]["compute_expr_cor_spearman"]
 
 ########## targets #############
-FILTERED_ORTHOGROUPS = expand("{path}/{my_version}/corrected_orthogroups-filtered.txt", path=BROCCOLI, my_version=MY_VERSION)
-CLADE_OG_ALL_GENES = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}_orthogroups-ALL_genes.txt", path=GENE_SETS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type=EVO_TYPES)
-GET_BATCH_NUMBER = expand("{path}/{my_version}/orthogroups_batches/batches_number.txt", path=GENE_SETS_DIR, my_version=MY_VERSION)
-ALL_SEQUENCE_SIMILARITIES = expand("{path}/{my_version}/sequence_similarity/all_pairwise_sequence_similarities.txt", path=GENE_SETS_DIR, my_version=MY_VERSION)
-ALL_EXPR_CORRELATIONS = expand("{path}/{my_version}/expression_correlations/all_pairwise_expression_correlations.txt", path=GENE_SETS_DIR, my_version=MY_VERSION)
-RECLUSTERED_OG = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-ALL_genes.txt", path=GENE_SETS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type=EVO_TYPES)
-BEST_HITS_ORTHOGROUPS_CONS = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.txt", path=GENE_SETS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type=EVO_TYPES)
-BEST_HITS_ORTHOGROUPS_SPEC = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.txt", path=GENE_SETS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=["Vertebrata", "Insecta"], evo_type="specific")
-SINGLE_COPY_ORTH_ORTHOGROUPS = expand("{path}/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}_orthogroups-SCO_genes.txt", path=GENE_SETS_DIR, my_version=MY_VERSION, category=CATEGORIES, clade=CLADES, evo_type=EVO_TYPES)
+BEST_ANCESTRAL_ORTHOGROUPS = expand("{path}/{my_version}/STRICT/Bilateria/conserved/Bilateria_conserved-reclustered_orthogroups-BH_genes.txt", path=GENE_SETS_DIR, my_version=MY_VERSION)
 
-SINGLE_COPY_ORTH_CLASS = expand("{path}/{my_version}/{category}/Bilateria/{evo_type}/Bilateria-single_copy_orthologs_classification.txt", path=GENE_SETS_DIR, my_version=MY_VERSION, category=CATEGORIES, evo_type=EVO_TYPES)
-ALL_EXPR_CORRELATIONS_SPEARMAN = expand("{path}/{my_version}/expression_correlations_spearman/all_pairwise_expression_correlations.txt", path=GENE_SETS_DIR, my_version=MY_VERSION)
 ######### rules ################
 
 rule all:
 	input:
-		ALL_EXPR_CORRELATIONS_SPEARMAN
-		#FILTERED_ORTHOGROUPS,
-		#CLADE_OG_ALL_GENES,
-		#GET_BATCH_NUMBER,
-		#RECLUSTERED_OG,
-		#ALL_SEQUENCE_SIMILARITIES,
-		#ALL_EXPR_CORRELATIONS,
-		#BEST_HITS_ORTHOGROUPS_CONS,
-		#BEST_HITS_ORTHOGROUPS_SPEC,
-		#SINGLE_COPY_ORTH_ORTHOGROUPS
-		#SINGLE_COPY_ORTH_CLASS
+		BEST_ANCESTRAL_ORTHOGROUPS
 
 ################################################
 ######### FILTER ORTHOGROUPS ###################
@@ -172,36 +149,6 @@ rule get_clade_conserved_orthogroups:
 		filtered_orthogroup_df.to_csv(str(output), sep="\t", index=False, header=False, na_rep="NA")
 
 
-#Since I am using only the bilaterian genes, the reclustering step is not needed.
-###############################################
-######## RECLUSTERING  ########################
-###############################################
-#I am going to derive the reclustered gene orthogroups for Vertebrates and Insects.
-#The Vertebrates orthogroups will be all the ones classified as: Bilateria + Deuterostoma + Vertebrata
-#The Insects orthogroups will be all the ones classified as: Bilateria + Protostoma + Insecta
-#I am not reclustering the Bilaterian genes, but it is to use the same pipeline.
-rule recluster_orthogroups:
-	input:
-		orthogroups = GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}_orthogroups-ALL_genes.txt",
-		formatted_orthopairs = BROCCOLI+"/{my_version}/formatted_orthopairs.txt"
-	output:
-		GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-ALL_genes.txt"
-	params:
-		clade_species = lambda wildcards: ",".join(CLADE_SPECIES_DICT[wildcards.clade])
-	shell:
-		"""
-		if [[ "{wildcards.clade}" == "Bilateria" ]]; then \
-			cat {input.orthogroups} > {output}; \
-		else \
-			python {RECLUSTER_ORTHOGROUPS} 	--orthogroups {input.orthogroups} \
-						--orthopairs {input.formatted_orthopairs} \
-						--clade_species "{params.clade_species}" \
-						--output {output}; \
-		fi; 
-		"""
-
-
-
 ###############################################
 ######### FILTER BY MIN EXPRESSION #############
 ################################################
@@ -234,12 +181,11 @@ rule filter_by_min_expr:
 
 
 ################################################
-######### BEST HITS SELECTION  #################
+######### SPLIT ORTHOGROUPS INTO BATCHES  ######
 ################################################
 rule split_orthogroups:
 	input:
 		GENE_SETS_DIR+"/{my_version}/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt"
-		#orthogroups = BROCCOLI+"/{my_version}/corrected_orthogroups-filtered.txt"
 	output:
 		GENE_SETS_DIR+"/{my_version}/orthogroups_batches/orthogroups_batch_1.txt"
 	params:
@@ -280,6 +226,10 @@ if os.path.isfile(BATCHES_FILE):
 else:
   BATCH_NUMBER = 1
 
+
+################################################
+### COMPUTE PAIRWISE SEQUENCE SIMILARITY #######
+################################################
 #This rule I will run only once starting from the general orthogroups
 rule compute_pairwise_seq_similarities:
 	input:
@@ -310,7 +260,6 @@ rule compute_pairwise_seq_similarities:
 
 rule join_pairwise_seq_similarities:
 	input:
-		#expand("{path}/{{my_version}}/sequence_similarity/batch_{batch_number}/batch_{batch_number}-sim_scores.tab", path=GENE_SETS_DIR, batch_number=[element for element in BATCH_NUMBER])
 		expand("{path}/{{my_version}}/sequence_similarity/batch_{batch_number}/batch_{batch_number}-sim_scores.tab", path=GENE_SETS_DIR, batch_number=BATCH_NUMBER)
 	output:
 		GENE_SETS_DIR+"/{my_version}/sequence_similarity/all_pairwise_sequence_similarities.txt"
@@ -321,10 +270,15 @@ rule join_pairwise_seq_similarities:
 		cat {params.input_dir}/batch_*/batch_*-sim_scores.tab > {output}
 		"""
 
+
+#############################################
+### COMPUTE PAIRWISE EXPR CORRELATION #######
+#############################################
 #Get the average expression correlations
 #NB: the measure here refers to the measure used to derive the tissue expression value of each gene in each species.
 #It can be either "average": the tissue expression value is the average of the samples expression values
 #Or "median": the tissue expression value is the median of the samples expression values.
+
 rule compute_pairwise_expr_correlations:
 	input:
 		orthogroups = GENE_SETS_DIR+"/{my_version}/orthogroups_batches/orthogroups_batch_{batch_number}.txt"
@@ -358,8 +312,13 @@ rule join_pairwise_expr_correlations:
 		"""
 
 
+#############################################
+###### GET THE BEST ANCESTRAL OGS ###########
+#############################################
+
 #All the inputs have the pairwise seq similarities or the pairwise expression correlations.
-rule get_best_hits_orthogroups:
+#NB: I keep the reclustered in the name for historical reason, but these orthogroups have not actually been reclustered
+rule get_best_ancestral_orthogroups:
 	input:
 		orthogroup = GENE_SETS_DIR+"/{my_version}/STRICT/Bilateria/conserved/Bilateria_conserved_orthogroups-EXPR_genes.txt",
 		seq_sim = GENE_SETS_DIR+"/{my_version}/sequence_similarity/all_pairwise_sequence_similarities.txt",
@@ -374,39 +333,14 @@ rule get_best_hits_orthogroups:
 						--output {output} 
 		"""
 
-
-#############################################
-###### SPEARMAN CORRELATIONS ################
-#############################################
-
-rule compute_pairwise_expr_correlations_spearman:
+#Transform gene orthogroups from the long format to the wide format.
+rule generate_BH_wide_table:
 	input:
-		orthogroups = GENE_SETS_DIR+"/{my_version}/orthogroups_batches/orthogroups_batch_{batch_number}.txt"
+		GENE_SETS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.txt"	
 	output:
-		GENE_SETS_DIR+"/{my_version}/expression_correlations_spearman/batch_{batch_number}-expression_correlations.tab"
-	params:
-		expr_table_dir = EXPR_TABLE_DIR,
-		expr_file_suffix = EXPR_FILE_SUFFIX_COR,
-		clade_species = ",".join(ALL_SPECIES),
-		tissues = ",".join(ALL_TISSUES),
-	shell:
-		"""
-		python {COMPUTE_EXPR_COR_SPEARMAN}	--orthogroups {input.orthogroups} \
-							--expr_table_dir {params.expr_table_dir} \
-							--expr_file_suffix="{params.expr_file_suffix}" \
-							--clade_species "{params.clade_species}" \
-							--tissues "{params.tissues}" \
-							--output {output}
-		"""
-
-rule join_pairwise_expr_correlations_spearman:
-	input:
-		expand("{path}/{{my_version}}/expression_correlations_spearman/batch_{batch_number}-expression_correlations.tab", path=GENE_SETS_DIR, batch_number=BATCH_NUMBER)
-	output:
-		GENE_SETS_DIR+"/{my_version}/expression_correlations_spearman/all_pairwise_expression_correlations.txt"
-	params:
-		input_dir = GENE_SETS_DIR+"/{my_version}/expression_correlations_spearman"
-	shell:
-		"""
-		cat {params.input_dir}/batch_*-expression_correlations.tab > {output}	
-		"""
+		PCA_ANALYSIS_DIR+"/{my_version}/{category}/{clade}/{evo_type}/{clade}_{evo_type}-reclustered_orthogroups-BH_genes.tab"
+	run:
+		import pandas as pd
+		orthogroups_long_df = pd.read_table(str(input), sep="\t", index_col=False, header=None, names=["OG_ID", "Species", "GeneID"])
+		orthogroups_wide_df = orthogroups_long_df.pivot(index="OG_ID", columns="Species", values="GeneID")
+		orthogroups_wide_df.to_csv(str(output), sep="\t", index=True, header=True, na_rep="NA")

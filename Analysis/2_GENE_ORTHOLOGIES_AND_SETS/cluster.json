@@ -31,7 +31,7 @@
     "disk" : "1G",
     "queue" : "short-sl7"
   },
-  "get_best_hits_orthogroups" :
+  "get_best_ancestral_orthogroups" :
   {
     "qsub" : "qsub -cwd -o \"logs/'{rule}.{wildcards}.$$.out'\" -e \"logs/'{rule}.{wildcards}.$$.out'\" -pe smp 3",
     "ram" : "20G",
