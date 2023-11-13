@@ -116,7 +116,7 @@ rule associate_all_OGs_to_tissue:
 ##################################################
 
 #In this case, the file in species_QN_5_TPM_taus and species_QN_taus should be identical
-rule filter_genes_by_expr_cutoff:
+rule add_expr_cutoff:
 	input:
 		tissue_association = TS_GAINS_LOSSES_DIR+"/{category}/{my_version}/{clade}_conserved_orthogroups-All_genes-associated_tissues-unfiltered.tab",
 		species_QN_expr = expand(TS_CALL_DIR+"/species_QN_5_TPM_taus/{{my_version}}/{species}-protein_coding-tissue_average_expr-NOSVA-log2-TPMs-NORM.tab", species=ALL_SPECIES) 
@@ -171,7 +171,8 @@ rule filter_all_OGs_by_tissue_association:
 		    if len(species_query_tissue) > 0:
 		      #Select the species entry associated to tissue and with the highest tau
 		      ordered_species_tissue_group = species_group.loc[species_group["Paralog_Tissue"].str.contains(wildcards.tissue)].sort_values(by="Tau", ascending=False)
-		      #If there are YES_EXPR entries, give precedence to those
+		      #If there are YES_EXPR entries, give precedence to those.
+		      #NB: this automatically gives precedence to TS-genes.
 		      expr_ordered_species_tissue_group = ordered_species_tissue_group.loc[ordered_species_tissue_group["Expr_cutoff"]=="YES_EXPR"]
 		      if expr_ordered_species_tissue_group.shape[0] > 0:
 		        OG_species_final_entry = pd.DataFrame(expr_ordered_species_tissue_group.iloc[0,:]).transpose()
@@ -326,21 +327,4 @@ rule no_ts_prone_GO_enrichments:
 	shell:
 		"""
 		Rscript {RUN_GPROFILER2} {input.gene_set} {input.background} {input.annot} {output}
-		"""
-
-
-##################################################
-####### SOME EXTRA GTF CORRECTION ################
-##################################################
-
-rule add_gene_entry_gtf:
-	input:
-		CORRECTED_GTFS_DIR+"/{my_version}/ref/{species}_annot-B-brochi.gtf"
-	output:
-		CORRECTED_GTFS_DIR+"/{my_version}/ref_gene_entries/{species}_annot-B-brochi.gtf"
-	shell:
-		"""
-		grep -v -P '\tgene\t' {input} | grep -v -P '\ttranscript\t' > {output}.tmp; \
-		perl {ADD_GENE_ENTRY} {output}.tmp {output}; \
-		rm {output}.tmp
 		"""

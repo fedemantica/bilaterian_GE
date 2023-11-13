@@ -154,6 +154,7 @@ for OG_ID, group in grouped_df:
           lower_species_gains = [species for species in prot_species_gains if species in inner_species]
         if len(lower_species_gains) >= 1:
           ts_gains_final_df = ts_gains_final_df.loc[~((ts_gains_final_df["OG_ID"]==OG_ID) & (ts_gains_final_df["TS_gain"].isin(lower_species_gains)))]
+      #This is because the species will be added again
       ######################
 
       if len(inferred_losses) >= 2: #You need at least two losses overall to go through this
