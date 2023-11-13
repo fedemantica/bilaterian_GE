@@ -10,7 +10,7 @@ output:
 # Evolution of tissue-specific expression of ancestral genes across vertebrates and insects
 
 <figure>
-  <img align="middle" src="./docs/Fig1.png" width=800 height=400 />
+  <img align="middle" src="./docs/Dataset.png" width=800 height=400 />
   <figcaption>Dataset used for the analysis</figcaption>
 <figure>
 
