@@ -252,7 +252,7 @@ Figures
 
 <figure>
   <img align="middle" src="./docs/EDF6.png" width=600 height=800 />
-  <figcaption> <br> <b>Extended Data Fig. 6: a.</b> Expression divergence of the query species on each phylogenetic branch (Hsa for the deuterostomes, Dme for the protostomes) from all other species on the same branch in function of the number of phylogenetic positions that separate them (e.g., 1 corresponds to Mmu/Eba, 2 to Bta/Aae, etc). Expression divergence in each tissue is represented by the absolute deltas of expression proportions between the two compared species, averaged among all best-ancestral orthogroups. The nonlinear regression with formula y = axk was fitted as in [Chen at al, Genome Research, 2019](https://genome.cshlp.org/content/29/1/53).</figcaption>
+  <figcaption> <br> <b>Extended Data Fig. 6: a.</b> Expression divergence of the query species on each phylogenetic branch (Hsa for the deuterostomes, Dme for the protostomes) from all other species on the same branch in function of the number of phylogenetic positions that separate them (e.g., 1 corresponds to Mmu/Eba, 2 to Bta/Aae, etc). Expression divergence in each tissue is represented by the absolute deltas of expression proportions between the two compared species, averaged among all best-ancestral orthogroups. The nonlinear regression with formula y = axk was fitted as in <a href="https://genome.cshlp.org/content/29/1/53">Chen at al, Genome Research, 2019</a>.</figcaption>
 <figure>
 
 <br>
@@ -288,7 +288,7 @@ Figures
 
 <figure>
   <img align="middle" src="./docs/EDF10.png" width=600 height=600 />
-  <figcaption> <br> <b>Extended Data Fig. 10: a-f:</b> Expression values (RPKMs) for human FGF17 (a) and its orthologs in five mammalian species (b-f) across several developmental and adult timepoints in seven tissues. Data from [Cardoso et al, Nature, 2019](https://www.nature.com/articles/s41586-019-1338-5).</figcaption>
+  <figcaption> <br> <b>Extended Data Fig. 10: a-f:</b> Expression values (RPKMs) for human FGF17 (a) and its orthologs in five mammalian species (b-f) across several developmental and adult timepoints in seven tissues. Data from <a href="https://www.nature.com/articles/s41586-019-1338-5">Cardoso et al, Nature, 2019</a>.</figcaption>
 <figure>
 
 <br>
