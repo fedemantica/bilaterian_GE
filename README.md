@@ -69,8 +69,8 @@ This folder contains a snakemake pipeline (i.e., **Snakefile**) used to fix anno
 
 * Generate protein fasta files for all species starting from the original annotation (best protein isoform per gene only).    
 * Perform a preliminary gene orthology run with [Broccoli](https://academic.oup.com/mbe/article/37/11/3389/5865275), which will be used to identify problematic gene annotations.   
-* Identify and fix broken genes, as described in XXX.   
-* Identify and fix chimeric genes, as described in XXX.   
+* Identify and fix broken genes.   
+* Identify and fix chimeric genes.   
 * Generate new gene annotations for all species, which include the corrections performed on broken and chimeric genes.  
 * Run [BUSCO](https://busco.ezlab.org/) to evaluate the quality of the new gene annotations.  
 * Correct the existing gene orthologies including the changes introduced for the broken/chimeric genes.  
