@@ -288,7 +288,7 @@ Figures
 
 <figure>
   <img align="middle" src="./docs/EDF10.png" width=600 height=600 />
-  <figcaption> <br> </b>Extended Data Fig. 10: a-f:</b> Expression values (RPKMs) for human FGF17 (a) and its orthologs in five mammalian species (b-f) across several developmental and adult timepoints in seven tissues. Data from [Cardoso et al, Nature, 2019](https://www.nature.com/articles/s41586-019-1338-5).</figcaption>
+  <figcaption> <br> <b>Extended Data Fig. 10: a-f:</b> Expression values (RPKMs) for human FGF17 (a) and its orthologs in five mammalian species (b-f) across several developmental and adult timepoints in seven tissues. Data from [Cardoso et al, Nature, 2019](https://www.nature.com/articles/s41586-019-1338-5).</figcaption>
 <figure>
 
 <br>
