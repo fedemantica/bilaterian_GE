@@ -13,7 +13,7 @@ output:
 
 <figure>
   <img align="middle" src="./docs/Dataset.png" width=500 height=400 />
-  <figcaption> __RNA-seq dataset overview.__ Left: phylogenetic tree including the common names and scientific acronyms of the 20 bilaterian species considered in this study. Evolutionary distances were derived from 75 (MYA: million years ago) and animal silhouettes downloaded from http://phylopic.org/. Center: scheme of RNA-seq meta-samples. The number of meta-samples for each species (rows) and tissue (columns) is reported. The cell color corresponds to the tissue, while its intensity distinguishes between cases where at least one RNA-seq sample has been generated for this project (full color) from cases where all the included samples are publicly available (transparent color). Right: barplot with the total number of processed RNA sequencing (RNA-seq) samples per species.</figcaption>
+  <figcaption><em>RNA-seq dataset overview.</em> Left: phylogenetic tree including the common names and scientific acronyms of the 20 bilaterian species considered in this study. Evolutionary distances were derived from 75 (MYA: million years ago) and animal silhouettes downloaded from http://phylopic.org/. Center: scheme of RNA-seq meta-samples. The number of meta-samples for each species (rows) and tissue (columns) is reported. The cell color corresponds to the tissue, while its intensity distinguishes between cases where at least one RNA-seq sample has been generated for this project (full color) from cases where all the included samples are publicly available (transparent color). Right: barplot with the total number of processed RNA sequencing (RNA-seq) samples per species.</figcaption>
 <figure>
 
 <!-- <br> -->
