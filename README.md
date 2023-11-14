@@ -7,6 +7,10 @@ output:
 ---
 -->
 
+---
+output: rmarkdown::github_document
+---
+
 # Evolution of tissue-specific expression of ancestral genes across vertebrates and insects
 
 <!-- <br> -->
@@ -35,7 +39,6 @@ Table of contents
   + [Bilaterian ancestral motif analyses](#bilaterian-ancestral-motif-analysis)
   + [Tissue-specificity call](#tissue-specificity-call)  
   + [Tissue-specificity inferences](#tissue-specificity-inferences)  
-  + [Tissue-specificity inferences validation](#tissue-specificity-inferences-validation)  
   + [Supplementary analysis](#supplementary-analysis)
 * [Figures](#figures)  
   + [Main Figures](#main-figures)  
@@ -94,7 +97,7 @@ This folder contains a snakemake pipeline (i.e., **Snakefile**) used to generate
 * Get the transcriptome index fasta needed for quantification of gene expression by [Kallisto](https://pachterlab.github.io/kallisto/about).    
 * Quantify counts at the transcript level through [Kallisto](https://pachterlab.github.io/kallisto/about) for all the samples.  
 * Merge counts at the gene level. 
-* Normalize raw counts with DESeq2. 
+* Normalize raw counts with [DESeq2](https://bioconductor.org/packages/release/bioc/html/DESeq2.html). 
 * Generate gene expression quantification in logged (log2) and unlogged TPMs or RPKMs, using as input the DESeq2 normalized counts. Only the logged TPM quantification has been considered for the final results presented in the paper.  
 
 ### Gene expression quantification  
