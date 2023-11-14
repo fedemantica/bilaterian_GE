@@ -103,7 +103,7 @@ This folder contains a snakemake pipeline (i.e., **Snakefile**) used to generate
 * For each species, quantify gene expression at the tissue level; this is represented by the average expression across all meta-samples of a given tissue.  
 * Generate gene expression matrices for the best-ancestral orthogroups (see [Gene orthologies and sets](#gene-orthologies-and-sets)) with orthogroup IDs on row, metasamples/tissues from all species on columns, and expression of the relative best-ancestral orthogroup as value.  
 * Quantile-normalize the best-ancestral orthogroup gene expression matrices.  
-* For each species, perform an SVA normalization across samples (from [Fukushima et al, NatCom, 2020](https://www.nature.com/articles/s41467-020-18090-8)). This normalization was used for one of the controls showed in <FONT COLOR="red">supplementary figure X.</FONT>  
+* For each species, perform an SVA normalization across samples (from [Fukushima et al, NatCom, 2020](https://www.nature.com/articles/s41467-020-18090-8)). This normalization was used for one of the controls showed in <p style="color:red;">supplementary figure X.</p>
 
 ### GO transfers  
 This folder contains a snakemake pipeline (i.e., **Snakefile**) used to generate GO annotations at the orthogroup level starting from the annotation of selected reference species (e.g., human and drosophila). The folder also contains the relative configuration file (**config.yml**) and a file with the parameters needed for cluster job submission (**cluster.json**). All relevant scripts can be found in the **bin** subfolder. The Snakefile includes rules to:  
