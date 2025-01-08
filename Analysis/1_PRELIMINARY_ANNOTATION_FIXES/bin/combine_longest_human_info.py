@@ -45,9 +45,12 @@ broken_pairs_df["GeneID2_match_start"] = broken_pairs_df["GeneID2"].map(geneID_s
 broken_pairs_df["GeneID2_match_stop"] = broken_pairs_df["GeneID2"].map(geneID_stop_dict)
 #I need to add this line because there are some chimeric genes (how shitty is that??) that end up in more orthogroups. But each gene ID can be repeated only once as a key.
 broken_pairs_df = broken_pairs_df.dropna()
+# Remove cases where the overlap in one of the genes is 0 to begin with. These will not be included in the final dataframe (Jan 2025)
+broken_pairs_df = broken_pairs_df.loc[~(((broken_pairs_df["GeneID1_match_start"]==0) & (broken_pairs_df["GeneID1_match_stop"]==0)) | ((broken_pairs_df["GeneID2_match_start"]==0) & (broken_pairs_df["GeneID2_match_stop"]==0)))]
+
 my_geneID1_match_list = [range(int(start), int(stop)) for start, stop in zip(list(broken_pairs_df["GeneID1_match_start"]), list(broken_pairs_df["GeneID1_match_stop"]))]
 my_geneID2_match_list = [range(int(start), int(stop)) for start, stop in zip(list(broken_pairs_df["GeneID2_match_start"]), list(broken_pairs_df["GeneID2_match_stop"]))]
-#Compute the range overlap
+#Compute the range overlap.
 my_match_overlap = [range(max(my_geneID1_match_list[x][0], my_geneID2_match_list[x][0]), min(my_geneID1_match_list[x][-1], my_geneID2_match_list[x][-1])+1) for x in list(range(broken_pairs_df.shape[0]))]
 my_match_overlap_len = [len(element) for element in my_match_overlap]
 
