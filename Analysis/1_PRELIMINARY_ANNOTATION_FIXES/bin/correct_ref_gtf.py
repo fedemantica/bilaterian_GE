@@ -94,7 +94,7 @@ def modify_value_in_tuple(attribute_field_raw, category, new_value):
 def rebuild_attribute_entry(mod_attribute_field):
   final_list = []
   for field in mod_attribute_field:
-    new_entry = '; '.join([' '.join(element) for element in field])
+    new_entry = '; '.join([' '.join(element) for element in field]) + ';'
     final_list = final_list + [new_entry]
   return(final_list)
 
