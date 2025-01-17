@@ -666,7 +666,7 @@ for repaired_gene, group in grouped_broken_GTF_df:
   broken_parts = order_broken_genes(group, broken_parts)
 
   ### Add gene
-  new_gene_name = ';'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
+  new_gene_name = '-'.join([name for name in list(set(list(group["gene_name"]))) if name != "NoName"])
   ### Add transcriptID and proteinID columns to group.
   group.loc[:,"new_transcriptID"] = [element+transcript_suffix for element in list(group["new_geneID"])]
   group.loc[:,"new_proteinID"] = [element+protein_suffix for element in list(group["new_geneID"])]
