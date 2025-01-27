@@ -354,6 +354,8 @@ def fix_broken_genes_negative_strand(broken_exons_df, broken_parts):
 
   ### Remove all exon entries that do not match a CDS and are not UTRs
   broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="exon") & ((broken_exons_df["start"] < first_exon_CDS_start) | (broken_exons_df["stop"] > first_exon_CDS_stop)) & ~(broken_exons_df["start"].isin(CDS_entries_starts)))]
+  broken_exons_df = broken_exons_df.loc[~((broken_exons_df["type"]=="exon") & ((broken_exons_df["start"] > first_exon_CDS_start) | (broken_exons_df["stop"] < first_exon_CDS_stop)) & ~(broken_exons_df["start"].isin(CDS_entries_starts)))]
+ 
   ### If somehow there are still some missing exon entries, add them
   exon_entries_coords = [(element[0], element[1]) for element in zip(list(broken_exons_df.loc[broken_exons_df["type"]=="exon"]["start"]), list(broken_exons_df.loc[broken_exons_df["type"]=="exon"]["stop"]))]
   exon_entries_starts = [element[0] for element in exon_entries_coords]
